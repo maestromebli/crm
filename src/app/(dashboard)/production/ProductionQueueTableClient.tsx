@@ -162,8 +162,8 @@ export function ProductionQueueTableClient({
 
   return (
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-[var(--enver-card)] shadow-sm">
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50/70 px-3 py-2">
-        <span className="text-xs text-slate-500">Фільтр:</span>
+      <div className="flex flex-wrap items-center gap-2.5 border-b border-slate-200 bg-slate-50/70 px-3 py-2.5">
+        <span className="text-sm text-slate-600">Фільтр:</span>
         {[
           { id: "all", label: "Усі" },
           { id: "failed", label: "Помилки" },
@@ -175,7 +175,7 @@ export function ProductionQueueTableClient({
             key={f.id}
             type="button"
             onClick={() => setFilter(f.id as typeof filter)}
-            className={`rounded px-2 py-1 text-xs ${
+            className={`rounded px-2.5 py-1.5 text-sm ${
               filter === f.id
                 ? "bg-slate-900 text-white"
                 : "border border-slate-200 bg-[var(--enver-card)] text-slate-700"
@@ -184,14 +184,14 @@ export function ProductionQueueTableClient({
             {f.label}
           </button>
         ))}
-        <span className="ml-auto text-[11px] text-slate-500">
+        <span className="ml-auto text-xs text-slate-500">
           Автооновлення: 25с
         </span>
         <button
           type="button"
           disabled={Boolean(bulkBusy)}
           onClick={() => void runBulk("launch_ready")}
-          className="rounded border border-slate-900 bg-slate-900 px-2 py-1 text-xs font-medium text-white disabled:opacity-40"
+          className="rounded border border-slate-900 bg-slate-900 px-2.5 py-1.5 text-sm font-medium text-white disabled:opacity-40"
         >
           {bulkBusy === "launch_ready" ? "Launch..." : "Launch all ready"}
         </button>
@@ -199,22 +199,22 @@ export function ProductionQueueTableClient({
           type="button"
           disabled={Boolean(bulkBusy)}
           onClick={() => void runBulk("retry_failed")}
-          className="rounded border border-slate-300 bg-[var(--enver-card)] px-2 py-1 text-xs font-medium text-slate-700 disabled:opacity-40"
+          className="rounded border border-slate-300 bg-[var(--enver-card)] px-2.5 py-1.5 text-sm font-medium text-slate-700 disabled:opacity-40"
         >
           {bulkBusy === "retry_failed" ? "Retry..." : "Retry all failed"}
         </button>
         <button
           type="button"
           onClick={exportCsv}
-          className="rounded border border-slate-300 bg-[var(--enver-card)] px-2 py-1 text-xs font-medium text-slate-700"
+          className="rounded border border-slate-300 bg-[var(--enver-card)] px-2.5 py-1.5 text-sm font-medium text-slate-700"
         >
           Export CSV
         </button>
         {bulkInfo ? (
-          <span className="text-[11px] text-slate-600">{bulkInfo}</span>
+          <span className="text-xs text-slate-600">{bulkInfo}</span>
         ) : null}
         {lastLaunchInfo ? (
-          <span className="max-w-[min(100vw-2rem,28rem)] truncate text-[11px] text-emerald-800">
+          <span className="max-w-[min(100vw-2rem,28rem)] truncate text-xs text-emerald-800">
             {lastLaunchInfo}
           </span>
         ) : null}
@@ -239,7 +239,7 @@ export function ProductionQueueTableClient({
             const isBusy = busyId === r.id;
             return (
               <tr key={r.id} className="align-top">
-                <td className="px-4 py-3">
+                <td className="px-4 py-3.5">
                   <a
                     href={`/production/${r.id}`}
                     className="font-medium text-[var(--enver-text)] hover:underline"
@@ -248,19 +248,19 @@ export function ProductionQueueTableClient({
                   </a>
                   <a
                     href={`/deals/${r.id}/workspace?tab=production`}
-                    className="ml-2 text-[11px] font-normal text-slate-500 hover:underline"
+                    className="ml-2 text-xs font-normal text-slate-500 hover:underline"
                   >
                     угода
                   </a>
                 </td>
-                <td className="px-4 py-3 text-slate-700">{r.clientName}</td>
-                <td className="px-4 py-3 text-slate-700">{r.ownerName}</td>
-                <td className="px-4 py-3">
-                  <span className="rounded bg-slate-100 px-2 py-1 text-xs text-slate-700">
+                <td className="px-4 py-3.5 text-slate-700">{r.clientName}</td>
+                <td className="px-4 py-3.5 text-slate-700">{r.ownerName}</td>
+                <td className="px-4 py-3.5">
+                  <span className="rounded bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">
                     {r.handoffStatus ?? "—"}
                   </span>
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-4 py-3.5">
                   <span
                     className={`rounded px-2 py-1 text-xs ${
                       launched
@@ -287,7 +287,7 @@ export function ProductionQueueTableClient({
                     <p className="mt-1 text-xs text-rose-700">{errorById[r.id]}</p>
                   ) : null}
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-4 py-3.5">
                   {r.handoffStatus === "SUBMITTED" && r.slaHours !== null ? (
                     <span
                       className={`rounded px-2 py-1 text-xs ${
@@ -302,13 +302,13 @@ export function ProductionQueueTableClient({
                     <span className="text-xs text-slate-400">—</span>
                   )}
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-4 py-3.5">
                   <div className="flex flex-wrap gap-1">
                     <button
                       type="button"
                       disabled={isBusy || !canLaunch}
                       onClick={() => void runAction(r.id, "launch")}
-                      className="rounded border border-slate-800 bg-slate-900 px-2 py-1 text-[11px] font-medium text-white disabled:opacity-40"
+                      className="rounded border border-slate-800 bg-slate-900 px-2 py-1 text-xs font-medium text-white disabled:opacity-40"
                     >
                       Launch
                     </button>
@@ -316,7 +316,7 @@ export function ProductionQueueTableClient({
                       type="button"
                       disabled={isBusy || r.launchStatus !== "FAILED"}
                       onClick={() => void runAction(r.id, "retry")}
-                      className="rounded border border-slate-300 bg-[var(--enver-card)] px-2 py-1 text-[11px] font-medium text-slate-700 disabled:opacity-40"
+                      className="rounded border border-slate-300 bg-[var(--enver-card)] px-2 py-1 text-xs font-medium text-slate-700 disabled:opacity-40"
                     >
                       Retry
                     </button>
@@ -324,13 +324,13 @@ export function ProductionQueueTableClient({
                       type="button"
                       disabled={isBusy || launched}
                       onClick={() => void runAction(r.id, "fail")}
-                      className="rounded border border-rose-200 bg-rose-50 px-2 py-1 text-[11px] font-medium text-rose-700 disabled:opacity-40"
+                      className="rounded border border-rose-200 bg-rose-50 px-2 py-1 text-xs font-medium text-rose-700 disabled:opacity-40"
                     >
                       Mark fail
                     </button>
                   </div>
                 </td>
-                <td className="px-4 py-3 text-xs text-slate-500">
+                <td className="px-4 py-3.5 text-xs text-slate-500">
                   {new Date(r.updatedAt).toLocaleString("uk-UA")}
                 </td>
               </tr>

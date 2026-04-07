@@ -142,7 +142,7 @@ function agendaTypeLabel(t: AgendaItem["type"]) {
 }
 
 const quickBtnClass =
-  "inline-flex items-center justify-center rounded-lg border border-slate-200 bg-[var(--enver-card)] px-3 py-2 text-xs font-medium text-slate-800 shadow-[0_1px_3px_rgba(0,0,0,0.06)] transition hover:border-slate-300 hover:bg-[var(--enver-bg)]";
+  "inline-flex items-center justify-center rounded-lg border border-slate-200 bg-[var(--enver-card)] px-3 py-2.5 text-sm font-medium text-slate-800 shadow-[0_1px_3px_rgba(0,0,0,0.06)] transition hover:border-slate-300 hover:bg-[var(--enver-bg)]";
 
 const handoffToneBorder: Record<
   "neutral" | "emerald" | "sky" | "amber",
@@ -275,9 +275,9 @@ export function DashboardHomeView({
     (perms.dealsView || perms.tasksView);
 
   return (
-    <main className="flex min-h-[calc(100vh-56px)] flex-col bg-[var(--enver-bg)] px-3 py-3 md:px-6 md:py-4">
-      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col space-y-4 md:space-y-6">
-        <section className="flex flex-col gap-3 rounded-lg border border-slate-200/90 bg-[var(--enver-card)] px-4 py-3 shadow-[0_1px_3px_rgba(0,0,0,0.06)] md:flex-row md:items-center md:justify-between">
+    <main className="flex min-h-[calc(100vh-56px)] flex-col bg-[var(--enver-bg)] px-3 py-4 md:px-6 md:py-5">
+      <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col space-y-4 md:space-y-6">
+        <section className="flex flex-col gap-3 rounded-lg border border-slate-200/90 bg-[var(--enver-card)] px-4 py-4 shadow-[0_1px_3px_rgba(0,0,0,0.06)] md:flex-row md:items-center md:justify-between">
           <div className="space-y-1">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-orange-600">
               ENVER CRM
@@ -285,7 +285,7 @@ export function DashboardHomeView({
             <h1 className="text-xl font-semibold tracking-tight text-[var(--enver-text)] md:text-2xl">
               Операційний дашборд
             </h1>
-            <p className="max-w-xl text-xs text-slate-600 md:text-sm">
+            <p className="max-w-xl text-sm text-slate-600">
               Показники та списки враховують вашу роль і права доступу. Дані
               обмежені видимістю лідів, угод, календаря та задач за правилами
               CRM.

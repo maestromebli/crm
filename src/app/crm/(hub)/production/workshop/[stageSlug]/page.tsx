@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { notFound, redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth/options";
 import { WorkshopKanbanClient } from "@/features/production/ui/workshop/WorkshopKanbanClient";
+import { canViewProduction } from "@/features/production/server/permissions/production-permissions";
 import {
   WORKSHOP_STAGE_LABEL_UK,
   stageKeyFromSlug,
@@ -28,6 +29,15 @@ export default async function WorkshopStagePage({ params }: Props) {
   const session = await getServerSession(authOptions);
   if (!session?.user) {
     redirect("/login");
+  }
+  if (
+    !canViewProduction({
+      dbRole: session.user.role,
+      realRole: session.user.realRole ?? session.user.role,
+      permissionKeys: session.user.permissionKeys ?? [],
+    })
+  ) {
+    redirect("/access-denied");
   }
   const { stageSlug } = await params;
   const stageKey = stageKeyFromSlug(stageSlug);

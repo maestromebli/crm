@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth/options";
 import { WorkshopKanbanClient } from "@/features/production/ui/workshop/WorkshopKanbanClient";
+import { canViewProduction } from "@/features/production/server/permissions/production-permissions";
 import {
   parseWorkshopStageParam,
   WORKSHOP_STAGE_SLUG,
@@ -18,6 +19,15 @@ export default async function WorkshopKanbanPage({ searchParams }: Props) {
   const session = await getServerSession(authOptions);
   if (!session?.user) {
     redirect("/login");
+  }
+  if (
+    !canViewProduction({
+      dbRole: session.user.role,
+      realRole: session.user.realRole ?? session.user.role,
+      permissionKeys: session.user.permissionKeys ?? [],
+    })
+  ) {
+    redirect("/access-denied");
   }
   const sp = await searchParams;
   const legacy = parseWorkshopStageParam(sp?.stage ?? null);

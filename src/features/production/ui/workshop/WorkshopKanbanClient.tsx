@@ -160,6 +160,7 @@ export function WorkshopKanbanClient({ initialStageKey = null }: WorkshopKanbanC
   }, []);
 
   async function move(taskId: string, stageKey: KanbanColumn["stageKey"]) {
+    if (!canManage) return;
     await postJson<{ ok?: boolean }>(
       `/api/crm/production/workshop/tasks/${taskId}/move`,
       { stageKey },
@@ -364,8 +365,13 @@ export function WorkshopKanbanClient({ initialStageKey = null }: WorkshopKanbanC
               duration: 0.28,
               ease: [0.4, 0, 0.2, 1],
             }}
-            onDragOver={(event) => event.preventDefault()}
+            onDragOver={(event) => {
+              if (canManage) {
+                event.preventDefault();
+              }
+            }}
             onDrop={(event) => {
+              if (!canManage) return;
               event.preventDefault();
               if (dragTaskId) {
                 void move(dragTaskId, column.stageKey);
@@ -400,9 +406,12 @@ export function WorkshopKanbanClient({ initialStageKey = null }: WorkshopKanbanC
                 return (
                   <motion.article
                     key={task.id}
-                    draggable
-                    onDragStart={() => setDragTaskId(task.id)}
-                    className={`cursor-move rounded-xl border p-2.5 text-xs shadow-[var(--enver-shadow)] transition-[box-shadow,border-color] duration-200 hover:shadow-md ${cardTone}`}
+                    draggable={canManage}
+                    onDragStart={() => {
+                      if (!canManage) return;
+                      setDragTaskId(task.id);
+                    }}
+                    className={`${canManage ? "cursor-move" : "cursor-default"} rounded-xl border p-2.5 text-xs shadow-[var(--enver-shadow)] transition-[box-shadow,border-color] duration-200 hover:shadow-md ${cardTone}`}
                     whileDrag={{ scale: 1.02, boxShadow: "0 12px 28px rgba(15, 23, 42, 0.12)" }}
                     whileHover={reduceMotion ? undefined : { y: -1 }}
                   >
