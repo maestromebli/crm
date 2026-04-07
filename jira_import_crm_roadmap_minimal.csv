@@ -1,0 +1,58 @@
+Issue Type,Summary,Description,Priority
+Epic,Security & Reliability Baseline,"P0/P1 hardening for webhook security, env validation, and abuse protection.",Highest
+Epic,Core API Performance & Cache Strategy,"Reduce cache invalidation overhead and establish measurable API performance baselines.",High
+Epic,Testing of Business-Critical Flows,"Integration test coverage for lead/deal/file-access critical business flows.",High
+Epic,Code Quality & Maintainability,"Gradual strict typing, API error standardization, and legacy app drift resolution.",Medium
+Epic,Observability & Operability,"Structured logs, tracing correlation, SLO dashboards and incident readiness.",Medium
+Story,Fail-closed webhook signature verification,"EPIC: Security & Reliability Baseline. In production, reject requests when webhook secret is missing or signature is invalid. Add safe diagnostics without leaking secrets.",Highest
+Sub-task,Update verifyMetaSignature fail-closed logic,"PARENT: Fail-closed webhook signature verification. Change production behavior: missing secret => reject and log critical event.",Highest
+Sub-task,Add webhook signature tests,"PARENT: Fail-closed webhook signature verification. Cover valid signature, invalid signature, and missing-secret scenarios.",Highest
+Sub-task,Add operational logging for signature rejects,"PARENT: Fail-closed webhook signature verification. Emit structured fields for reason code and endpoint without secret exposure.",High
+Story,Startup environment validation,"EPIC: Security & Reliability Baseline. Implement centralized env validation with separate required sets for dev/prod and clear startup errors.",Highest
+Sub-task,Create centralized env schema,"PARENT: Startup environment validation. Define typed schema for required runtime variables and parse at startup.",High
+Sub-task,Split dev and prod requirements,"PARENT: Startup environment validation. Maintain explicit policy for mandatory vars by environment.",High
+Sub-task,Improve startup error messages,"PARENT: Startup environment validation. Provide actionable errors with missing keys list and remediation hints.",Medium
+Story,Rate limiting for public and integration endpoints,"EPIC: Security & Reliability Baseline. Add IP/token/path-aware rate limits for webhook and public token routes, with 429 handling and telemetry.",High
+Sub-task,Choose and implement limiter strategy,"PARENT: Rate limiting for public and integration endpoints. Define bucket keys and burst/sustained limits per endpoint class.",High
+Sub-task,Apply limiter to webhook endpoints,"PARENT: Rate limiting for public and integration endpoints. Protect integrations from abuse and accidental floods.",High
+Sub-task,Apply limiter to public token routes,"PARENT: Rate limiting for public and integration endpoints. Prevent brute-force attempts against public attachment/token paths.",High
+Story,Centralize cache invalidation for mutations,"EPIC: Core API Performance & Cache Strategy. Replace long manual revalidatePath lists with domain-level helper/tag strategy.",High
+Sub-task,Create domain invalidation helper,"PARENT: Centralize cache invalidation for mutations. Implement helper methods per domain (lead/deal/calendar).",High
+Sub-task,Refactor core lead/deal mutation endpoints,"PARENT: Centralize cache invalidation for mutations. Adopt helper and remove duplicated invalidation code.",High
+Sub-task,Add smoke checks for stale UI regressions,"PARENT: Centralize cache invalidation for mutations. Verify key pages refresh correctly after mutations.",Medium
+Story,Establish API performance baseline metrics,"EPIC: Core API Performance & Cache Strategy. Track p50/p95 latency and error rate for core endpoints with before/after comparison.",High
+Sub-task,Add latency/status instrumentation,"PARENT: Establish API performance baseline metrics. Capture endpoint duration and status with route metadata.",High
+Sub-task,Publish baseline report,"PARENT: Establish API performance baseline metrics. Document baseline values and target improvements for top endpoints.",Medium
+Sub-task,Create recurring trend review,"PARENT: Establish API performance baseline metrics. Schedule weekly review of latency/error trends and actions.",Medium
+Story,Integration tests for lead creation flow,"EPIC: Testing of Business-Critical Flows. Cover valid/invalid payloads, owner assignment permissions, and post-create invariants.",High
+Sub-task,Test lead creation success and validation failures,"PARENT: Integration tests for lead creation flow. Assert status codes and response payload contracts for create endpoint.",High
+Sub-task,Test owner assignment permission checks,"PARENT: Integration tests for lead creation flow. Verify permission-gated assignment and forbidden scenarios.",High
+Sub-task,Verify post-create invariants,"PARENT: Integration tests for lead creation flow. Check activity log append and related contact linkage behavior.",Medium
+Story,Integration tests for lead-to-deal conversion,"EPIC: Testing of Business-Critical Flows. Validate conversion correctness, permissions, and repeated-call behavior.",High
+Sub-task,Test successful lead-to-deal conversion,"PARENT: Integration tests for lead-to-deal conversion. Assert entity transfer and expected side effects.",High
+Sub-task,Test conversion idempotency/retry behavior,"PARENT: Integration tests for lead-to-deal conversion. Handle repeated calls safely and verify stable outcomes.",High
+Sub-task,Test permission-denied conversion paths,"PARENT: Integration tests for lead-to-deal conversion. Ensure unauthorized users receive correct status and payload.",Medium
+Story,Integration tests for attachment access control,"EPIC: Testing of Business-Critical Flows. Verify authorized access, public token scope, and invalid/deleted file handling.",High
+Sub-task,Test private attachment authorization matrix,"PARENT: Integration tests for attachment access control. Cover allowed/denied access by role and ownership scope.",High
+Sub-task,Test public token attachment scope,"PARENT: Integration tests for attachment access control. Ensure token grants access only to expected lead/proposal files.",High
+Sub-task,Test invalid/deleted file behavior,"PARENT: Integration tests for attachment access control. Confirm stable 404/400 responses for missing or invalid resources.",Medium
+Story,Phased TypeScript strictness uplift,"EPIC: Code Quality & Maintainability. Increase type safety in src/lib and src/app/api without big-bang migration.",Medium
+Sub-task,Enable stricter checks in src/lib,"PARENT: Phased TypeScript strictness uplift. Turn on stricter options and resolve resulting compile issues.",Medium
+Sub-task,Enable stricter checks in src/app/api,"PARENT: Phased TypeScript strictness uplift. Apply stricter typing to handlers and DTO parsing paths.",Medium
+Sub-task,Remove high-risk any/nullable gaps,"PARENT: Phased TypeScript strictness uplift. Address unsafe contracts in critical business services.",Medium
+Story,Standardize API error handling,"EPIC: Code Quality & Maintainability. Unify error payload format and mapping from domain errors to HTTP responses.",Medium
+Sub-task,Define standard error response schema,"PARENT: Standardize API error handling. Include code, message, and correlation/request id fields.",Medium
+Sub-task,Refactor core handlers to use shared error utility,"PARENT: Standardize API error handling. Replace ad-hoc patterns in high-traffic endpoints first.",Medium
+Sub-task,Document domain-to-http error mapping,"PARENT: Standardize API error handling. Create concise doc for backend/frontend alignment.",Low
+Story,Resolve legacy apps/web version drift,"EPIC: Code Quality & Maintainability. Decide archive/migrate/align strategy and document canonical app ownership.",Medium
+Sub-task,Inventory apps/web usage and dependencies,"PARENT: Resolve legacy apps/web version drift. Identify active usage and any runtime/tooling coupling.",Medium
+Sub-task,Choose and execute path (archive or align),"PARENT: Resolve legacy apps/web version drift. Perform minimal required changes for selected strategy.",Medium
+Sub-task,Document canonical app and ownership,"PARENT: Resolve legacy apps/web version drift. Update docs to remove ambiguity for contributors.",Low
+Story,Structured logging with correlation IDs,"EPIC: Observability & Operability. Add request correlation and standardized structured logs for incident debugging.",Medium
+Sub-task,Generate/propagate request correlation id,"PARENT: Structured logging with correlation IDs. Attach id through middleware/handlers and include in responses where appropriate.",Medium
+Sub-task,Standardize log fields for core events,"PARENT: Structured logging with correlation IDs. Include route, userId, entityId, status, duration, and error code.",Medium
+Sub-task,Add log usage guide for incident response,"PARENT: Structured logging with correlation IDs. Provide filtering examples and triage workflow.",Low
+Story,SLO dashboards and alerting,"EPIC: Observability & Operability. Build dashboards and alerts for 5xx, latency, and webhook failures with runbook.",Medium
+Sub-task,Create SLO dashboards for core APIs,"PARENT: SLO dashboards and alerting. Add charts for error rate, p95 latency, and throughput.",Medium
+Sub-task,Configure actionable alerts,"PARENT: SLO dashboards and alerting. Define thresholds and escalation channels to avoid alert fatigue.",Medium
+Sub-task,Write runbook for on-call response,"PARENT: SLO dashboards and alerting. Document triage steps, rollback points, and validation checks.",Low

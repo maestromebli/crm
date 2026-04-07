@@ -1,0 +1,311 @@
+@import "tailwindcss";
+
+/*
+ * ENVER CRM — design system (furniture / premium SaaS)
+ * Attio-like minimal · Linear structure · HubSpot-functional
+ */
+@layer base {
+  :root {
+    --enver-bg: #eef2f7;
+    --enver-surface: #f5f7fb;
+    /** Підняті панелі / модальні шари (м’яка глибина поверх surface). */
+    --enver-surface-elevated: #f9fbff;
+    --enver-card: #f7f9fd;
+    --enver-border: #d8deea;
+    --enver-border-strong: #c2ccdc;
+    --enver-text: #1f2937;
+    --enver-text-muted: #4b5563;
+    --enver-muted: #64748b;
+    --enver-accent: #6354de;
+    --enver-accent-hover: #4f46c8;
+    --enver-accent-soft: rgba(99, 84, 222, 0.14);
+    --enver-accent-ring: rgba(99, 84, 222, 0.3);
+    --enver-success: #00c853;
+    --enver-success-soft: rgba(0, 200, 83, 0.14);
+    --enver-warning: #ffb020;
+    --enver-warning-soft: rgba(255, 176, 32, 0.16);
+    --enver-danger: #ff5252;
+    --enver-danger-soft: rgba(255, 82, 82, 0.14);
+    --enver-info: #38bdf8;
+    --enver-info-soft: rgba(56, 189, 248, 0.14);
+    --enver-hover: #e9eef7;
+    --enver-input-bg: #edf2f8;
+    --enver-radius: 12px;
+    --enver-shadow: 0 1px 2px rgba(20, 30, 50, 0.09);
+    --enver-shadow-lg: 0 14px 34px rgba(30, 41, 59, 0.14);
+    --enver-transition: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+    --enver-transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+    color-scheme: light;
+  }
+  html,
+  body {
+    padding: 0;
+    margin: 0;
+  }
+  body {
+    @apply min-h-screen bg-[var(--enver-bg)] text-[var(--enver-text)] antialiased;
+    font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  }
+}
+
+@keyframes enver-card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.enver-card-appear {
+  animation: enver-card-enter 0.35s ease-out both;
+}
+
+.enver-hover-lift {
+  transition:
+    transform var(--enver-transition),
+    box-shadow var(--enver-transition);
+}
+.enver-hover-lift:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--enver-shadow-lg);
+}
+
+.enver-press:active {
+  transform: scale(0.98);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .enver-card-appear {
+    animation: none !important;
+  }
+  .enver-hover-lift:hover {
+    transform: none;
+    box-shadow: none;
+  }
+  .enver-press:active {
+    transform: none;
+  }
+}
+
+.pac-container {
+  z-index: 10050 !important;
+}
+
+@keyframes enver-assistant-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
+@keyframes enver-assistant-blink {
+  0%,
+  96%,
+  100% {
+    transform: scaleY(1);
+  }
+  97.5% {
+    transform: scaleY(0.08);
+  }
+}
+
+@keyframes enver-assistant-glow-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.72;
+  }
+}
+
+.enver-assistant-float:not(.enver-assistant-reduced) {
+  animation: enver-assistant-float 5.5s ease-in-out infinite;
+}
+
+.enver-assistant-blink:not(.enver-assistant-reduced) g.enver-assistant-eye-lid {
+  transform-origin: center;
+  transform-box: fill-box;
+  animation: enver-assistant-blink var(--enver-blink-dur, 5.8s) ease-in-out
+    infinite;
+  animation-delay: var(--enver-blink-delay, 0s);
+}
+
+.enver-assistant-glow-thinking:not(.enver-assistant-reduced) {
+  animation: enver-assistant-glow-pulse 1.65s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .enver-assistant-float,
+  .enver-assistant-blink g.enver-assistant-eye-lid,
+  .enver-assistant-glow-thinking {
+    animation: none !important;
+  }
+}
+
+/* Radix tooltip — легка поява */
+@keyframes enver-tooltip-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.enver-tooltip-content[data-state="delayed-open"],
+.enver-tooltip-content[data-state="instant-open"] {
+  animation: enver-tooltip-in 0.18s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+/* Мобільний drawer — в’їзд зліва */
+@keyframes enver-sheet-from-left {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.enver-sheet-panel[data-state="open"] {
+  animation: enver-sheet-from-left 0.28s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+@keyframes enver-overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.enver-dialog-overlay[data-state="open"] {
+  animation: enver-overlay-in 0.2s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .enver-tooltip-content[data-state="delayed-open"],
+  .enver-tooltip-content[data-state="instant-open"] {
+    animation: none;
+  }
+  .enver-sheet-panel[data-state="open"] {
+    animation: none;
+  }
+  .enver-dialog-overlay[data-state="open"] {
+    animation: none;
+  }
+}
+
+/*
+ * ENVER — спільні поверхні, навігація та текстові посилання
+ * (використовуйте класи на картках / чіпах / порожніх станах для єдиного вигляду)
+ */
+.enver-panel {
+  border-radius: 1rem;
+  border: 1px solid var(--enver-border);
+  background: var(--enver-card);
+  box-shadow: var(--enver-shadow);
+  transition:
+    border-color var(--enver-transition),
+    box-shadow var(--enver-transition);
+}
+
+.enver-panel--interactive:hover {
+  border-color: var(--enver-border-strong);
+  box-shadow: var(--enver-shadow-lg);
+}
+
+.enver-panel--interactive:focus-within {
+  border-color: var(--enver-border-strong);
+}
+
+.enver-eyebrow {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--enver-muted);
+}
+
+.enver-nav-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  padding: 0.25rem 0.625rem;
+  font-size: 0.75rem;
+  line-height: 1.25;
+  font-weight: 500;
+  color: var(--enver-text-muted);
+  background: var(--enver-card);
+  border: 1px solid var(--enver-border);
+  transition:
+    background-color var(--enver-transition),
+    color var(--enver-transition),
+    border-color var(--enver-transition),
+    box-shadow var(--enver-transition);
+}
+
+.enver-nav-pill:hover {
+  background: var(--enver-hover);
+  color: var(--enver-text);
+  border-color: var(--enver-border-strong);
+}
+
+.enver-nav-pill--active {
+  background: var(--enver-accent);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 2px 8px rgba(99, 84, 222, 0.35);
+}
+
+.enver-nav-pill--active:hover {
+  background: var(--enver-accent-hover);
+  color: #fff;
+}
+
+.enver-empty {
+  border-radius: 1rem;
+  border: 1px dashed var(--enver-border-strong);
+  background: color-mix(in srgb, var(--enver-surface) 92%, transparent);
+  transition:
+    border-color var(--enver-transition),
+    background-color var(--enver-transition);
+}
+
+.enver-empty:hover {
+  border-color: var(--enver-accent);
+  background: var(--enver-accent-soft);
+}
+
+.enver-text-link {
+  color: var(--enver-accent);
+  text-underline-offset: 3px;
+  transition: color var(--enver-transition-fast);
+}
+
+.enver-text-link:hover {
+  color: var(--enver-accent-hover);
+}
+
+.enver-page-shell {
+  min-height: calc(100vh - 3.5rem);
+  background: var(--enver-bg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .enver-panel,
+  .enver-nav-pill,
+  .enver-empty {
+    transition: none;
+  }
+}

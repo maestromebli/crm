@@ -1,0 +1,114 @@
+/* ENVER — темний мінімалістичний сайдбар */
+
+.aside {
+  --sidebar-base: #0e0e11;
+  --enver-bg: #0e0e11;
+  --enver-surface: #15161a;
+  --enver-surface-elevated: #1a1b21;
+  --enver-card: #15161a;
+  --enver-border: #2a2d35;
+  --enver-border-strong: #3d4149;
+  --enver-text: #f4f4f5;
+  --enver-text-muted: #a1a1aa;
+  --enver-muted: #71717a;
+  --enver-accent: #6c5ce7;
+  --enver-accent-hover: #a29bfe;
+  --enver-accent-soft: rgba(108, 92, 231, 0.18);
+  --enver-accent-ring: rgba(162, 155, 254, 0.45);
+  --enver-hover: #1c1d22;
+  --enver-input-bg: #1a1b20;
+  --enver-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --enver-shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.45);
+  color-scheme: dark;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background:
+    radial-gradient(140% 90% at 12% 0%, rgba(108, 92, 231, 0.22), transparent 58%),
+    radial-gradient(120% 100% at 95% 100%, rgba(56, 189, 248, 0.12), transparent 62%),
+    linear-gradient(180deg, #12141c 0%, #0e0f14 48%, #0c0d12 100%);
+}
+
+.aside::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      165deg,
+      rgba(255, 255, 255, 0.05) 0%,
+      rgba(255, 255, 255, 0) 35%,
+      rgba(255, 255, 255, 0.03) 100%
+    );
+  animation: sidebarShimmer 14s ease-in-out infinite alternate;
+}
+
+.aside::after {
+  content: "";
+  position: absolute;
+  inset: -18% -12%;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 18% 22%, rgba(139, 92, 246, 0.18), transparent 40%),
+    radial-gradient(circle at 82% 74%, rgba(34, 211, 238, 0.12), transparent 36%),
+    radial-gradient(circle at 52% 48%, rgba(99, 102, 241, 0.1), transparent 44%);
+  filter: blur(10px);
+  transform-origin: 50% 50%;
+  animation: sidebarAuroraDrift 18s ease-in-out infinite;
+}
+
+.aside > * {
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes sidebarAuroraDrift {
+  0% {
+    transform: translate3d(-2%, -1%, 0) scale(1) rotate(0deg);
+  }
+  50% {
+    transform: translate3d(2%, 2.5%, 0) scale(1.06) rotate(3deg);
+  }
+  100% {
+    transform: translate3d(-1%, 1%, 0) scale(1.02) rotate(-2deg);
+  }
+}
+
+@keyframes sidebarShimmer {
+  0% {
+    opacity: 0.38;
+    transform: translateX(-1.5%);
+  }
+  100% {
+    opacity: 0.62;
+    transform: translateX(1.5%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aside::before,
+  .aside::after {
+    animation: none !important;
+  }
+}
+
+.navLink {
+  color: #e8eaef;
+  text-shadow: none;
+}
+
+.navLinkMuted {
+  color: #8b92a3;
+  text-shadow: none;
+}
+
+.navLink:hover {
+  color: #e8eaef;
+}
+
+.navRow {
+  transition: background-color 200ms ease;
+}

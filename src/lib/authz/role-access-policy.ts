@@ -1,0 +1,223 @@
+/**
+ * Політика прав доступу за ролями (ENVER CRM).
+ *
+ * **Адміністратор (`SUPER_ADMIN`)** — повний доступ до всіх `PermissionKey` у БД;
+ * перевірки `hasEffectivePermission` для нього зазвичай обходяться (окрім імпersonації).
+ *
+ * **Директор (`DIRECTOR`)** — ті самі права в БД, що й адміністратор, але без обходу перевірок
+ * у JWT: усі дії мають бути представлені записами `PermissionOnUser` (через `grantAllPermissions`).
+ *
+ * **Адміністратор операційний (`ADMIN`)** — видимість даних як у директора (`normalizeRole` → DIRECTOR),
+ * права: усі модулі крім **глобального керування ролями** (`ROLES_MANAGE`), щоб не змінювати
+ * матрицю системних ролей; решта — підтримка користувачів, налаштувань, угод, виробництва.
+ *
+ * **Головний менеджер (`HEAD_MANAGER`)** — лінія продажів + команда в `data-scope`; без керування
+ * обліковими записами, ролями, аудиту та адмін-панелі (див. `HEAD_MANAGER_EXCLUDED_KEYS`).
+ *
+ * **Менеджер з продажів (`SALES_MANAGER`)** — власні ліди/угоди/задачі в межах scope; повний
+ * операційний контур продажу без фінансової аналітики собівартості/маржі, без налаштувань і HR.
+ *
+ * Legacy: `MANAGER` → та сама політика, що `HEAD_MANAGER`; `USER` → як `SALES_MANAGER`.
+ */
+
+import type { PermissionKey, Role } from "@prisma/client";
+
+/** Повний перелік ключів (узгоджено з `enum PermissionKey` у prisma/schema.prisma). */
+export const ALL_PERMISSION_KEYS: readonly PermissionKey[] = [
+  "DASHBOARD_VIEW",
+  "LEADS_VIEW",
+  "CONTACTS_VIEW",
+  "CALENDAR_VIEW",
+  "TASKS_VIEW",
+  "ORDERS_VIEW",
+  "PRODUCTS_VIEW",
+  "REPORTS_VIEW",
+  "REPORTS_EXPORT",
+  "NOTIFICATIONS_VIEW",
+  "ADMIN_PANEL_VIEW",
+  "SETTINGS_VIEW",
+  "LEADS_CREATE",
+  "LEADS_UPDATE",
+  "LEADS_ASSIGN",
+  "DEALS_VIEW",
+  "DEALS_CREATE",
+  "DEALS_UPDATE",
+  "DEALS_ASSIGN",
+  "DEALS_STAGE_CHANGE",
+  "TASKS_CREATE",
+  "TASKS_UPDATE",
+  "TASKS_ASSIGN",
+  "FILES_VIEW",
+  "FILES_UPLOAD",
+  "FILES_DELETE",
+  "ESTIMATES_VIEW",
+  "ESTIMATES_CREATE",
+  "ESTIMATES_UPDATE",
+  "QUOTES_CREATE",
+  "CONTRACTS_VIEW",
+  "CONTRACTS_CREATE",
+  "CONTRACTS_UPDATE",
+  "PAYMENTS_VIEW",
+  "PAYMENTS_UPDATE",
+  "COST_VIEW",
+  "MARGIN_VIEW",
+  "SETTINGS_MANAGE",
+  "USERS_VIEW",
+  "USERS_MANAGE",
+  "ROLES_MANAGE",
+  "AUDIT_LOG_VIEW",
+  "DEAL_WORKSPACE_VIEW",
+  "CONTRACT_VIEW",
+  "CONTRACT_EDIT",
+  "CONTRACT_APPROVE_INTERNAL",
+  "CONTRACT_SEND_SIGNATURE",
+  "FILE_UPLOAD",
+  "FILE_DELETE",
+  "READINESS_OVERRIDE_REQUEST",
+  "READINESS_OVERRIDE_APPROVE",
+  "HANDOFF_SUBMIT",
+  "HANDOFF_ACCEPT",
+  "PRODUCTION_LAUNCH",
+  "PAYMENT_CONFIRM",
+  "AI_USE",
+  "AI_ANALYTICS",
+] as const;
+
+/** Головний менеджер: без керування користувачами/ролями та глобального аудиту. */
+export const HEAD_MANAGER_EXCLUDED_KEYS: readonly PermissionKey[] = [
+  "USERS_MANAGE",
+  "ROLES_MANAGE",
+  "AUDIT_LOG_VIEW",
+  "ADMIN_PANEL_VIEW",
+];
+
+/** Операційний адмін: без зміни системної матриці ролей. */
+export const OPERATIONAL_ADMIN_EXCLUDED_KEYS: readonly PermissionKey[] = [
+  "ROLES_MANAGE",
+];
+
+/**
+ * Менеджер продажів: повний цикл угоди в межах своїх даних, без margin/cost, без settings/users.
+ */
+export const SALES_MANAGER_PERMISSION_KEYS: readonly PermissionKey[] = [
+  "DASHBOARD_VIEW",
+  "LEADS_VIEW",
+  "LEADS_CREATE",
+  "LEADS_UPDATE",
+  "LEADS_ASSIGN",
+  "CONTACTS_VIEW",
+  "CALENDAR_VIEW",
+  "TASKS_VIEW",
+  "TASKS_CREATE",
+  "TASKS_UPDATE",
+  "TASKS_ASSIGN",
+  "DEALS_VIEW",
+  "DEALS_CREATE",
+  "DEALS_UPDATE",
+  "DEALS_ASSIGN",
+  "DEALS_STAGE_CHANGE",
+  "DEAL_WORKSPACE_VIEW",
+  "NOTIFICATIONS_VIEW",
+  "FILES_VIEW",
+  "FILES_UPLOAD",
+  "FILES_DELETE",
+  "FILE_UPLOAD",
+  "FILE_DELETE",
+  "ESTIMATES_VIEW",
+  "ESTIMATES_CREATE",
+  "ESTIMATES_UPDATE",
+  "QUOTES_CREATE",
+  "CONTRACTS_VIEW",
+  "CONTRACTS_CREATE",
+  "CONTRACTS_UPDATE",
+  "CONTRACT_VIEW",
+  "CONTRACT_EDIT",
+  "CONTRACT_SEND_SIGNATURE",
+  "PAYMENTS_VIEW",
+  "PAYMENTS_UPDATE",
+  "PAYMENT_CONFIRM",
+  "HANDOFF_SUBMIT",
+  "READINESS_OVERRIDE_REQUEST",
+  "PRODUCTION_LAUNCH",
+  "REPORTS_VIEW",
+  "ORDERS_VIEW",
+  "PRODUCTS_VIEW",
+  "AI_USE",
+];
+
+/** Замірник: календар + обмежені ліди; без угод/фінансів/редагування комерції. */
+export const MEASURER_PERMISSION_KEYS: readonly PermissionKey[] = [
+  "DASHBOARD_VIEW",
+  "LEADS_VIEW",
+  "CALENDAR_VIEW",
+  "TASKS_VIEW",
+  "NOTIFICATIONS_VIEW",
+  "AI_USE",
+];
+
+const headExcludedSet = new Set(HEAD_MANAGER_EXCLUDED_KEYS);
+const adminExcludedSet = new Set(OPERATIONAL_ADMIN_EXCLUDED_KEYS);
+
+export type DefaultPermissionMode = "ALL" | PermissionKey[];
+
+export function getDefaultPermissionKeysForRole(role: Role): DefaultPermissionMode {
+  switch (role) {
+    case "SUPER_ADMIN":
+    case "DIRECTOR":
+      return "ALL";
+    case "HEAD_MANAGER":
+    case "MANAGER":
+      return ALL_PERMISSION_KEYS.filter((k) => !headExcludedSet.has(k));
+    case "ADMIN":
+      return ALL_PERMISSION_KEYS.filter((k) => !adminExcludedSet.has(k));
+    case "SALES_MANAGER":
+    case "USER":
+      return [...SALES_MANAGER_PERMISSION_KEYS];
+    case "MEASURER":
+      return [...MEASURER_PERMISSION_KEYS];
+    case "ACCOUNTANT":
+      return [
+        ...ALL_PERMISSION_KEYS.filter(
+          (k) =>
+            !headExcludedSet.has(k) &&
+            k !== "LEADS_ASSIGN" &&
+            k !== "DEALS_ASSIGN",
+        ),
+        "AI_USE",
+      ];
+    case "PROCUREMENT_MANAGER":
+      return [
+        ...ALL_PERMISSION_KEYS.filter(
+          (k) =>
+            !headExcludedSet.has(k) &&
+            k !== "ROLES_MANAGE" &&
+            k !== "USERS_MANAGE",
+        ),
+        "AI_USE",
+        "AI_ANALYTICS",
+      ];
+    default:
+      return [...SALES_MANAGER_PERMISSION_KEYS];
+  }
+}
+
+/** Короткі описи для UI (налаштування користувачів, довідка). */
+export const ROLE_POLICY_SUMMARY_UK: Partial<Record<Role, string>> = {
+  SUPER_ADMIN:
+    "Повний доступ до системи та всіх прав; обхід перевірок прав у сесії (окрім імпersonації).",
+  DIRECTOR:
+    "Усі права в БД як у адміністратора, звичайні перевірки JWT; зазвичай — керівник компанії.",
+  ADMIN:
+    "Допомога команді: користувачі, налаштування, угоди, виробництво; без зміни ROLES_MANAGE.",
+  HEAD_MANAGER:
+    "Команда продажів у data-scope; без USERS_MANAGE, ROLES_MANAGE, аудиту, адмін-панелі.",
+  MANAGER: "Legacy-роль: політика як у головного менеджера.",
+  SALES_MANAGER:
+    "Продажі та воркспейс угоди; без собівартості/маржі, без налаштувань і керування ролями.",
+  USER: "Legacy-роль: політика як у менеджера з продажів.",
+  MEASURER:
+    "Замірник: лише призначені заміри та обмежений перегляд лідів; без фінансів та комерційного редагування.",
+  ACCOUNTANT: "Бухгалтерія: фінансові модулі та звітність; обмеження на операції продажів за політикою.",
+  PROCUREMENT_MANAGER:
+    "Закупівлі / виробництво: розширений доступ до угод і постачання без керування ролями.",
+};

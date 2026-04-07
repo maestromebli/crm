@@ -1,0 +1,46 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "ENVER CRM: dev server",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["dev"],
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {}
+      },
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "next",
+        "pattern": { "regexp": "^$" },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".",
+          "endsPattern": "(Ready in|Local:)"
+        }
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "focus": true
+      }
+    },
+    {
+      "label": "ENVER CRM: unlock dev lock",
+      "type": "shell",
+      "command": "node",
+      "args": ["scripts/dev-unlock.mjs"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "ENVER CRM: diagnose",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["diagnose"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+Issue Type,Summary,Description,Priority,Labels,Story Points,Epic Name,Epic Link,Parent
+Epic,Security & Reliability Baseline,"P0/P1 hardening for webhook security, env validation, and abuse protection.",Highest,"crm,roadmap,security",,,,
+Epic,Core API Performance & Cache Strategy,"Reduce cache invalidation overhead and establish measurable API performance baselines.",High,"crm,roadmap,performance",,,,
+Epic,Testing of Business-Critical Flows,"Integration test coverage for lead/deal/file-access critical business flows.",High,"crm,roadmap,testing",,,,
+Epic,Code Quality & Maintainability,"Gradual strict typing, API error standardization, and legacy app drift resolution.",Medium,"crm,roadmap,quality",,,,
+Epic,Observability & Operability,"Structured logs, tracing correlation, SLO dashboards and incident readiness.",Medium,"crm,roadmap,observability",,,,
+Story,Fail-closed webhook signature verification,"In production, reject requests when webhook secret is missing or signature is invalid. Add safe diagnostics without leaking secrets.",Highest,"crm,security,webhook",5,,Security & Reliability Baseline,
+Sub-task,Update verifyMetaSignature fail-closed logic,"Change production behavior: missing secret => reject and log critical event.",Highest,"crm,security,webhook",2,,,Fail-closed webhook signature verification
+Sub-task,Add webhook signature tests,"Cover valid signature, invalid signature, and missing-secret scenarios.",Highest,"crm,testing,webhook",2,,,Fail-closed webhook signature verification
+Sub-task,Add operational logging for signature rejects,"Emit structured fields for reason code and endpoint without secret exposure.",High,"crm,observability,security",1,,,Fail-closed webhook signature verification
+Story,Startup environment validation,"Implement centralized env validation with separate required sets for dev/prod and clear startup errors.",Highest,"crm,security,platform",3,,Security & Reliability Baseline,
+Sub-task,Create centralized env schema,"Define typed schema for required runtime variables and parse at startup.",High,"crm,platform,config",1,,,Startup environment validation
+Sub-task,Split dev and prod requirements,"Maintain explicit policy for mandatory vars by environment.",High,"crm,platform,config",1,,,Startup environment validation
+Sub-task,Improve startup error messages,"Provide actionable errors with missing keys list and remediation hints.",Medium,"crm,platform,dx",1,,,Startup environment validation
+Story,Rate limiting for public and integration endpoints,"Add IP/token/path-aware rate limits for webhook and public token routes, with 429 handling and telemetry.",High,"crm,security,performance",5,,Security & Reliability Baseline,
+Sub-task,Choose and implement limiter strategy,"Define bucket keys and burst/sustained limits per endpoint class.",High,"crm,security,rate-limit",2,,,Rate limiting for public and integration endpoints
+Sub-task,Apply limiter to webhook endpoints,"Protect integrations from abuse and accidental floods.",High,"crm,security,webhook",2,,,Rate limiting for public and integration endpoints
+Sub-task,Apply limiter to public token routes,"Prevent brute-force attempts against public attachment/token paths.",High,"crm,security,public-api",1,,,Rate limiting for public and integration endpoints
+Story,Centralize cache invalidation for mutations,"Replace long manual revalidatePath lists with domain-level helper/tag strategy.",High,"crm,performance,cache",5,,Core API Performance & Cache Strategy,
+Sub-task,Create domain invalidation helper,"Implement helper methods per domain (lead/deal/calendar).",High,"crm,performance,cache",2,,,Centralize cache invalidation for mutations
+Sub-task,Refactor core lead/deal mutation endpoints,"Adopt helper and remove duplicated invalidation code.",High,"crm,performance,cache",2,,,Centralize cache invalidation for mutations
+Sub-task,Add smoke checks for stale UI regressions,"Verify key pages refresh correctly after mutations.",Medium,"crm,testing,cache",1,,,Centralize cache invalidation for mutations
+Story,Establish API performance baseline metrics,"Track p50/p95 latency and error rate for core endpoints with before/after comparison.",High,"crm,performance,metrics",3,,Core API Performance & Cache Strategy,
+Sub-task,Add latency/status instrumentation,"Capture endpoint duration and status with route metadata.",High,"crm,observability,metrics",1,,,Establish API performance baseline metrics
+Sub-task,Publish baseline report,"Document baseline values and target improvements for top endpoints.",Medium,"crm,performance,metrics",1,,,Establish API performance baseline metrics
+Sub-task,Create recurring trend review,"Schedule weekly review of latency/error trends and actions.",Medium,"crm,process,metrics",1,,,Establish API performance baseline metrics
+Story,Integration tests for lead creation flow,"Cover valid/invalid payloads, owner assignment permissions, and post-create invariants.",High,"crm,testing,leads",8,,Testing of Business-Critical Flows,
+Sub-task,Test lead creation success and validation failures,"Assert status codes and response payload contracts for create endpoint.",High,"crm,testing,api",3,,,Integration tests for lead creation flow
+Sub-task,Test owner assignment permission checks,"Verify permission-gated assignment and forbidden scenarios.",High,"crm,testing,rbac",3,,,Integration tests for lead creation flow
+Sub-task,Verify post-create invariants,"Check activity log append and related contact linkage behavior.",Medium,"crm,testing,domain",2,,,Integration tests for lead creation flow
+Story,Integration tests for lead-to-deal conversion,"Validate conversion correctness, permissions, and repeated-call behavior.",High,"crm,testing,deals",5,,Testing of Business-Critical Flows,
+Sub-task,Test successful lead-to-deal conversion,"Assert entity transfer and expected side effects.",High,"crm,testing,deals",2,,,Integration tests for lead-to-deal conversion
+Sub-task,Test conversion idempotency/retry behavior,"Handle repeated calls safely and verify stable outcomes.",High,"crm,testing,reliability",2,,,Integration tests for lead-to-deal conversion
+Sub-task,Test permission-denied conversion paths,"Ensure unauthorized users receive correct status and payload.",Medium,"crm,testing,rbac",1,,,Integration tests for lead-to-deal conversion
+Story,Integration tests for attachment access control,"Verify authorized access, public token scope, and invalid/deleted file handling.",High,"crm,testing,files",5,,Testing of Business-Critical Flows,
+Sub-task,Test private attachment authorization matrix,"Cover allowed/denied access by role and ownership scope.",High,"crm,testing,rbac",2,,,Integration tests for attachment access control
+Sub-task,Test public token attachment scope,"Ensure token grants access only to expected lead/proposal files.",High,"crm,testing,security",2,,,Integration tests for attachment access control
+Sub-task,Test invalid/deleted file behavior,"Confirm stable 404/400 responses for missing or invalid resources.",Medium,"crm,testing,api",1,,,Integration tests for attachment access control
+Story,Phased TypeScript strictness uplift,"Increase type safety in src/lib and src/app/api without big-bang migration.",Medium,"crm,quality,typescript",8,,Code Quality & Maintainability,
+Sub-task,Enable stricter checks in src/lib,"Turn on stricter options and resolve resulting compile issues.",Medium,"crm,quality,typescript",3,,,Phased TypeScript strictness uplift
+Sub-task,Enable stricter checks in src/app/api,"Apply stricter typing to handlers and DTO parsing paths.",Medium,"crm,quality,typescript",3,,,Phased TypeScript strictness uplift
+Sub-task,Remove high-risk any/nullable gaps,"Address unsafe contracts in critical business services.",Medium,"crm,quality,typescript",2,,,Phased TypeScript strictness uplift
+Story,Standardize API error handling,"Unify error payload format and mapping from domain errors to HTTP responses.",Medium,"crm,quality,api",5,,Code Quality & Maintainability,
+Sub-task,Define standard error response schema,"Include code, message, and correlation/request id fields.",Medium,"crm,quality,api",2,,,Standardize API error handling
+Sub-task,Refactor core handlers to use shared error utility,"Replace ad-hoc patterns in high-traffic endpoints first.",Medium,"crm,quality,api",2,,,Standardize API error handling
+Sub-task,Document domain-to-http error mapping,"Create concise doc for backend/frontend alignment.",Low,"crm,docs,api",1,,,Standardize API error handling
+Story,Resolve legacy apps/web version drift,"Decide archive/migrate/align strategy and document canonical app ownership.",Medium,"crm,architecture,monorepo",3,,Code Quality & Maintainability,
+Sub-task,Inventory apps/web usage and dependencies,"Identify active usage and any runtime/tooling coupling.",Medium,"crm,architecture,monorepo",1,,,Resolve legacy apps/web version drift
+Sub-task,Choose and execute path (archive or align),"Perform minimal required changes for selected strategy.",Medium,"crm,architecture,monorepo",1,,,Resolve legacy apps/web version drift
+Sub-task,Document canonical app and ownership,"Update docs to remove ambiguity for contributors.",Low,"crm,docs,process",1,,,Resolve legacy apps/web version drift
+Story,Structured logging with correlation IDs,"Add request correlation and standardized structured logs for incident debugging.",Medium,"crm,observability,logging",5,,Observability & Operability,
+Sub-task,Generate/propagate request correlation id,"Attach id through middleware/handlers and include in responses where appropriate.",Medium,"crm,observability,logging",2,,,Structured logging with correlation IDs
+Sub-task,Standardize log fields for core events,"Include route, userId, entityId, status, duration, and error code.",Medium,"crm,observability,logging",2,,,Structured logging with correlation IDs
+Sub-task,Add log usage guide for incident response,"Provide filtering examples and triage workflow.",Low,"crm,docs,observability",1,,,Structured logging with correlation IDs
+Story,SLO dashboards and alerting,"Build dashboards and alerts for 5xx, latency, and webhook failures with runbook.",Medium,"crm,observability,slo",5,,Observability & Operability,
+Sub-task,Create SLO dashboards for core APIs,"Add charts for error rate, p95 latency, and throughput.",Medium,"crm,observability,slo",2,,,SLO dashboards and alerting
+Sub-task,Configure actionable alerts,"Define thresholds and escalation channels to avoid alert fatigue.",Medium,"crm,observability,alerts",2,,,SLO dashboards and alerting
+Sub-task,Write runbook for on-call response,"Document triage steps, rollback points, and validation checks.",Low,"crm,docs,runbook",1,,,SLO dashboards and alerting

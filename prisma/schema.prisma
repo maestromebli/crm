@@ -1,0 +1,1714 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  passwordHash  String
+  role          Role      @default(USER)
+  /** Обмеження пунктів бокового меню: ключ = id секції з NAV_SECTIONS; "all" або список subItem.id. Null = усі підпункти (лише базові права P.*). */
+  menuAccess    Json?
+  permissions   PermissionOnUser[]
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  accounts      Account[]
+  sessions      Session[]
+  leadsOwned    Lead[]    @relation("LeadOwner")
+  dealsOwned    Deal[]    @relation("DealOwner")
+  dealsProductionManaged Deal[] @relation("DealProductionManager")
+  eventsCreated CalendarEvent[] @relation("Calendar_CreatedBy")
+  eventsAssigned CalendarEvent[] @relation("Calendar_AssignedTo")
+  uploadedFiles Attachment[]
+  automationRunsStarted AutomationRun[] @relation("AutomationRunStartedBy")
+  managedOrders Order[] @relation("OrderManager")
+  dealStageChanges DealStageHistory[]
+  activityLogs ActivityLog[]
+
+  dealContractVersionsApproved DealContractVersion[] @relation("DealContractVersionApprovedBy")
+  dealContractVersionsCreated  DealContractVersion[] @relation("DealContractVersionCreatedBy")
+  attachmentsValidated         Attachment[]          @relation("AttachmentValidatedBy")
+  readinessOverridesRequested  ReadinessOverride[]   @relation("ReadinessOverrideRequestedBy")
+  readinessOverridesApproved   ReadinessOverride[]   @relation("ReadinessOverrideApprovedBy")
+  contractApprovals            ContractApproval[]
+  paymentMilestonesConfirmed   DealPaymentMilestone[] @relation("DealPaymentMilestoneConfirmedBy")
+
+  leadMessagesAuthored LeadMessage[] @relation("LeadMessageAuthor")
+
+  tasksAssigned     Task[]     @relation("TaskAssignee")
+  tasksCreated      Task[]     @relation("TaskCreatedBy")
+  estimatesCreated  Estimate[] @relation("EstimateCreatedBy")
+  estimatesApproved Estimate[] @relation("EstimateApprovedBy")
+  leadsCreated      Lead[]     @relation("LeadCreatedBy")
+  leadProposalsCreated LeadProposal[] @relation("LeadProposalCreatedBy")
+  leadConversionsAudited LeadConversionAudit[] @relation("LeadConversionAuditedBy")
+  /** Потоки виробництва, де користувач виступає начальником виробництва. */
+  productionFlowsAsChief ProductionFlow[] @relation("ProductionFlowChief")
+  /** Призначені задачі в потоці виробництва. */
+  productionFlowTasksAssigned ProductionTask[] @relation("ProductionTaskAssignee")
+
+  /** Збережені власні вигляди списку угод (фільтри / таблиця / дошка). */
+  dealHubSavedViews DealHubSavedView[]
+}
+
+/** Збережені користувацькі пресети для модуля «Угоди» (DealsHubClient). */
+model DealHubSavedView {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String   @db.VarChar(160)
+  filtersJson Json
+  sortIndex   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId, sortIndex])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Permission {
+  id          String              @id @default(cuid())
+  key         PermissionKey       @unique
+  description String
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  users       PermissionOnUser[]
+  categoryPolicyPermissions AttachmentCategoryPolicyPermission[]
+}
+
+model PermissionOnUser {
+  userId       String
+  permissionId String
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([userId, permissionId])
+}
+
+model Lead {
+  id           String   @id @default(cuid())
+  title        String
+  source       String
+  pipelineId   String
+  stageId      String
+  priority     String
+  contactName  String?
+  phone        String?
+  email        String?
+  note         String?
+  ownerId      String
+  owner        User     @relation("LeadOwner", fields: [ownerId], references: [id])
+  /** Хто створив лід (Lead Hub). */
+  createdById  String?
+  createdBy    User?    @relation("LeadCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  contactId    String?
+  contact      Contact? @relation(fields: [contactId], references: [id])
+  clientId     String?
+  client       Client?  @relation(fields: [clientId], references: [id])
+  /** Після конверсії — основна угода (дублює зв’язок через Deal.leadId; зручний FK з боку ліда). */
+  dealId       String?  @unique
+  convertedDeal Deal?   @relation("LeadConvertedDeal", fields: [dealId], references: [id], onDelete: SetNull)
+  pipeline     Pipeline     @relation(fields: [pipelineId], references: [id])
+  stage        PipelineStage @relation(fields: [stageId], references: [id])
+  deals        Deal[]   @relation("DealSourceLead")
+  calendarEvents CalendarEvent[]
+  leadMessages   LeadMessage[]
+  estimates      Estimate[]
+  leadContacts   LeadContact[]
+  proposals      LeadProposal[]
+  activeEstimateId String?   @unique
+  activeEstimate   Estimate? @relation("LeadActiveEstimate", fields: [activeEstimateId], references: [id], onDelete: SetNull)
+  activeProposalId String?   @unique
+  activeProposal   LeadProposal? @relation("LeadActiveProposal", fields: [activeProposalId], references: [id], onDelete: SetNull)
+  attachmentMeta LeadAttachmentMeta[]
+  conversionAudit LeadConversionAudit?
+  /** Короткий наступний крок для one-click CRM (що зробити далі). */
+  nextStep      String?  @db.VarChar(500)
+  nextContactAt DateTime?
+  lastActivityAt DateTime?
+  /** Кваліфікація до угоди: тип меблів, обʼєкт, бюджет, терміни, температура тощо (JSON). */
+  qualification Json?
+  projectAgreed Boolean @default(false)
+  /** Денормалізація: узгоджене КП (джерело правди — LeadProposal.status). */
+  proposalApproved Boolean @default(false)
+  /** Останній знімок AI / rule checklist перед конверсією (опційно). */
+  lastChecklistJson Json?
+  lastChecklistAt   DateTime?
+  aiChecklistOutcome LeadAiChecklistOutcome?
+  readinessState     LeadReadinessState?
+  hubMeta            Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([pipelineId, stageId])
+  @@index([ownerId])
+  @@index([createdById])
+}
+
+/** Внутрішні нотатки / «повідомлення» по ліду (до інтеграцій Inbox, Telegram). */
+model LeadMessage {
+  id          String   @id @default(cuid())
+  leadId      String
+  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  body        String   @db.Text
+  /** INTERNAL | PHONE | EMAIL — для майбутніх каналів */
+  channel     String   @default("INTERNAL")
+  /** CALL | MESSAGE | NOTE | COMMENT — таймлайн комунікації в Lead Hub */
+  interactionKind String @default("NOTE")
+  contactId   String?
+  contact     Contact? @relation("LeadMessageContact", fields: [contactId], references: [id], onDelete: SetNull)
+  summary     String?  @db.VarChar(500)
+  occurredAt  DateTime?
+  hasAttachments Boolean @default(false)
+  createdById String
+  createdBy   User     @relation("LeadMessageAuthor", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([leadId, createdAt])
+  @@index([contactId])
+}
+
+/** Звʼязок ліда з контактами (primary + додаткові). */
+model LeadContact {
+  id              String   @id @default(cuid())
+  leadId          String
+  lead            Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  contactId       String
+  contact         Contact  @relation(fields: [contactId], references: [id], onDelete: Restrict)
+  isPrimary       Boolean  @default(false)
+  isDecisionMaker Boolean  @default(false)
+  role            String?
+  comment         String?  @db.Text
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([leadId, contactId])
+  @@index([leadId])
+  @@index([contactId])
+}
+
+/** КП (комерційна пропозиція) на етапі ліда. */
+model LeadProposal {
+  id           String             @id @default(cuid())
+  leadId       String
+  lead         Lead               @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  estimateId   String?
+  estimate     Estimate?          @relation(fields: [estimateId], references: [id], onDelete: SetNull)
+  version      Int
+  status       LeadProposalStatus @default(DRAFT)
+  sentAt       DateTime?
+  approvedAt   DateTime?
+  viewedAt     DateTime?
+  /** Заголовок для КП / PDF */
+  title        String?
+  summary      String?            @db.Text
+  /** Публічний перегляд без логіну */
+  publicToken  String?            @unique
+  pdfAttachmentId String?         @unique
+  pdfAttachment   Attachment?     @relation("LeadProposalPdf", fields: [pdfAttachmentId], references: [id], onDelete: SetNull)
+  notes        String?            @db.Text
+  /** Знімок смети на момент створення КП (addon contract: стабільна оферта). */
+  snapshotJson Json?
+  createdById  String
+  createdBy    User               @relation("LeadProposalCreatedBy", fields: [createdById], references: [id])
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  activeForLead Lead?             @relation("LeadActiveProposal")
+
+  @@unique([leadId, version])
+  @@index([leadId, status])
+  @@index([publicToken])
+}
+
+/** Постачальник каталогу (Viyar тощо) — довідник для пошуку в сметі. */
+model MaterialProvider {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  name      String
+  kind      String   @default("catalog")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items MaterialCatalogItem[]
+}
+
+/** Кешовані позиції каталогу (імпорт/sync — окремо). */
+model MaterialCatalogItem {
+  id          String           @id @default(cuid())
+  providerId  String
+  provider    MaterialProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  externalId  String
+  category    String?
+  brand       String?
+  name        String
+  displayName String?
+  unit        String   @default("шт")
+  price       Float?
+  currency    String   @default("UAH")
+  sourceUrl   String?
+  rawDataJson Json?
+  syncedAt    DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([providerId, externalId])
+  @@index([providerId, name])
+}
+
+/** Метадані файлу ліда: hub-категорія + pin (Attachment лишається джерелом blob). */
+model LeadAttachmentMeta {
+  id           String             @id @default(cuid())
+  attachmentId String             @unique
+  attachment   Attachment         @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
+  leadId       String
+  lead         Lead               @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  hubCategory  LeadHubFileCategory
+  pinned       Boolean            @default(false)
+  createdAt    DateTime           @default(now())
+
+  @@index([leadId, hubCategory])
+}
+
+/** Аудит одноразової конверсії ліда в угоду. */
+model LeadConversionAudit {
+  id                    String   @id @default(cuid())
+  leadId                String   @unique
+  lead                  Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  dealId                String
+  deal                  Deal     @relation(fields: [dealId], references: [id], onDelete: Restrict)
+  convertedById         String
+  convertedBy           User     @relation("LeadConversionAuditedBy", fields: [convertedById], references: [id])
+  convertedAt           DateTime @default(now())
+  activeEstimateIdUsed  String?
+  approvedProposalIdUsed String?
+  checklistSnapshot     Json?
+  warningsAtConversion  Json?
+  migratedFilesCount    Int      @default(0)
+  migratedContactsCount Int      @default(0)
+  migratedMessagesCount Int      @default(0)
+
+  @@index([dealId])
+  @@index([convertedAt])
+}
+
+model Order {
+  id            String   @id @default(cuid())
+  orderNumber   String
+  customerName  String
+  customerPhone String?
+  customerEmail String?
+  address       String?
+  comment       String?
+
+  status   String
+  source   String?
+  amount   Float?
+  currency String
+
+  managerId String?
+  manager   User?    @relation("OrderManager", fields: [managerId], references: [id])
+
+  dealId   String?
+  deal     Deal?   @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  clientId String?
+  client   Client? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([managerId])
+  @@index([dealId])
+  @@index([clientId])
+}
+
+/** До підписання договору — LEAD; після повного підписання (затвердження) — CUSTOMER. */
+enum ContactLifecycle {
+  LEAD
+  CUSTOMER
+}
+
+enum ClientType {
+  PERSON
+  COMPANY
+}
+
+enum DealStatus {
+  OPEN
+  WON
+  LOST
+  ON_HOLD
+}
+
+/** Життєвий цикл договору в межах угоди (єдине робоче місце). */
+enum DealContractStatus {
+  DRAFT
+  GENERATED
+  EDITED
+  PENDING_INTERNAL_APPROVAL
+  APPROVED_INTERNAL
+  SENT_FOR_SIGNATURE
+  VIEWED_BY_CLIENT
+  CLIENT_SIGNED
+  COMPANY_SIGNED
+  FULLY_SIGNED
+  DECLINED
+  EXPIRED
+  SUPERSEDED
+}
+
+enum PipelineEntityType {
+  LEAD
+  DEAL
+  PRODUCTION_JOB
+}
+
+enum StageFinalType {
+  WON
+  LOST
+  CLOSED
+}
+
+enum CalendarEventType {
+  MEETING
+  MEASUREMENT
+  INSTALLATION
+  DELIVERY
+  OTHER
+}
+
+enum CalendarEventStatus {
+  PLANNED
+  CONFIRMED
+  COMPLETED
+  CANCELED
+}
+
+enum AttachmentCategory {
+  OBJECT_PHOTO
+  MEASUREMENT_SHEET
+  BRIEF
+  REFERENCE
+  CALCULATION
+  QUOTE_PDF
+  CONTRACT
+  INVOICE
+  PAYMENT_CONFIRMATION
+  DRAWING
+  SPEC
+  TECH_CARD
+  INSTALL_SCHEME
+  ACCEPTANCE_ACT
+  RESULT_PHOTO
+  OTHER
+}
+
+enum AttachmentEntityType {
+  LEAD
+  CONTACT
+  CLIENT
+  DEAL
+  ORDER
+  HANDOFF
+  EVENT
+  TASK
+}
+
+enum HandoffStatus {
+  DRAFT
+  SUBMITTED
+  ACCEPTED
+  REJECTED
+}
+
+enum ReadinessOutcome {
+  READY_PRODUCTION
+  BLOCKED
+  PARTIAL
+}
+
+enum AutomationRunStatus {
+  PENDING
+  RUNNING
+  SUCCESS
+  FAILED
+  SKIPPED
+}
+
+enum ActivityEntityType {
+  LEAD
+  CONTACT
+  CLIENT
+  DEAL
+  ORDER
+  TASK
+  EVENT
+  HANDOFF
+}
+
+enum ActivityType {
+  LEAD_CREATED
+  LEAD_UPDATED
+  DEAL_CREATED
+  DEAL_UPDATED
+  DEAL_STAGE_CHANGED
+  DEAL_WORKSPACE_META_UPDATED
+  CONTRACT_CREATED
+  CONTRACT_STATUS_CHANGED
+  TASK_CREATED
+  TASK_COMPLETED
+  EVENT_CREATED
+  EVENT_UPDATED
+  FILE_UPLOADED
+  HANDOFF_SUBMITTED
+  HANDOFF_ACCEPTED
+  HANDOFF_REJECTED
+  READINESS_SNAPSHOT_SAVED
+}
+
+/** Pre-deal Lead Hub: узгоджений стан для конверсії (не плутати з Deal readiness production). */
+enum LeadReadinessState {
+  NOT_READY
+  CAN_CONVERT_WITH_WARNINGS
+  READY_TO_CONVERT
+}
+
+/** Группи файлів у Lead Hub (доповнює AttachmentCategory). */
+enum LeadHubFileCategory {
+  PROJECT
+  PHOTOS
+  MEASUREMENTS
+  ESTIMATES_KP
+  MESSENGER_ATTACHMENTS
+  TECHNICAL_NOTES
+  DOCUMENTS
+  OTHER
+}
+
+/** Комерційна пропозиція (КП) до створення угоди. */
+enum LeadProposalStatus {
+  DRAFT
+  SENT
+  CLIENT_REVIEWING
+  APPROVED
+  REJECTED
+  SUPERSEDED
+}
+
+enum LeadAiChecklistOutcome {
+  PASSED
+  PARTIAL
+  FAILED
+}
+
+enum ProductionFlowStatus {
+  NEW
+  ACTIVE
+  ON_HOLD
+  BLOCKED
+  READY_FOR_PROCUREMENT_AND_WORKSHOP
+  IN_WORKSHOP
+  READY_FOR_INSTALLATION
+  DONE
+  CANCELLED
+}
+
+enum ProductionStepKey {
+  ACCEPTED_BY_CHIEF
+  CONSTRUCTOR_ASSIGNED
+  CONSTRUCTOR_IN_PROGRESS
+  FILES_PACKAGE_UPLOADED
+  FILES_VALIDATED
+  APPROVED_BY_CHIEF
+  TASKS_DISTRIBUTED
+}
+
+enum ProductionStepState {
+  LOCKED
+  AVAILABLE
+  IN_PROGRESS
+  DONE
+  BLOCKED
+}
+
+enum ProductionTaskType {
+  CONSTRUCTOR
+  PROCUREMENT
+  WORKSHOP
+  INSTALLATION
+}
+
+enum ProductionTaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+  BLOCKED
+  CANCELLED
+}
+
+enum ProductionApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ProductionRiskSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ProductionAIInsightType {
+  SUMMARY
+  WARNING
+  NEXT_ACTION
+  RISK
+}
+
+enum ProductionQuestionStatus {
+  OPEN
+  ANSWERED
+  IGNORED
+}
+
+enum ProductionConstructorMode {
+  INTERNAL
+  OUTSOURCE
+}
+
+model ProductionFlow {
+  id                    String                    @id @default(cuid())
+  dealId                String                    @unique
+  deal                  Deal                      @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  number                String                    @unique
+  title                 String
+  clientName            String
+  productSummary        String?
+  status                ProductionFlowStatus      @default(NEW)
+  currentStepKey        ProductionStepKey         @default(ACCEPTED_BY_CHIEF)
+  priority              TaskPriority              @default(NORMAL)
+  readinessPercent      Int                       @default(0)
+  riskScore             Int                       @default(0)
+  marginRiskPercent     Int?
+  dueDate               DateTime?
+  acceptedAt            DateTime?
+  approvedAt            DateTime?
+  distributedAt         DateTime?
+  chiefUserId           String?
+  chiefUser             User?                     @relation("ProductionFlowChief", fields: [chiefUserId], references: [id], onDelete: SetNull)
+  constructorMode       ProductionConstructorMode?
+  constructorName       String?
+  constructorCompany    String?
+  constructorWorkspaceUrl String?
+  telegramThreadUrl     String?
+  procurementTasksCount Int                       @default(0)
+  workshopTasksCount    Int                       @default(0)
+  blockersCount         Int                       @default(0)
+  openQuestionsCount    Int                       @default(0)
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+
+  steps         ProductionFlowStep[]
+  events        ProductionEvent[]
+  tasks         ProductionTask[]
+  filePackages  ProductionFilePackage[]
+  approvals     ProductionApproval[]
+  risks         ProductionRisk[]
+  aiInsights    ProductionAIInsight[]
+  questions     ProductionQuestion[]
+  stationLoads  ProductionStationLoad[]
+
+  @@index([status, currentStepKey])
+  @@index([chiefUserId, status])
+  @@index([dueDate])
+  @@index([dealId])
+}
+
+model ProductionFlowStep {
+  id          String              @id @default(cuid())
+  flowId      String
+  flow        ProductionFlow      @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  key         ProductionStepKey
+  state       ProductionStepState @default(LOCKED)
+  sortOrder   Int
+  completedAt DateTime?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@unique([flowId, key])
+  @@index([flowId, sortOrder])
+}
+
+model ProductionEvent {
+  id          String         @id @default(cuid())
+  flowId      String
+  flow        ProductionFlow @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  type        String
+  actorName   String?
+  title       String
+  description String?
+  metadataJson Json?
+  createdAt   DateTime       @default(now())
+
+  @@index([flowId, createdAt])
+}
+
+model ProductionTask {
+  id             String               @id @default(cuid())
+  flowId         String
+  flow           ProductionFlow       @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  type           ProductionTaskType
+  title          String
+  description    String?              @db.Text
+  status         ProductionTaskStatus @default(TODO)
+  assigneeUserId String?
+  assigneeUser   User?                @relation("ProductionTaskAssignee", fields: [assigneeUserId], references: [id], onDelete: SetNull)
+  dueDate        DateTime?
+  metadataJson   Json?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  @@index([flowId, type, status])
+  @@index([assigneeUserId, status])
+}
+
+model ProductionFilePackage {
+  id               String                 @id @default(cuid())
+  flowId           String
+  flow             ProductionFlow         @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  packageName      String
+  versionLabel     String
+  packageTypeTags  String[]
+  note             String?                @db.Text
+  uploadedByName   String?
+  validationPassed Boolean                @default(false)
+  approvalStatus   ProductionApprovalStatus?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+  uploadedAt       DateTime               @default(now())
+
+  files     ProductionFileItem[]
+  approvals ProductionApproval[]
+
+  @@index([flowId, uploadedAt])
+}
+
+model ProductionFileItem {
+  id             String                @id @default(cuid())
+  packageId      String
+  package        ProductionFilePackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  fileName       String
+  fileType       String?
+  fileUrl        String?
+  metadataJson   Json?
+  createdAt      DateTime              @default(now())
+
+  @@index([packageId])
+}
+
+model ProductionApproval {
+  id          String                   @id @default(cuid())
+  flowId      String
+  flow        ProductionFlow           @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  packageId   String?
+  package     ProductionFilePackage?   @relation(fields: [packageId], references: [id], onDelete: SetNull)
+  status      ProductionApprovalStatus @default(PENDING)
+  reason      String?                  @db.Text
+  actorName   String?
+  decidedAt   DateTime?
+  createdAt   DateTime                 @default(now())
+
+  @@index([flowId, createdAt])
+}
+
+model ProductionRisk {
+  id          String               @id @default(cuid())
+  flowId      String
+  flow        ProductionFlow       @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  code        String
+  title       String
+  description String
+  severity    ProductionRiskSeverity @default(MEDIUM)
+  resolvedAt  DateTime?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  @@index([flowId, severity, resolvedAt])
+}
+
+model ProductionAIInsight {
+  id                String                @id @default(cuid())
+  flowId            String
+  flow              ProductionFlow        @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  type              ProductionAIInsightType
+  title             String
+  description       String
+  severity          ProductionRiskSeverity?
+  recommendedAction String?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  @@index([flowId, type, createdAt])
+}
+
+model ProductionQuestion {
+  id          String                 @id @default(cuid())
+  flowId      String
+  flow        ProductionFlow         @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  source      String                 @default("INTERNAL")
+  authorName  String
+  text        String                 @db.Text
+  status      ProductionQuestionStatus @default(OPEN)
+  isCritical  Boolean                @default(false)
+  answeredAt  DateTime?
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+
+  @@index([flowId, status, isCritical])
+}
+
+model ProductionStationLoad {
+  id          String         @id @default(cuid())
+  flowId      String
+  flow        ProductionFlow @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  stationKey  String
+  stationLabel String
+  loadPercent Int
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@unique([flowId, stationKey])
+  @@index([stationKey, loadPercent])
+}
+
+model Contact {
+  id             String   @id @default(cuid())
+  firstName      String?
+  lastName       String?
+  fullName       String
+  phone          String?
+  email          String?
+  instagramHandle String?
+  telegramHandle  String?
+  city           String?
+  country        String?
+  notes          String?
+  lifecycle      ContactLifecycle @default(LEAD)
+
+  clientId       String?
+  client         Client?  @relation(fields: [clientId], references: [id])
+
+  leads          Lead[]
+  deals          Deal[]
+  primaryForClients Client[] @relation("Client_PrimaryContact")
+  leadContactLinks LeadContact[]
+  leadMessagesAsContact LeadMessage[] @relation("LeadMessageContact")
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([phone])
+  @@index([email])
+}
+
+model Client {
+  id               String      @id @default(cuid())
+  name             String
+  type             ClientType
+  primaryContactId String?
+  primaryContact   Contact?    @relation("Client_PrimaryContact", fields: [primaryContactId], references: [id])
+
+  contacts         Contact[]
+  deals            Deal[]
+  orders           Order[]
+  leads            Lead[]
+
+  notes            String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  @@index([type, name])
+}
+
+model Pipeline {
+  id         String             @id @default(cuid())
+  name       String
+  entityType PipelineEntityType
+  isDefault  Boolean            @default(false)
+
+  stages     PipelineStage[]
+  leads      Lead[]
+  deals      Deal[]
+  attachmentCategoryPolicies AttachmentCategoryPolicy[]
+  readinessRuleSets        ReadinessRuleSet[]
+}
+
+model PipelineStage {
+  id         String       @id @default(cuid())
+  pipelineId String
+  pipeline   Pipeline     @relation(fields: [pipelineId], references: [id])
+  name       String
+  slug       String
+  sortOrder  Int
+  isFinal    Boolean      @default(false)
+  finalType  StageFinalType?
+
+  deals      Deal[]
+  leads      Lead[]
+  dealStageHistoryFrom DealStageHistory[] @relation("DealStageHistory_FromStage")
+  dealStageHistoryTo   DealStageHistory[] @relation("DealStageHistory_ToStage")
+  dealDocumentRequirements DealDocumentRequirement[]
+  readinessRules           ReadinessRule[]
+
+  @@unique([pipelineId, slug])
+  @@unique([pipelineId, sortOrder])
+}
+
+model Deal {
+  id              String        @id @default(cuid())
+  title           String
+  description     String?
+  status          DealStatus    @default(OPEN)
+
+  pipelineId      String
+  pipeline        Pipeline      @relation(fields: [pipelineId], references: [id])
+
+  stageId         String
+  stage           PipelineStage @relation(fields: [stageId], references: [id])
+
+  leadId          String?
+  lead            Lead?         @relation("DealSourceLead", fields: [leadId], references: [id])
+
+  /** Зворотний бік Lead.dealId (угода, на яку вказує лід після конверсії). */
+  leadConvertedFrom Lead?       @relation("LeadConvertedDeal")
+
+  clientId        String
+  client          Client        @relation(fields: [clientId], references: [id])
+
+  primaryContactId String?
+  primaryContact   Contact?     @relation(fields: [primaryContactId], references: [id])
+
+  ownerId         String
+  owner           User          @relation("DealOwner", fields: [ownerId], references: [id])
+
+  /** Виробництво / монтаж — окремо від sales owner. */
+  productionManagerId String?
+  productionManager   User?       @relation("DealProductionManager", fields: [productionManagerId], references: [id], onDelete: SetNull)
+  installationDate    DateTime?
+
+  expectedCloseDate DateTime?
+  value           Float?
+  currency        String?
+
+  /** Платежі, готовність до виробництва, SLA — гнучкий стан для UI воркспейсу. */
+  workspaceMeta   Json?
+
+  orders          Order[]
+  stageHistory    DealStageHistory[]
+  contract        DealContract?
+  readinessEvaluations ReadinessEvaluation[]
+  handoff         DealHandoff?
+  fileAssets      FileAsset[]
+  dealDocumentRequirements DealDocumentRequirement[]
+  readinessOverrides       ReadinessOverride[]
+  paymentMilestones        DealPaymentMilestone[]
+  domainEvents             DomainEvent[]
+  estimates                Estimate[]
+  leadConversionAudits     LeadConversionAudit[]
+  /** Новий production flow engine: один активний/єдиний потік на угоду. */
+  productionFlow           ProductionFlow?
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([clientId, status])
+  @@index([pipelineId, stageId])
+}
+
+/** Знімок розрахунку готовності до виробництва (історія / аудит). */
+model ReadinessEvaluation {
+  id          String           @id @default(cuid())
+  dealId      String
+  deal        Deal             @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  outcome     ReadinessOutcome
+  allMet      Boolean
+  checksJson  Json
+  evaluatedAt DateTime         @default(now())
+  checkItems  ReadinessCheckItem[]
+
+  @@index([dealId, evaluatedAt])
+}
+
+/** Normalized line items for a single readiness evaluation (alongside checksJson). */
+model ReadinessCheckItem {
+  id                    String              @id @default(cuid())
+  readinessEvaluationId String
+  readinessEvaluation   ReadinessEvaluation @relation(fields: [readinessEvaluationId], references: [id], onDelete: Cascade)
+  ruleKey               String
+  passed                Boolean
+  hardBlock             Boolean             @default(false)
+  detail                Json?
+  createdAt             DateTime            @default(now())
+
+  @@index([readinessEvaluationId])
+  @@index([ruleKey])
+}
+
+/** Пакет передачі у виробництво по угоді (структурований, окремо від workspaceMeta). */
+model DealHandoff {
+  id              String        @id @default(cuid())
+  dealId          String        @unique
+  deal            Deal          @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  status          HandoffStatus @default(DRAFT)
+  manifestJson    Json?
+  notes           String?       @db.Text
+  submittedAt     DateTime?
+  acceptedAt      DateTime?
+  rejectedAt      DateTime?
+  rejectionReason String?       @db.Text
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+/** Логічний файл у межах угоди; фізичні версії — рядки Attachment. */
+model FileAsset {
+  id          String              @id @default(cuid())
+  dealId      String
+  deal        Deal                @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  category    AttachmentCategory
+  displayName String?
+  createdAt   DateTime            @default(now())
+
+  attachments Attachment[]
+
+  @@index([dealId])
+}
+
+model AutomationRule {
+  id        String   @id @default(cuid())
+  name      String
+  enabled   Boolean  @default(true)
+  trigger   String
+  graphJson Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  runs AutomationRun[]
+}
+
+model AutomationRun {
+  id          String               @id @default(cuid())
+  ruleId      String?
+  rule        AutomationRule?      @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+  triggerKey  String?
+  status      AutomationRunStatus  @default(PENDING)
+  payload     Json?
+  error       String?              @db.Text
+  startedById String?
+  startedBy   User?                @relation("AutomationRunStartedBy", fields: [startedById], references: [id], onDelete: SetNull)
+  startedAt   DateTime             @default(now())
+  finishedAt  DateTime?
+
+  @@index([status, startedAt])
+}
+
+/** Структурований договір по угоді (не лише файл). Один активний запис на угоду. */
+model DealContract {
+  id             String             @id @default(cuid())
+  dealId         String             @unique
+  deal           Deal               @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  status         DealContractStatus @default(DRAFT)
+  templateKey    String?
+  version        Int                @default(1)
+  /** Змінні шаблону, обрані клаузи, чернетка блоків. */
+  content        Json?
+  signedPdfUrl   String?
+  diiaSessionId  String?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  /** Pointer to row that mirrors API “current” contract; dual-write during migration. */
+  currentVersionId String?              @unique
+  currentVersion   DealContractVersion? @relation("ContractCurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+  versions         DealContractVersion[] @relation("ContractVersionsRoot")
+}
+
+/** Immutable revision of deal contract; legal + Diia anchor. */
+model DealContractVersion {
+  id                       String                @id @default(cuid())
+  contractId               String
+  contract                 DealContract          @relation("ContractVersionsRoot", fields: [contractId], references: [id], onDelete: Cascade)
+  asCurrentForContract     DealContract?         @relation("ContractCurrentVersion")
+  revision                 Int
+  lifecycleStatus          DealContractStatus
+  templateKey              String?
+  content                  Json?
+  contentHash              String?
+  renderedPdfAttachmentId  String?
+  renderedPdfAttachment    Attachment?           @relation("VersionRenderedPdf", fields: [renderedPdfAttachmentId], references: [id], onDelete: SetNull)
+  signedPdfAttachmentId    String?
+  signedPdfAttachment      Attachment?           @relation("VersionSignedPdf", fields: [signedPdfAttachmentId], references: [id], onDelete: SetNull)
+  approvalStatus           String?
+  approvedById             String?
+  approvedBy               User?                 @relation("DealContractVersionApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedAt               DateTime?
+  sentForSignatureAt       DateTime?
+  fullySignedAt            DateTime?
+  supersedesVersionId      String?
+  supersedesVersion        DealContractVersion?  @relation("VersionSupersedes", fields: [supersedesVersionId], references: [id], onDelete: SetNull)
+  supersededBy             DealContractVersion[] @relation("VersionSupersedes")
+  activeSignatureRequestId String?               @unique
+  activeSignatureRequest   SignatureRequest?     @relation("VersionActiveSignatureRequest", fields: [activeSignatureRequestId], references: [id], onDelete: SetNull)
+  createdById              String?
+  createdBy                User?                 @relation("DealContractVersionCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt                DateTime              @default(now())
+  updatedAt                DateTime              @updatedAt
+
+  contractApprovals     ContractApproval[]
+  signatureRequests     SignatureRequest[]
+  attachmentsForVersion Attachment[]          @relation("AttachmentContractVersion")
+
+  @@unique([contractId, revision])
+  @@index([contractId])
+}
+
+model ContractApproval {
+  id                String                 @id @default(cuid())
+  contractVersionId String
+  contractVersion   DealContractVersion    @relation(fields: [contractVersionId], references: [id], onDelete: Cascade)
+  stepOrder         Int
+  approverUserId    String?
+  approverUser      User?                  @relation(fields: [approverUserId], references: [id], onDelete: SetNull)
+  status            ContractApprovalStatus @default(PENDING)
+  decidedAt         DateTime?
+  comment           String?                @db.Text
+  createdAt         DateTime               @default(now())
+
+  @@unique([contractVersionId, stepOrder])
+  @@index([contractVersionId])
+}
+
+model SignatureRequest {
+  id                    String                 @id @default(cuid())
+  contractVersionId     String
+  contractVersion       DealContractVersion    @relation(fields: [contractVersionId], references: [id], onDelete: Cascade)
+  provider              SignatureProvider
+  providerRequestId     String?                @unique
+  status                SignatureRequestStatus
+  sequence              SignatureSequence      @default(PARALLEL)
+  expiresAt             DateTime?
+  completedAttachmentId String?                @unique
+  completedAttachment   Attachment?            @relation("SignatureCompletedAttachment", fields: [completedAttachmentId], references: [id], onDelete: SetNull)
+  legacyDiiaSessionId   String?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+
+  signers              SignatureSigner[]
+  providerEvents       SignatureProviderEvent[]
+  attachments          Attachment[]           @relation("AttachmentSignatureRequest")
+  versionUsingAsActive DealContractVersion?   @relation("VersionActiveSignatureRequest")
+
+  @@index([contractVersionId])
+}
+
+model SignatureSigner {
+  id                 String                @id @default(cuid())
+  signatureRequestId String
+  signatureRequest   SignatureRequest      @relation(fields: [signatureRequestId], references: [id], onDelete: Cascade)
+  role               SignatureSignerRole
+  sortOrder          Int                   @default(0)
+  status             SignatureSignerStatus @default(PENDING)
+  viewedAt           DateTime?
+  signedAt           DateTime?
+  externalRef        Json?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+
+  /** PARALLEL signing often uses the same sortOrder for multiple signers — do not add @@unique(requestId, sortOrder). */
+  @@index([signatureRequestId])
+}
+
+model SignatureProviderEvent {
+  id                 String           @id @default(cuid())
+  signatureRequestId String
+  signatureRequest   SignatureRequest @relation(fields: [signatureRequestId], references: [id], onDelete: Cascade)
+  providerEventId    String           @unique
+  payload            Json
+  receivedAt         DateTime         @default(now())
+
+  @@index([signatureRequestId])
+}
+
+model DealStageHistory {
+  id          String        @id @default(cuid())
+  dealId      String
+  deal        Deal          @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  fromStageId String?
+  fromStage   PipelineStage? @relation("DealStageHistory_FromStage", fields: [fromStageId], references: [id])
+
+  toStageId   String
+  toStage     PipelineStage  @relation("DealStageHistory_ToStage", fields: [toStageId], references: [id])
+
+  changedById String?
+  changedBy   User?         @relation(fields: [changedById], references: [id])
+
+  changedAt   DateTime      @default(now())
+}
+
+model CalendarEvent {
+  id           String              @id @default(cuid())
+  title        String
+  description  String?
+  type         CalendarEventType
+  status       CalendarEventStatus @default(PLANNED)
+  startAt      DateTime
+  endAt        DateTime
+  isAllDay     Boolean             @default(false)
+
+  leadId       String?
+  lead         Lead?               @relation(fields: [leadId], references: [id])
+
+  createdById  String
+  createdBy    User                @relation("Calendar_CreatedBy", fields: [createdById], references: [id])
+
+  assignedToId String?
+  assignedTo   User?               @relation("Calendar_AssignedTo", fields: [assignedToId], references: [id])
+
+  location     String?
+
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  @@index([startAt])
+  @@index([assignedToId, startAt])
+}
+
+model Attachment {
+  id          String              @id @default(cuid())
+  fileName    String
+  fileUrl     String
+  mimeType    String
+  fileSize    Int?
+  category    AttachmentCategory
+  entityType  AttachmentEntityType
+  entityId    String
+
+  fileAssetId      String?
+  fileAsset        FileAsset?       @relation(fields: [fileAssetId], references: [id], onDelete: SetNull)
+  version          Int              @default(1)
+  isCurrentVersion Boolean          @default(true)
+
+  uploadedById String
+  uploadedBy   User               @relation(fields: [uploadedById], references: [id])
+
+  createdAt   DateTime            @default(now())
+  /** Soft-delete: hidden from UI/lists; FK targets remain valid for audit. */
+  deletedAt   DateTime?
+
+  source                   AttachmentSource      @default(MANUAL)
+  contentHash              String?
+  storageKey               String?
+  virusScanStatus          VirusScanStatus?
+  validatedAt              DateTime?
+  validatedById            String?
+  validatedBy              User?                 @relation("AttachmentValidatedBy", fields: [validatedById], references: [id], onDelete: SetNull)
+  supersededByAttachmentId String?
+  supersededByAttachment   Attachment?           @relation("AttachmentSupersedes", fields: [supersededByAttachmentId], references: [id], onDelete: SetNull)
+  supersedes               Attachment[]          @relation("AttachmentSupersedes")
+  dealContractVersionId    String?
+  dealContractVersion      DealContractVersion?  @relation("AttachmentContractVersion", fields: [dealContractVersionId], references: [id], onDelete: SetNull)
+  signatureRequestId       String?
+  signatureRequest         SignatureRequest?     @relation("AttachmentSignatureRequest", fields: [signatureRequestId], references: [id], onDelete: SetNull)
+
+  versionAsRenderedPdf  DealContractVersion[] @relation("VersionRenderedPdf")
+  versionAsSignedPdf    DealContractVersion[] @relation("VersionSignedPdf")
+  signatureCompletedFor SignatureRequest?     @relation("SignatureCompletedAttachment")
+  paymentMilestoneProofs DealPaymentMilestone[]
+  leadAttachmentMeta     LeadAttachmentMeta?
+  leadProposalPdf        LeadProposal?        @relation("LeadProposalPdf")
+
+  @@index([entityType, entityId])
+  @@index([fileAssetId])
+  @@index([dealContractVersionId])
+  @@index([signatureRequestId])
+}
+
+model ActivityLog {
+  id          String            @id @default(cuid())
+  entityType  ActivityEntityType
+  entityId    String
+  type        ActivityType
+  actorUserId String?
+  actorUser   User?             @relation(fields: [actorUserId], references: [id])
+  source      String            // "SYSTEM" | "USER" | "INTEGRATION"
+  data        Json?
+  createdAt   DateTime          @default(now())
+
+  @@index([entityType, entityId, createdAt])
+}
+
+model DealDocumentRequirement {
+  id              String             @id @default(cuid())
+  dealId          String
+  deal            Deal               @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  category        AttachmentCategory
+  minCount        Int                @default(1)
+  pipelineStageId String?
+  pipelineStage   PipelineStage?     @relation(fields: [pipelineStageId], references: [id], onDelete: SetNull)
+  templateKey     String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@index([dealId])
+}
+
+model AttachmentCategoryPolicy {
+  id                 String             @id @default(cuid())
+  category           AttachmentCategory
+  /** Null = global default for this category; see `prisma/sql/partial_uniques.sql` — Prisma @@unique allows duplicate (category, NULL) in PostgreSQL. */
+  pipelineId         String?
+  pipeline           Pipeline?          @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  readinessImpact    ReadinessImpact    @default(NONE)
+  requiresValidation Boolean            @default(false)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  allowedEntityTypes AttachmentCategoryPolicyEntityType[]
+  uploadPermissions  AttachmentCategoryPolicyPermission[]
+
+  @@index([category, pipelineId])
+}
+
+model AttachmentCategoryPolicyEntityType {
+  policyId   String
+  policy     AttachmentCategoryPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  entityType AttachmentEntityType
+
+  @@id([policyId, entityType])
+}
+
+model AttachmentCategoryPolicyPermission {
+  policyId     String
+  policy       AttachmentCategoryPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  permissionId String
+  permission   Permission               @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([policyId, permissionId])
+}
+
+model ReadinessRuleSet {
+  id         String          @id @default(cuid())
+  pipelineId String
+  pipeline   Pipeline        @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  name       String?
+  isActive   Boolean         @default(true)
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+  rules      ReadinessRule[]
+
+  @@index([pipelineId])
+}
+
+model ReadinessRule {
+  id          String           @id @default(cuid())
+  ruleSetId   String
+  ruleSet     ReadinessRuleSet @relation(fields: [ruleSetId], references: [id], onDelete: Cascade)
+  ruleKey     String
+  stageId     String?
+  stage       PipelineStage?   @relation(fields: [stageId], references: [id], onDelete: SetNull)
+  templateKey String?
+  sortOrder   Int              @default(0)
+  hardBlock   Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+
+  /** Uniqueness for (ruleSetId, ruleKey, stageId) when stageId set: enforce in app + partial unique in SQL — NULL stageId duplicates allowed by plain @@unique in Postgres. */
+  @@index([ruleSetId, ruleKey, stageId])
+  @@index([ruleSetId])
+}
+
+model ReadinessOverride {
+  id              String                  @id @default(cuid())
+  dealId          String
+  deal            Deal                    @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  ruleKey         String
+  reason          String
+  status          ReadinessOverrideStatus @default(PENDING)
+  requestedById   String
+  requestedBy     User                    @relation("ReadinessOverrideRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
+  approvedById    String?
+  approvedBy      User?                   @relation("ReadinessOverrideApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedAt      DateTime?
+  expiresAt       DateTime?
+  createdAt       DateTime                @default(now())
+
+  @@index([dealId, ruleKey, status])
+  @@index([dealId])
+}
+
+/** Payment tranche / prepayment gate — moves truth out of workspaceMeta-only JSON. */
+model DealPaymentMilestone {
+  id                String   @id @default(cuid())
+  dealId            String
+  deal              Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  sortOrder         Int      @default(0)
+  label             String?
+  amount            Float?
+  currency          String?
+  dueAt             DateTime?
+  confirmedAt       DateTime?
+  confirmedById     String?
+  confirmedBy       User?    @relation("DealPaymentMilestoneConfirmedBy", fields: [confirmedById], references: [id], onDelete: SetNull)
+  proofAttachmentId String?
+  proofAttachment   Attachment? @relation(fields: [proofAttachmentId], references: [id], onDelete: SetNull)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([dealId, sortOrder])
+  @@index([dealId])
+}
+
+/** Outbox / idempotent automation trigger log (n8n-style workers consume `processedAt IS NULL`). */
+model DomainEvent {
+  id          String    @id @default(cuid())
+  type        String
+  dedupeKey   String?   @unique
+  payload     Json
+  dealId      String?
+  deal        Deal?     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  processedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([dealId, createdAt])
+  @@index([type, processedAt])
+}
+
+enum TaskEntityType {
+  LEAD
+  DEAL
+}
+
+enum TaskType {
+  CALLBACK
+  SEND_QUOTE
+  PREPARE_ESTIMATE
+  SCHEDULE_MEETING
+  VERIFY_PAYMENT
+  FOLLOW_UP
+  SEND_KP
+  COLLECT_FILES
+  CLARIFY_PROJECT
+  APPROVAL_FOLLOW_UP
+  OTHER
+}
+
+enum TaskStatus {
+  OPEN
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}
+
+enum TaskPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum EstimateStatus {
+  DRAFT
+  SENT
+  APPROVED
+  REJECTED
+  SUPERSEDED
+}
+
+enum EstimateLineType {
+  PRODUCT
+  SERVICE
+  DELIVERY
+  INSTALLATION
+  DISCOUNT
+  OTHER
+}
+
+/** Етап 1: задачі по лидах/угодах (follow-up, КП, оплата тощо). */
+model Task {
+  id            String         @id @default(cuid())
+  title         String
+  description   String?        @db.Text
+  entityType    TaskEntityType
+  entityId      String
+  taskType      TaskType
+  status        TaskStatus     @default(OPEN)
+  priority      TaskPriority   @default(NORMAL)
+  dueAt         DateTime?
+  reminderAt    DateTime?
+  assigneeId    String
+  assignee      User           @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  createdById   String
+  createdBy     User           @relation("TaskCreatedBy", fields: [createdById], references: [id])
+  completedAt   DateTime?
+  resultComment String?        @db.Text
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([assigneeId, status, dueAt])
+  @@index([entityType, entityId])
+}
+
+/**
+ * Глобальні налаштування інстансу (singleton `id = "default"`).
+ * `communicationsJson` — телефон менеджера та API месенджерів / телефонії (див. `lib/settings/communications-config`).
+ */
+model SystemSettings {
+  id                 String   @id
+  communicationsJson Json?
+  updatedAt          DateTime @updatedAt
+  updatedById        String?
+
+  @@map("system_settings")
+}
+
+/** Етап 1: sales-friendly смета по угоді (не BOM). Може бути привʼязана до ліда до конверсії. */
+model Estimate {
+  id               String          @id @default(cuid())
+  dealId           String?
+  deal             Deal?           @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  leadId           String?
+  lead             Lead?           @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  version          Int             @default(1)
+  status           EstimateStatus  @default(DRAFT)
+  totalPrice       Float?
+  totalCost        Float?
+  grossMargin      Float?
+  discountAmount   Float?
+  deliveryCost     Float?
+  installationCost Float?
+  notes            String?         @db.Text
+  /** Шаблон швидкого розрахунку (kitchen, wardrobe, …) */
+  templateKey      String?
+  createdById      String
+  createdBy        User            @relation("EstimateCreatedBy", fields: [createdById], references: [id])
+  approvedById     String?
+  approvedBy       User?           @relation("EstimateApprovedBy", fields: [approvedById], references: [id])
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  lineItems        EstimateLineItem[]
+  proposals        LeadProposal[]
+  /** Лід, для якого ця смета позначена активною в Hub (опційно). */
+  leadActiveFor    Lead?           @relation("LeadActiveEstimate")
+
+  isActive         Boolean         @default(false)
+  isClientFacing   Boolean         @default(false)
+
+  @@unique([dealId, version])
+  @@unique([leadId, version])
+  @@index([dealId, status])
+  @@index([leadId, status])
+}
+
+model EstimateLineItem {
+  id           String           @id @default(cuid())
+  estimateId   String
+  estimate     Estimate         @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+  type         EstimateLineType
+  category     String?
+  productName  String
+  qty          Float
+  unit         String
+  salePrice    Float
+  costPrice    Float?
+  amountSale   Float
+  amountCost   Float?
+  margin       Float?
+  metadataJson Json?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@index([estimateId])
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  MANAGER
+  USER
+  DIRECTOR
+  HEAD_MANAGER
+  SALES_MANAGER
+}
+
+enum PermissionKey {
+  DASHBOARD_VIEW
+  LEADS_VIEW
+  CONTACTS_VIEW
+  CALENDAR_VIEW
+  TASKS_VIEW
+  ORDERS_VIEW
+  PRODUCTS_VIEW
+  REPORTS_VIEW
+  REPORTS_EXPORT
+  NOTIFICATIONS_VIEW
+  ADMIN_PANEL_VIEW
+  SETTINGS_VIEW
+
+  LEADS_CREATE
+  LEADS_UPDATE
+  LEADS_ASSIGN
+  DEALS_VIEW
+  DEALS_CREATE
+  DEALS_UPDATE
+  DEALS_ASSIGN
+  DEALS_STAGE_CHANGE
+  TASKS_CREATE
+  TASKS_UPDATE
+  TASKS_ASSIGN
+  FILES_VIEW
+  FILES_UPLOAD
+  FILES_DELETE
+  ESTIMATES_VIEW
+  ESTIMATES_CREATE
+  ESTIMATES_UPDATE
+  QUOTES_CREATE
+  CONTRACTS_VIEW
+  CONTRACTS_CREATE
+  CONTRACTS_UPDATE
+  PAYMENTS_VIEW
+  PAYMENTS_UPDATE
+  COST_VIEW
+  MARGIN_VIEW
+  SETTINGS_MANAGE
+  USERS_VIEW
+  USERS_MANAGE
+  ROLES_MANAGE
+  AUDIT_LOG_VIEW
+
+  // Deal workspace / document core (enforce in API — presence in DB alone grants nothing until guards check)
+  DEAL_WORKSPACE_VIEW
+  CONTRACT_VIEW
+  CONTRACT_EDIT
+  CONTRACT_APPROVE_INTERNAL
+  CONTRACT_SEND_SIGNATURE
+  FILE_UPLOAD
+  FILE_DELETE
+  READINESS_OVERRIDE_REQUEST
+  READINESS_OVERRIDE_APPROVE
+  HANDOFF_SUBMIT
+  HANDOFF_ACCEPT
+  PRODUCTION_LAUNCH
+  PAYMENT_CONFIRM
+}
+
+// --- Document / contract / signature / readiness (architecture redesign) ---
+
+enum AttachmentSource {
+  MANUAL
+  GENERATED
+  INBOX_IMPORT
+  SYSTEM
+  SIGNATURE_OUTPUT
+}
+
+enum VirusScanStatus {
+  PENDING
+  CLEAN
+  REJECTED
+  SKIPPED
+}
+
+enum ReadinessImpact {
+  NONE
+  SOFT
+  HARD
+}
+
+enum SignatureProvider {
+  DIIA
+}
+
+enum SignatureRequestStatus {
+  DRAFT
+  SENT
+  IN_PROGRESS
+  COMPLETED
+  DECLINED
+  EXPIRED
+  CANCELLED
+}
+
+enum SignatureSequence {
+  SEQUENTIAL
+  PARALLEL
+}
+
+enum SignatureSignerRole {
+  CLIENT
+  COMPANY
+  WITNESS
+}
+
+enum SignatureSignerStatus {
+  PENDING
+  VIEWED
+  SIGNED
+  DECLINED
+}
+
+enum ContractApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ReadinessOverrideStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  REVOKED
+}

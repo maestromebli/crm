@@ -1,0 +1,19 @@
+Issue Type,Summary,Description,Priority
+Epic,Security & Reliability Baseline,"P0/P1 hardening for webhook security, env validation, and abuse protection.",Highest
+Epic,Core API Performance & Cache Strategy,"Reduce cache invalidation overhead and establish measurable API performance baselines.",High
+Epic,Testing of Business-Critical Flows,"Integration test coverage for lead/deal/file-access critical business flows.",High
+Epic,Code Quality & Maintainability,"Gradual strict typing, API error standardization, and legacy app drift resolution.",Medium
+Epic,Observability & Operability,"Structured logs, tracing correlation, SLO dashboards and incident readiness.",Medium
+Story,Fail-closed webhook signature verification,"EPIC: Security & Reliability Baseline. In production, reject requests when webhook secret is missing or signature is invalid. Add safe diagnostics without leaking secrets.",Highest
+Story,Startup environment validation,"EPIC: Security & Reliability Baseline. Implement centralized env validation with separate required sets for dev/prod and clear startup errors.",Highest
+Story,Rate limiting for public and integration endpoints,"EPIC: Security & Reliability Baseline. Add IP/token/path-aware rate limits for webhook and public token routes, with 429 handling and telemetry.",High
+Story,Centralize cache invalidation for mutations,"EPIC: Core API Performance & Cache Strategy. Replace long manual revalidatePath lists with domain-level helper/tag strategy.",High
+Story,Establish API performance baseline metrics,"EPIC: Core API Performance & Cache Strategy. Track p50/p95 latency and error rate for core endpoints with before/after comparison.",High
+Story,Integration tests for lead creation flow,"EPIC: Testing of Business-Critical Flows. Cover valid/invalid payloads, owner assignment permissions, and post-create invariants.",High
+Story,Integration tests for lead-to-deal conversion,"EPIC: Testing of Business-Critical Flows. Validate conversion correctness, permissions, and repeated-call behavior.",High
+Story,Integration tests for attachment access control,"EPIC: Testing of Business-Critical Flows. Verify authorized access, public token scope, and invalid/deleted file handling.",High
+Story,Phased TypeScript strictness uplift,"EPIC: Code Quality & Maintainability. Increase type safety in src/lib and src/app/api without big-bang migration.",Medium
+Story,Standardize API error handling,"EPIC: Code Quality & Maintainability. Unify error payload format and mapping from domain errors to HTTP responses.",Medium
+Story,Resolve legacy apps/web version drift,"EPIC: Code Quality & Maintainability. Decide archive/migrate/align strategy and document canonical app ownership.",Medium
+Story,Structured logging with correlation IDs,"EPIC: Observability & Operability. Add request correlation and standardized structured logs for incident debugging.",Medium
+Story,SLO dashboards and alerting,"EPIC: Observability & Operability. Build dashboards and alerts for 5xx, latency, and webhook failures with runbook.",Medium

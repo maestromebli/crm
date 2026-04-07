@@ -1,0 +1,387 @@
+import { revalidatePath } from "next/cache";
+import { NextResponse } from "next/server";
+import { appendActivityLog } from "../../../../../lib/deal-api/audit";
+import { extractFirstJsonObject } from "../../../../../lib/ai/extract-json";
+import {
+  forbidUnlessLeadAccess,
+  requireSessionUser,
+} from "../../../../../lib/authz/api-guard";
+import { P } from "../../../../../lib/authz/permissions";
+import { prisma } from "../../../../../lib/prisma";
+
+type Ctx = { params: Promise<{ leadId: string }> };
+
+type StageOpt = { id: string; name: string; slug: string };
+
+function normalizeTips(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  return v
+    .filter((x): x is string => typeof x === "string")
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .slice(0, 8);
+}
+
+export async function POST(req: Request, ctx: Ctx) {
+  try {
+    return await postLeadAiInsight(req, ctx);
+  } catch (e) {
+     
+    console.error("[POST ai-insight] unhandled", e);
+    return NextResponse.json(
+      { error: "Внутрішня помилка під час аналізу ШІ." },
+      { status: 500 },
+    );
+  }
+}
+
+async function postLeadAiInsight(req: Request, ctx: Ctx) {
+  if (!process.env.DATABASE_URL?.trim()) {
+    return NextResponse.json(
+      { error: "DATABASE_URL не задано" },
+      { status: 503 },
+    );
+  }
+
+  const user = await requireSessionUser();
+  if (user instanceof NextResponse) return user;
+
+  const { leadId } = await ctx.params;
+
+  let body: { autoApplyStage?: boolean };
+  try {
+    body = (await req.json()) as typeof body;
+  } catch {
+    body = {};
+  }
+  const autoApplyStage = Boolean(body.autoApplyStage);
+
+  const leadRow = await prisma.lead.findUnique({
+    where: { id: leadId },
+    select: {
+      id: true,
+      ownerId: true,
+      pipelineId: true,
+      title: true,
+      source: true,
+      priority: true,
+      stageId: true,
+      contactName: true,
+      phone: true,
+      email: true,
+      note: true,
+      stage: { select: { id: true, name: true, slug: true } },
+      pipeline: { select: { name: true } },
+      owner: { select: { name: true, email: true } },
+      contact: {
+        select: { fullName: true, phone: true, email: true },
+      },
+      deals: {
+        where: { status: "OPEN" },
+        take: 1,
+        select: { title: true, stage: { select: { name: true } } },
+      },
+    },
+  });
+
+  if (!leadRow) {
+    return NextResponse.json({ error: "Лід не знайдено" }, { status: 404 });
+  }
+
+  const viewDenied = await forbidUnlessLeadAccess(user, P.LEADS_VIEW, leadRow);
+  if (viewDenied) return viewDenied;
+
+  const [msgCount, fileCount] = await Promise.all([
+    prisma.leadMessage.count({ where: { leadId } }),
+    prisma.attachment.count({
+      where: {
+        entityType: "LEAD",
+        entityId: leadId,
+        deletedAt: null,
+      },
+    }),
+  ]);
+
+  const stages = await prisma.pipelineStage.findMany({
+    where: { pipelineId: leadRow.pipelineId },
+    orderBy: { sortOrder: "asc" },
+    select: { id: true, name: true, slug: true, isFinal: true },
+  });
+
+  const stageOpts: StageOpt[] = stages.map((s) => ({
+    id: s.id,
+    name: s.name,
+    slug: s.slug,
+  }));
+  const stageIdSet = new Set(stageOpts.map((s) => s.id));
+
+  const apiKey = process.env.AI_API_KEY?.trim();
+  const baseUrl = process.env.AI_BASE_URL ?? "https://api.openai.com/v1";
+  const model = process.env.AI_MODEL ?? "gpt-4.1-mini";
+
+  const dealHint = leadRow.deals[0];
+  const contextLines = [
+    `Назва: ${leadRow.title}`,
+    `Воронка: ${leadRow.pipeline.name}, поточна стадія: ${leadRow.stage.name} (id=${leadRow.stageId})`,
+    `Джерело: ${leadRow.source}, пріоритет: ${leadRow.priority}`,
+    `Відповідальний: ${leadRow.owner.name ?? leadRow.owner.email}`,
+    `Контакт: ${leadRow.contactName ?? "—"} / ${leadRow.phone ?? "—"} / ${leadRow.email ?? "—"}`,
+  ];
+  if (leadRow.contact) {
+    contextLines.push(
+      `Картка контакту: ${leadRow.contact.fullName}, ${leadRow.contact.phone ?? ""}, ${leadRow.contact.email ?? ""}`,
+    );
+  }
+  if (leadRow.note?.trim()) {
+    contextLines.push(`Нотатка: ${leadRow.note.trim()}`);
+  }
+  if (dealHint) {
+    contextLines.push(
+      `Відкрита угода: ${dealHint.title} · ${dealHint.stage.name}`,
+    );
+  }
+  contextLines.push(
+    `Внутрішні повідомлення по ліду: ${msgCount}, файлів: ${fileCount}`,
+  );
+
+  const stagesJson = JSON.stringify(
+    stages.map((s) => ({
+      id: s.id,
+      name: s.name,
+      slug: s.slug,
+      isFinal: s.isFinal,
+    })),
+  );
+
+  if (!apiKey) {
+    return NextResponse.json({
+      configured: false,
+      summary:
+        "ШІ не налаштовано: додайте AI_API_KEY у .env. Після цього тут зʼявиться аналіз і рекомендація стадії.",
+      managerTips: [
+        "Перевірте телефон та джерело ліда перед першим дзвінком.",
+        "Зафіксуйте наступний крок у задачах на вкладці «Задачі».",
+      ],
+      recommendedStageId: null,
+      recommendedStageName: null,
+      currentStageId: leadRow.stageId,
+      currentStageName: leadRow.stage.name,
+      reason: "Модель не викликалась — немає ключа API.",
+      confidence: "low" as const,
+      appliedStage: false,
+    });
+  }
+
+  const userPrompt = `Ти аналітик для CRM корпусних меблів (Україна). Допоможи менеджеру.
+
+Контекст ліда:
+${contextLines.join("\n")}
+
+Доступні стадії воронки (JSON масив, поле id — єдине дійсне для recommendedStageId):
+${stagesJson}
+
+Поточний stageId: "${leadRow.stageId}"
+
+Поверни ЛИШЕ валідний JSON (без markdown), формат:
+{
+  "summary": "короткий підсумок ситуації українською, 2-4 речення",
+  "managerTips": ["порада 1", "порада 2", "до 5 пунктів"],
+  "recommendedStageId": "<один з id з масиву вище або null якщо залишити поточну>",
+  "stayOnCurrent": true або false,
+  "reason": "чому така стадія, українською, 1-2 речення",
+  "confidence": "low" | "medium" | "high"
+}
+
+Правила:
+- Якщо даних мало — recommendedStageId: null, stayOnCurrent: true, confidence: "low".
+- Не вигадуй id стадій — тільки зі списку.
+- Фінальні стадії (isFinal true) обирай лише якщо логічно закрити лід.`;
+
+  let parsed: {
+    summary?: string;
+    managerTips?: unknown;
+    recommendedStageId?: string | null;
+    stayOnCurrent?: boolean;
+    reason?: string;
+    confidence?: string;
+  };
+
+  try {
+    const response = await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          {
+            role: "system",
+            content:
+              "Ти повертаєш лише JSON без пояснень. Ключі англійською як у інструкції, текстові значення українською.",
+          },
+          { role: "user", content: userPrompt },
+        ],
+        temperature: 0.25,
+        max_tokens: 900,
+      }),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      return NextResponse.json(
+        {
+          error: `AI HTTP ${response.status}`,
+          detail: errText.slice(0, 500),
+        },
+        { status: 502 },
+      );
+    }
+
+    const rawAi = await response.text();
+    if (!rawAi.trim()) {
+      return NextResponse.json(
+        { error: "Провайдер ШІ повернув порожню відповідь" },
+        { status: 502 },
+      );
+    }
+    let data: { choices?: { message?: { content?: string } }[] };
+    try {
+      data = JSON.parse(rawAi) as typeof data;
+    } catch {
+      return NextResponse.json(
+        { error: "Провайдер ШІ повернув некоректний JSON" },
+        { status: 502 },
+      );
+    }
+    const content = data.choices?.[0]?.message?.content?.trim() ?? "";
+    if (!content) {
+      return NextResponse.json(
+        { error: "AI не повернув текст" },
+        { status: 502 },
+      );
+    }
+
+    parsed = extractFirstJsonObject(content) as typeof parsed;
+  } catch (e) {
+     
+    console.error("[ai-insight] parse/call", e);
+    return NextResponse.json(
+      {
+        error:
+          e instanceof Error && e.message === "JSON_NOT_FOUND"
+            ? "Не вдалося розпарсити відповідь ШІ"
+            : "Помилка звернення до ШІ",
+      },
+      { status: 502 },
+    );
+  }
+
+  let recommendedStageId: string | null =
+    typeof parsed.recommendedStageId === "string" &&
+    parsed.recommendedStageId.trim()
+      ? parsed.recommendedStageId.trim()
+      : null;
+
+  if (recommendedStageId && !stageIdSet.has(recommendedStageId)) {
+    recommendedStageId = null;
+  }
+
+  if (parsed.stayOnCurrent === true) {
+    recommendedStageId = null;
+  }
+
+  const summary =
+    typeof parsed.summary === "string" && parsed.summary.trim()
+      ? parsed.summary.trim()
+      : "Без короткого підсумку.";
+
+  const managerTips = normalizeTips(parsed.managerTips);
+  const reason =
+    typeof parsed.reason === "string" && parsed.reason.trim()
+      ? parsed.reason.trim()
+      : "";
+  const confidenceRaw =
+    typeof parsed.confidence === "string"
+      ? parsed.confidence.toLowerCase()
+      : "low";
+  const confidence =
+    confidenceRaw === "high" || confidenceRaw === "medium"
+      ? confidenceRaw
+      : "low";
+
+  const recommendedStageName = recommendedStageId
+    ? (stageOpts.find((s) => s.id === recommendedStageId)?.name ?? null)
+    : null;
+
+  let appliedStage = false;
+
+  if (
+    autoApplyStage &&
+    recommendedStageId &&
+    recommendedStageId !== leadRow.stageId
+  ) {
+    const updateDenied = await forbidUnlessLeadAccess(
+      user,
+      P.LEADS_UPDATE,
+      leadRow,
+    );
+    if (updateDenied) {
+      return NextResponse.json({
+        configured: true,
+        summary,
+        managerTips,
+        recommendedStageId,
+        recommendedStageName,
+        currentStageId: leadRow.stageId,
+        currentStageName: leadRow.stage.name,
+        reason,
+        confidence,
+        appliedStage: false,
+        autoApplyBlocked:
+          "Недостатньо прав на оновлення ліда — стадію можна змінити вручну.",
+      });
+    }
+
+    await prisma.lead.update({
+      where: { id: leadId },
+      data: { stageId: recommendedStageId },
+    });
+
+    await appendActivityLog({
+      entityType: "LEAD",
+      entityId: leadId,
+      type: "LEAD_UPDATED",
+      actorUserId: user.id,
+      data: {
+        fields: ["stageId"],
+        source: "ai_insight_auto",
+        fromStageId: leadRow.stageId,
+        toStageId: recommendedStageId,
+      },
+    });
+
+    revalidatePath("/leads");
+    revalidatePath(`/leads/${leadId}`);
+    revalidatePath(`/leads/${leadId}/activity`);
+    appliedStage = true;
+  }
+
+  return NextResponse.json({
+    configured: true,
+    summary,
+    managerTips,
+    recommendedStageId,
+    recommendedStageName,
+    currentStageId: appliedStage
+      ? recommendedStageId!
+      : leadRow.stageId,
+    currentStageName: appliedStage
+      ? (recommendedStageName ?? leadRow.stage.name)
+      : leadRow.stage.name,
+    reason,
+    confidence,
+    appliedStage,
+  });
+}

@@ -1,0 +1,46 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Next.js
+.next
+out
+
+# Env & secrets (шаблон .env.example залишаємо)
+.env
+.env.local
+.env.*.local
+
+# Test / Playwright
+test-results
+playwright-report
+blob-report
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Vercel
+.vercel
+
+# TypeScript / збірка
+*.tsbuildinfo
+tsc.log
+
+# Локальні завантаження CRM (контракти тощо) — лише .gitkeep у репозиторії
+storage/uploads/**
+!storage/uploads/.gitkeep
+
+# Local / temp dirs (розгортання, тимчасові витяжки)
+.tmp-*/
+.tmp-*
+
+# IDE (опційно; розкоментуйте якщо не хочете шарити)
+# .vscode
