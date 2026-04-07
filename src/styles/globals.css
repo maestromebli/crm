@@ -329,6 +329,23 @@
   letter-spacing: 0.005em;
 }
 
+/* Contrast pass for dense CRM screens (keeps palette, improves legibility). */
+.enver-readable :where(.text-slate-500, .text-\[var\(--enver-text-muted\)\]) {
+  color: #475569;
+}
+
+.enver-readable :where(.text-slate-600) {
+  color: #334155;
+}
+
+.enver-readable :where(.border-slate-100) {
+  border-color: #d7dfeb;
+}
+
+.enver-readable :where(.border-slate-200) {
+  border-color: #c6d1e2;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .enver-panel,
   .enver-nav-pill,
