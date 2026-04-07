@@ -53,7 +53,7 @@ export async function POST(req: Request, ctx: Ctx) {
     }
 
     const msg = await prisma.$transaction(async (tx) => {
-      const created = await tx.constructorRoomMessage.create({
+      const created = await tx.dealConstructorRoomMessage.create({
         data: {
           roomId: room.id,
           body: text,

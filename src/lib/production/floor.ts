@@ -1,14 +1,9 @@
-import type { ProductionStageName } from "@prisma/client";
 import { stageLabelUa } from "./default-stages";
 
-/** Підпис етапу для legacy-сторінок / звітів (без старого enum лінії). */
+/** Підпис етапу для legacy-сторінок / звітів. */
 export function floorStageLabelUa(stage: string): string {
   if (stage === "WAITING") return "Очікування";
-  try {
-    return stageLabelUa(stage as ProductionStageName);
-  } catch {
-    return stage;
-  }
+  return stageLabelUa(stage);
 }
 
 export function floorStageShortUa(stage: string): string {
@@ -35,7 +30,6 @@ export function utilizationPercent(count: number, capacity: number): number {
   return Math.min(100, Math.round((count / capacity) * 100));
 }
 
-/** Legacy: операційний борд (якщо ще імпортується). */
 export const FLOOR_STAGE_ORDER = [
   "CUTTING",
   "EDGING",

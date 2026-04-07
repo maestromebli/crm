@@ -1,12 +1,12 @@
 "use client";
 
-import type { ProductionOrchestrationStatus } from "@prisma/client";
+import type { ConstructorRoomStatus } from "@prisma/client";
 
 type Snapshot = {
   productionNumber: string;
   dealTitle: string;
   clientName: string;
-  status: ProductionOrchestrationStatus;
+  status: ConstructorRoomStatus;
   dueDate: string | null;
   constructorExternalName: string | null;
 };

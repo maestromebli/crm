@@ -7,6 +7,7 @@ import {
   requireSessionUser,
 } from "../../../../../lib/authz/api-guard";
 import { P } from "../../../../../lib/authz/permissions";
+import { newEstimateStableLineId } from "../../../../../lib/estimates/new-stable-line-id";
 import { recalculateEstimateTotals } from "../../../../../lib/estimates/recalculate";
 import { serializeEstimateForClient } from "../../../../../lib/estimates/serialize";
 
@@ -181,6 +182,8 @@ export async function POST(req: Request, ctx: Ctx) {
       amountCost: number | null;
       margin: number | null;
       metadataJson?: unknown;
+      stableLineId?: string | null;
+      sortOrder?: number;
     }> = [];
 
     if (typeof body.cloneFromEstimateId === "string" && body.cloneFromEstimateId) {
@@ -201,6 +204,8 @@ export async function POST(req: Request, ctx: Ctx) {
           amountCost: li.amountCost,
           margin: li.margin,
           metadataJson: li.metadataJson ?? undefined,
+          stableLineId: li.stableLineId ?? null,
+          sortOrder: li.sortOrder,
         }));
       }
     }
@@ -232,7 +237,7 @@ export async function POST(req: Request, ctx: Ctx) {
           installationCost,
           createdById: user.id,
           lineItems: {
-            create: lineData.map((l) => ({
+            create: lineData.map((l, idx) => ({
               type: l.type,
               category: l.category,
               productName: l.productName,
@@ -243,6 +248,14 @@ export async function POST(req: Request, ctx: Ctx) {
               amountSale: l.amountSale,
               amountCost: l.amountCost,
               margin: l.margin,
+              stableLineId:
+                typeof l.stableLineId === "string" && l.stableLineId.trim()
+                  ? l.stableLineId.trim()
+                  : newEstimateStableLineId(),
+              sortOrder:
+                typeof l.sortOrder === "number" && Number.isFinite(l.sortOrder)
+                  ? l.sortOrder
+                  : idx,
               ...(l.metadataJson !== undefined && l.metadataJson !== null
                 ? { metadataJson: l.metadataJson as object }
                 : {}),

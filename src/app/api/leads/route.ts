@@ -19,6 +19,8 @@ import { ensureContactForLead } from "@/lib/leads/ensure-contact-from-lead";
 import { prisma } from "@/lib/prisma";
 import { requireDatabaseUrl } from "@/lib/api/route-guards";
 import { saveLeadUploadPrivate } from "@/lib/uploads/lead-disk-upload";
+import { CORE_EVENT_TYPES, publishEntityEvent } from "@/lib/events/crm-events";
+import { recordWorkflowEvent, WORKFLOW_EVENT_TYPES } from "@/features/event-system";
 
 const PRIORITIES = new Set(["low", "normal", "high"]);
 
@@ -208,6 +210,36 @@ export async function POST(req: Request) {
           ownerId !== sessionUserId ? sessionUserId : undefined,
       },
     });
+    await publishEntityEvent({
+      type: CORE_EVENT_TYPES.LEAD_CREATED,
+      entityType: "LEAD",
+      entityId: lead.id,
+      userId: sessionUserId,
+      payload: {
+        source: lead.source,
+        ownerId: lead.ownerId,
+      },
+    });
+    await recordWorkflowEvent(
+      WORKFLOW_EVENT_TYPES.LEAD_CREATED,
+      { leadId: lead.id },
+      {
+        entityType: "LEAD",
+        entityId: lead.id,
+        userId: sessionUserId,
+        dedupeKey: `lead-created:${lead.id}`,
+      },
+    );
+    await recordWorkflowEvent(
+      WORKFLOW_EVENT_TYPES.LEAD_ASSIGNED,
+      { leadId: lead.id, ownerId: lead.ownerId },
+      {
+        entityType: "LEAD",
+        entityId: lead.id,
+        userId: sessionUserId,
+        dedupeKey: `lead-assigned:${lead.id}:${lead.ownerId}`,
+      },
+    );
 
     revalidatePath("/leads");
     revalidatePath("/leads/new");
@@ -259,6 +291,26 @@ export async function POST(req: Request) {
             category: multipartFileCategory,
           },
         });
+        await publishEntityEvent({
+          type: CORE_EVENT_TYPES.FILE_UPLOADED,
+          entityType: "LEAD",
+          entityId: lead.id,
+          userId: sessionUserId,
+          payload: {
+            fileName: saved.originalName,
+            category: multipartFileCategory,
+          },
+        });
+        await recordWorkflowEvent(
+          WORKFLOW_EVENT_TYPES.FILE_UPLOADED,
+          { leadId: lead.id, attachmentId },
+          {
+            entityType: "LEAD",
+            entityId: lead.id,
+            userId: sessionUserId,
+            dedupeKey: `file-uploaded:${attachmentId}`,
+          },
+        );
       } catch (e) {
         let hint = "не вдалося зберегти";
         if (e instanceof Error) {

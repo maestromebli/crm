@@ -34,6 +34,29 @@ export type CommandCenterKpi = {
   highRiskFlows: number;
   overdueFlows: number;
   readyToDistribute: number;
+  /** Задачі закупівлі без статусу «доставлено». */
+  procurementPending: number;
+  /** Очікувана дата вже минула, поставка ще не закрита. */
+  procurementOverdue: number;
+};
+
+/** Колонка Kanban з найбільшим навантаженням (оцінка вузького місця). */
+export type WorkshopBottleneck = {
+  stageKey: string;
+  stageLabel: string;
+  taskCount: number;
+  totalWorkshopTasks: number;
+  sharePercent: number;
+};
+
+export type ProductionCommandCenterEvent = {
+  id: string;
+  flowId: string;
+  flowNumber: string;
+  actorName: string | null;
+  title: string;
+  description: string | null;
+  createdAt: string;
 };
 
 export type ProductionQueueItem = {
@@ -52,6 +75,10 @@ export type ProductionQueueItem = {
 
 export type ProductionCommandCenterView = {
   kpis: CommandCenterKpi;
+  /** Найзавантаженіша стадія цеху; `null`, якщо немає задач WORKSHOP. */
+  workshopBottleneck: WorkshopBottleneck | null;
+  /** Останні події по потоках (журнал рішень і переходів). */
+  recentEvents: ProductionCommandCenterEvent[];
   queue: ProductionQueueItem[];
   stationLoads: Array<{
     stationKey: string;

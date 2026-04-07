@@ -7,6 +7,7 @@ type EventEntityScope = {
   entityId: string;
   dealId?: string | null;
   userId?: string | null;
+  dedupeKey?: string;
 };
 
 export async function recordWorkflowEvent<K extends WorkflowEventType>(
@@ -25,5 +26,6 @@ export async function recordWorkflowEvent<K extends WorkflowEventType>(
     dealId: scope.dealId ?? null,
     userId: scope.userId ?? null,
     payload: jsonPayload,
+    dedupeKey: scope.dedupeKey,
   });
 }

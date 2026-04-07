@@ -1,13 +1,15 @@
 import { prisma } from "../../lib/prisma";
 import type { Prisma } from "@prisma/client";
-import {
-  logPrismaError,
-  userFacingPrismaMessage,
-} from "../../lib/prisma-errors";
+import { loadDealPaymentMilestonesForWorkspace } from "../../lib/deals/deal-payment-milestone-load";
+import { logPrismaError, userFacingPrismaMessage } from "../../lib/prisma-errors";
 import type { AccessContext } from "../../lib/authz/data-scope";
 import { canAccessOwner, ownerIdWhere } from "../../lib/authz/data-scope";
 import { evaluateReadiness, allReadinessMet } from "./readiness";
-import type { DealWorkspaceMeta, DealWorkspacePayload } from "./types";
+import type { DealWorkspaceMeta, DealWorkspacePayload } from "../../lib/deal-core/workspace-types";
+import { parseDealCommercialSnapshot } from "../../lib/deals/commercial-snapshot";
+import { parseDealControlMeasurement } from "../../lib/deals/control-measurement";
+import { parseHandoffManifest } from "../../lib/deals/document-templates";
+import { mapPrismaConstructorRoomToWorkspacePayload } from "../../lib/constructor-room/workspace-room-map";
 import { deriveDealListWarningBadge } from "./deal-workspace-warnings";
 
 /** Фільтр списку угод (бокове меню / статичні маршрути). */
@@ -131,7 +133,7 @@ export async function listDealsForTable(
           pipelineName: d.pipeline.name,
           ownerId: d.ownerId,
           clientName: d.client.name,
-          value: d.value,
+          value: d.value != null ? Number(d.value) : null,
           currency: d.currency,
           ownerName: d.owner.name ?? d.owner.email,
           updatedAt: d.updatedAt,
@@ -164,6 +166,56 @@ export async function listDealsForTable(
   }
 }
 
+/** Стадії воронки DEAL для канбану — усі колонки, навіть без угод. */
+export type DealBoardStage = {
+  id: string;
+  name: string;
+  sortOrder: number;
+  pipelineId: string;
+  pipelineName: string;
+};
+
+/**
+ * Усі стадії для пайплайнів, присутніх у рядках; якщо рядків немає — дефолтна воронка DEAL.
+ */
+export async function listDealBoardStages(
+  dealRows: Array<{ pipelineId: string }>,
+): Promise<DealBoardStage[]> {
+  if (!process.env.DATABASE_URL?.trim()) return [];
+  try {
+    let pipelineIds = [...new Set(dealRows.map((r) => r.pipelineId))];
+    if (pipelineIds.length === 0) {
+      const fallback = await prisma.pipeline.findFirst({
+        where: { entityType: "DEAL" },
+        orderBy: [{ isDefault: "desc" }, { id: "asc" }],
+      });
+      if (fallback) pipelineIds = [fallback.id];
+    }
+    if (pipelineIds.length === 0) return [];
+    const pipelines = await prisma.pipeline.findMany({
+      where: { id: { in: pipelineIds } },
+      include: { stages: { orderBy: { sortOrder: "asc" } } },
+      orderBy: { id: "asc" },
+    });
+    const out: DealBoardStage[] = [];
+    for (const p of pipelines) {
+      for (const s of p.stages) {
+        out.push({
+          id: s.id,
+          name: s.name,
+          sortOrder: s.sortOrder,
+          pipelineId: p.id,
+          pipelineName: p.name,
+        });
+      }
+    }
+    return out;
+  } catch (e) {
+    logPrismaError("listDealBoardStages", e);
+    return [];
+  }
+}
+
 export async function getDealWorkspacePayload(
   dealId: string,
   ctx: AccessContext,
@@ -181,11 +233,56 @@ export async function getDealWorkspacePayload(
         },
         pipeline: true,
         stage: true,
-        contract: true,
+        productionFlow: {
+          select: {
+            id: true,
+            status: true,
+            createdAt: true,
+            acceptedAt: true,
+            number: true,
+          },
+        },
+        constructorRoom: {
+          include: {
+            assignedUser: {
+              select: { id: true, name: true, email: true },
+            },
+            messages: {
+              orderBy: { createdAt: "asc" },
+              take: 200,
+              select: {
+                id: true,
+                body: true,
+                author: true,
+                createdAt: true,
+                createdBy: { select: { name: true, email: true } },
+              },
+            },
+          },
+        },
+        contract: {
+          include: {
+            versions: {
+              orderBy: { revision: "desc" },
+              take: 24,
+              select: {
+                id: true,
+                revision: true,
+                createdAt: true,
+                createdById: true,
+                lifecycleStatus: true,
+                templateKey: true,
+              },
+            },
+          },
+        },
       },
     });
     if (!deal) return null;
     if (!canAccessOwner(ctx, deal.ownerId)) return null;
+
+    const paymentMilestoneRows =
+      await loadDealPaymentMilestonesForWorkspace(deal.id);
 
     const stages = await prisma.pipelineStage.findMany({
       where: { pipelineId: deal.pipelineId },
@@ -194,7 +291,7 @@ export async function getDealWorkspacePayload(
 
     const now = new Date();
     const [
-      attachments,
+      attachmentRows,
       handoffRow,
       lastEval,
       estimatesCount,
@@ -203,10 +300,26 @@ export async function getDealWorkspacePayload(
       completedTasksCount,
       lastActivityRow,
       latestEstimate,
+      linkedProjects,
     ] = await Promise.all([
       prisma.attachment.findMany({
-        where: { entityType: "DEAL", entityId: deal.id },
-        select: { category: true },
+        where: {
+          entityType: "DEAL",
+          entityId: deal.id,
+          deletedAt: null,
+        },
+        select: {
+          id: true,
+          fileAssetId: true,
+          fileName: true,
+          fileUrl: true,
+          category: true,
+          version: true,
+          isCurrentVersion: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: "desc" },
+        take: 500,
       }),
       prisma.dealHandoff.upsert({
         where: { dealId: deal.id },
@@ -256,10 +369,14 @@ export async function getDealWorkspacePayload(
           totalPrice: true,
         },
       }),
+      prisma.project.findMany({
+        where: { dealId: deal.id },
+        select: { id: true, code: true, title: true, status: true },
+      }),
     ]);
 
     const attachmentsByCategory: Record<string, number> = {};
-    for (const a of attachments) {
+    for (const a of attachmentRows) {
       const k = a.category;
       attachmentsByCategory[k] = (attachmentsByCategory[k] ?? 0) + 1;
     }
@@ -293,13 +410,37 @@ export async function getDealWorkspacePayload(
       attachmentsByCategory,
     });
 
+    const manifest = parseHandoffManifest(handoffRow.manifestJson);
+    const flow = deal.productionFlow;
+    const productionLaunch: DealWorkspacePayload["productionLaunch"] = !flow
+      ? {
+          status:
+            meta.productionLaunched || meta.productionOrderCreated
+              ? "LAUNCHED"
+              : "NOT_READY",
+          queuedAt: null,
+          launchedAt: null,
+          failedAt: null,
+          error: null,
+          productionOrderId: null,
+        }
+      : {
+          status: "LAUNCHED",
+          queuedAt: flow.createdAt.toISOString(),
+          launchedAt:
+            flow.acceptedAt?.toISOString() ?? flow.createdAt.toISOString(),
+          failedAt: null,
+          error: null,
+          productionOrderId: flow.id,
+        };
+
     const payload: DealWorkspacePayload = {
       deal: {
         id: deal.id,
         title: deal.title,
         description: deal.description,
         status: deal.status,
-        value: deal.value,
+        value: deal.value != null ? Number(deal.value) : null,
         currency: deal.currency,
         expectedCloseDate: deal.expectedCloseDate?.toISOString() ?? null,
         createdAt: deal.createdAt.toISOString(),
@@ -348,16 +489,54 @@ export async function getDealWorkspacePayload(
         interactionKind: m.interactionKind,
       })),
       meta,
+      commercialSnapshot: parseDealCommercialSnapshot(
+        deal.commercialSnapshotJson,
+      ),
+      paymentMilestones: paymentMilestoneRows.map((m) => ({
+        id: m.id,
+        sortOrder: m.sortOrder,
+        label: m.label,
+        amount: m.amount != null ? Number(m.amount) : null,
+        currency: m.currency,
+        dueAt: m.dueAt?.toISOString() ?? null,
+        confirmedAt: m.confirmedAt?.toISOString() ?? null,
+      })),
+      controlMeasurement: parseDealControlMeasurement(
+        deal.controlMeasurementJson,
+      ),
       contract: deal.contract
         ? {
             status: deal.contract.status,
             templateKey: deal.contract.templateKey,
             version: deal.contract.version,
+            updatedAt: deal.contract.updatedAt.toISOString(),
             signedPdfUrl: deal.contract.signedPdfUrl,
             diiaSessionId: deal.contract.diiaSessionId,
+            draft: null,
+            versions: deal.contract.versions.map((v) => ({
+              id: v.id,
+              revision: v.revision,
+              createdAt: v.createdAt.toISOString(),
+              createdById: v.createdById,
+              lifecycleStatus: v.lifecycleStatus,
+              documentType: "CONTRACT" as const,
+              format: "HTML" as const,
+              templateKey: v.templateKey,
+              recipientType: "CLIENT_PERSON" as const,
+            })),
           }
         : null,
-      attachmentsCount: attachments.length,
+      attachments: attachmentRows.map((a) => ({
+        id: a.id,
+        fileAssetId: a.fileAssetId,
+        fileName: a.fileName,
+        fileUrl: a.fileUrl,
+        category: a.category,
+        version: a.version,
+        isCurrentVersion: a.isCurrentVersion,
+        createdAt: a.createdAt.toISOString(),
+      })),
+      attachmentsCount: attachmentRows.length,
       attachmentsByCategory,
       readiness,
       readinessAllMet: allReadinessMet(readiness),
@@ -372,7 +551,12 @@ export async function getDealWorkspacePayload(
         acceptedAt: handoffRow.acceptedAt?.toISOString() ?? null,
         rejectedAt: handoffRow.rejectedAt?.toISOString() ?? null,
         rejectionReason: handoffRow.rejectionReason,
+        manifest,
       },
+      productionLaunch,
+      constructorRoom: deal.constructorRoom
+        ? mapPrismaConstructorRoomToWorkspacePayload(deal.constructorRoom)
+        : null,
       operationalStats: {
         estimatesCount,
         openTasksCount,
@@ -388,6 +572,13 @@ export async function getDealWorkspacePayload(
             }
           : null,
       },
+      linkedFinanceProjects: linkedProjects.map((p) => ({
+        id: p.id,
+        code: p.code ?? "",
+        title: p.title ?? "",
+        status: p.status ?? "",
+      })),
+      canManageFinanceProjectLink: false,
     };
 
     return payload;

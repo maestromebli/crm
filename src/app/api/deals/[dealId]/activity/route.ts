@@ -5,6 +5,11 @@ import {
   requireSessionUser,
 } from "../../../../../lib/authz/api-guard";
 import { P } from "../../../../../lib/authz/permissions";
+import {
+  canonicalEventType,
+  EVENT_FAMILIES,
+  eventFamilyForType,
+} from "../../../../../lib/events/event-catalog";
 
 type Ctx = { params: Promise<{ dealId: string }> };
 
@@ -33,9 +38,14 @@ const TYPE_UA: Record<string, string> = {
   CLIENT_PAYMENT_RECORDED: "Зареєстровано оплату від клієнта",
   CLIENT_PAYMENT_VOIDED: "Скасовано запис оплати",
   DEAL_FINANCE_SNAPSHOT_SAVED: "Збережено фінансовий знімок угоди",
+  payment_received: "Отримано оплату",
+  status_changed: "Змінено статус",
+  file_uploaded: "Завантажено файл",
+  estimate_created: "Створено прорахунок",
+  quote_sent: "Надіслано КП",
 };
 
-export async function GET(_req: Request, ctx: Ctx) {
+export async function GET(req: Request, ctx: Ctx) {
   if (!process.env.DATABASE_URL?.trim()) {
     return NextResponse.json(
       { error: "DATABASE_URL не задано" },
@@ -47,6 +57,7 @@ export async function GET(_req: Request, ctx: Ctx) {
   if (user instanceof NextResponse) return user;
 
   const { dealId } = await ctx.params;
+  const category = new URL(req.url).searchParams.get("category");
 
   try {
     const deal = await prisma.deal.findUnique({
@@ -73,19 +84,52 @@ export async function GET(_req: Request, ctx: Ctx) {
         actorUser: { select: { name: true, email: true } },
       },
     });
+    const eventRows = await prisma.domainEvent.findMany({
+      where: { dealId },
+      orderBy: { createdAt: "desc" },
+      take: 40,
+      select: {
+        id: true,
+        type: true,
+        payload: true,
+        createdAt: true,
+      },
+    });
+    const eventItems = eventRows.map((r) => ({
+      id: `ev_${r.id}`,
+      type: r.type,
+      label: TYPE_UA[canonicalEventType(r.type)] ?? TYPE_UA[r.type] ?? r.type,
+      category: eventFamilyForType(r.type),
+      source: "domain_event",
+      data: r.payload,
+      createdAt: r.createdAt.toISOString(),
+      actor: null as string | null,
+    }));
+    const activityItems = rows.map((r) => ({
+      id: r.id,
+      type: r.type,
+      label: TYPE_UA[r.type] ?? r.type,
+      category: EVENT_FAMILIES.DEAL,
+      source: r.source,
+      data: r.data,
+      createdAt: r.createdAt.toISOString(),
+      actor: r.actorUser
+        ? r.actorUser.name ?? r.actorUser.email
+        : null,
+    }));
+    const items = [...activityItems, ...eventItems].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+    const isKnownCategory =
+      category === EVENT_FAMILIES.LEAD ||
+      category === EVENT_FAMILIES.DEAL ||
+      category === EVENT_FAMILIES.PRODUCTION ||
+      category === EVENT_FAMILIES.AI_AUTOMATION;
+    const filtered =
+      category && isKnownCategory ? items.filter((x) => x.category === category) : items;
 
     return NextResponse.json({
-      items: rows.map((r) => ({
-        id: r.id,
-        type: r.type,
-        label: TYPE_UA[r.type] ?? r.type,
-        source: r.source,
-        data: r.data,
-        createdAt: r.createdAt.toISOString(),
-        actor: r.actorUser
-          ? r.actorUser.name ?? r.actorUser.email
-          : null,
-      })),
+      items: filtered.slice(0, 60),
     });
   } catch (e) {
      

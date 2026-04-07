@@ -12,3 +12,5 @@ export * from "./lead-ai-hints";
 export * from "./lead-input.mappers";
 export * from "./lead-stage-playbook";
 export * from "./lead-check-anchors";
+export * from "./lead-flow-engine";
+export * from "./lead-funnel-panel";

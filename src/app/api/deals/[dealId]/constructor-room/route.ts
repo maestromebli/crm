@@ -81,7 +81,7 @@ export async function POST(req: Request, ctx: Ctx) {
   try {
     const deal = await prisma.deal.findUnique({
       where: { id: dealId },
-      include: { productionOrders: { take: 1 }, handoff: true },
+      include: { productionFlow: { select: { id: true } }, handoff: true },
     });
     if (!deal) {
       return NextResponse.json({ error: "Угоду не знайдено" }, { status: 404 });
@@ -101,7 +101,7 @@ export async function POST(req: Request, ctx: Ctx) {
         { status: 400 },
       );
     }
-    if (!deal.productionOrders?.length) {
+    if (!deal.productionFlow) {
       return NextResponse.json(
         {
           error:

@@ -14,6 +14,11 @@ import {
 } from "@/lib/authz/api-guard";
 import { P } from "@/lib/authz/permissions";
 import {
+  enrichContractDraftFromDeal,
+  buildSeededContractDraft,
+  toDealForContractSeed,
+} from "@/lib/deals/contract-draft-seed";
+import {
   DEAL_DOCUMENT_TEMPLATES,
   makeDefaultDraft,
   parseRecipientType,
@@ -26,8 +31,10 @@ import type {
 import { renderDealContractPdf } from "@/lib/deals/render-deal-contract-pdf";
 import { saveDealBufferPrivate } from "@/lib/uploads/lead-disk-upload";
 import { closeDiiaSignatureStaleTasks } from "@/lib/diia/signature-stale-task";
+import { loadDealPaymentMilestoneSummariesForContract } from "@/lib/deals/deal-payment-milestone-load";
 import { seedDealPaymentPlan7030 } from "@/lib/deals/payment-milestones";
 import { publishCrmEvent, CRM_EVENT_TYPES } from "@/lib/events/crm-events";
+import { recordWorkflowEvent, WORKFLOW_EVENT_TYPES } from "@/features/event-system";
 
 type Ctx = { params: Promise<{ dealId: string }> };
 
@@ -66,14 +73,23 @@ export async function POST(_req: Request, ctx: Ctx) {
         title: true,
         value: true,
         currency: true,
+        expectedCloseDate: true,
+        description: true,
         ownerId: true,
         client: { select: { name: true, type: true } },
+        primaryContact: {
+          select: { fullName: true, city: true, country: true },
+        },
+        owner: { select: { name: true, email: true } },
         contract: { select: { id: true } },
       },
     });
     if (!deal) {
       return NextResponse.json({ error: "Угоду не знайдено" }, { status: 404 });
     }
+
+    const paymentMilestones =
+      await loadDealPaymentMilestoneSummariesForContract(dealId);
 
     const denied = await forbidUnlessDealAccess(user, P.CONTRACTS_CREATE, {
       ownerId: deal.ownerId,
@@ -88,21 +104,17 @@ export async function POST(_req: Request, ctx: Ctx) {
       );
     }
 
-    const defaultTemplate = DEAL_DOCUMENT_TEMPLATES[0];
-    const initialDraft = makeDefaultDraft({
-      template: defaultTemplate,
-      clientName: deal.client.name,
-      dealTitle: deal.title,
-      dealValue: deal.value ?? null,
-      dealCurrency: deal.currency ?? "UAH",
-      recipientType: deal.client.type === "COMPANY" ? "CLIENT_COMPANY" : "CLIENT_PERSON",
+    const initialDraft = buildSeededContractDraft({
+      deal: toDealForContractSeed({ ...deal, paymentMilestones }),
+      recipientType:
+        deal.client.type === "COMPANY" ? "CLIENT_COMPANY" : "CLIENT_PERSON",
     });
 
     await prisma.dealContract.create({
       data: {
         dealId,
         status: "DRAFT",
-        templateKey: defaultTemplate.key,
+        templateKey: initialDraft.templateKey,
         content: initialDraft as unknown as object,
       },
     });
@@ -121,6 +133,23 @@ export async function POST(_req: Request, ctx: Ctx) {
       trigger: "CONTRACT_CREATED",
       startedById: userId,
     });
+    const createdContract = await prisma.dealContract.findUnique({
+      where: { dealId },
+      select: { id: true },
+    });
+    if (createdContract) {
+      await recordWorkflowEvent(
+        WORKFLOW_EVENT_TYPES.CONTRACT_DRAFT_CREATED,
+        { dealId, contractId: createdContract.id },
+        {
+          entityType: "DEAL",
+          entityId: dealId,
+          dealId,
+          userId,
+          dedupeKey: `contract-draft-created:${createdContract.id}`,
+        },
+      );
+    }
 
     revalidatePath(`/deals/${dealId}/workspace`);
     return NextResponse.json({ ok: true });
@@ -174,16 +203,26 @@ export async function PATCH(req: Request, ctx: Ctx) {
     const deal = await prisma.deal.findUnique({
       where: { id: dealId },
       select: {
+        id: true,
         ownerId: true,
         title: true,
         value: true,
         currency: true,
+        expectedCloseDate: true,
+        description: true,
         client: { select: { name: true, type: true } },
+        primaryContact: {
+          select: { fullName: true, city: true, country: true },
+        },
+        owner: { select: { name: true, email: true } },
       },
     });
     if (!deal) {
       return NextResponse.json({ error: "Угоду не знайдено" }, { status: 404 });
     }
+
+    const paymentMilestones =
+      await loadDealPaymentMilestoneSummariesForContract(dealId);
 
     const denied = await forbidUnlessDealAccess(user, P.CONTRACTS_UPDATE, deal);
     if (denied) return denied;
@@ -245,14 +284,17 @@ export async function PATCH(req: Request, ctx: Ctx) {
       if (!tpl) {
         return NextResponse.json({ error: "Шаблон не знайдено" }, { status: 400 });
       }
-      const draft = makeDefaultDraft({
-        template: tpl,
-        clientName: deal.client.name,
-        dealTitle: deal.title,
-        dealValue: deal.value ?? null,
-        dealCurrency: deal.currency ?? "UAH",
-        recipientType: body.recipientType ?? existingDraft.recipientType,
-      });
+      const draft = enrichContractDraftFromDeal(
+        makeDefaultDraft({
+          template: tpl,
+          clientName: deal.client.name,
+          dealTitle: deal.title,
+          dealValue: deal.value != null ? Number(deal.value) : null,
+          dealCurrency: deal.currency ?? "UAH",
+          recipientType: body.recipientType ?? existingDraft.recipientType,
+        }),
+        toDealForContractSeed({ ...deal, paymentMilestones }),
+      );
       patch.templateKey = tpl.key;
       patch.content = draft as unknown as object;
     } else if (body.action === "saveDraft") {
@@ -458,7 +500,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
       });
       if (
         dealForPlan?.value != null &&
-        dealForPlan.value > 0 &&
+        Number(dealForPlan.value) > 0 &&
         !(await prisma.dealPaymentPlan.findUnique({
           where: { dealId },
           select: { id: true },
@@ -466,7 +508,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
       ) {
         await seedDealPaymentPlan7030(prisma, {
           dealId,
-          total: dealForPlan.value,
+          total: Number(dealForPlan.value),
           currency: dealForPlan.currency?.trim() || "UAH",
         });
       }
@@ -476,6 +518,17 @@ export async function PATCH(req: Request, ctx: Ctx) {
         payload: { status: resultingStatus },
         dedupeKey: `contract:signed:${dealId}:${row.id}:${patch.version ?? row.version}`,
       });
+      await recordWorkflowEvent(
+        WORKFLOW_EVENT_TYPES.CONTRACT_SIGNED,
+        { dealId, contractId: row.id },
+        {
+          entityType: "DEAL",
+          entityId: dealId,
+          dealId,
+          userId,
+          dedupeKey: `contract-signed:${row.id}:${patch.version ?? row.version}`,
+        },
+      );
     }
     if (
       resultingStatus === "FULLY_SIGNED" ||

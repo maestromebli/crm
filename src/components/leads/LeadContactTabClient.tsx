@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { useLeadMutationActions } from "../../features/leads/use-lead-mutation-actions";
 import type { LeadDetailRow } from "../../features/leads/queries";
 
 type SearchItem = {
@@ -23,16 +23,12 @@ export function LeadContactTabClient({
   canUpdateLead,
   canSearchContacts,
 }: Props) {
-  const router = useRouter();
-  const [busy, setBusy] = useState(false);
+  const leadActions = useLeadMutationActions(lead.id);
   const [err, setErr] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [hits, setHits] = useState<SearchItem[]>([]);
   const [searching, setSearching] = useState(false);
-
-  const refresh = useCallback(() => {
-    router.refresh();
-  }, [router]);
+  const busy = leadActions.isPending;
 
   useEffect(() => {
     if (!canSearchContacts || q.trim().length < 2) {
@@ -72,41 +68,21 @@ export function LeadContactTabClient({
 
   const linkContact = async (contactId: string) => {
     setErr(null);
-    setBusy(true);
     try {
-      const r = await fetch(`/api/leads/${lead.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contactId }),
-      });
-      const j = (await r.json()) as { error?: string };
-      if (!r.ok) throw new Error(j.error ?? "Помилка");
+      await leadActions.linkContact(contactId);
       setQ("");
       setHits([]);
-      refresh();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Помилка");
-    } finally {
-      setBusy(false);
     }
   };
 
   const unlink = async () => {
     setErr(null);
-    setBusy(true);
     try {
-      const r = await fetch(`/api/leads/${lead.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contactId: null }),
-      });
-      const j = (await r.json()) as { error?: string };
-      if (!r.ok) throw new Error(j.error ?? "Помилка");
-      refresh();
+      await leadActions.linkContact(null);
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Помилка");
-    } finally {
-      setBusy(false);
     }
   };
 

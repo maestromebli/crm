@@ -1,7 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { useDealMutationActions } from "../../features/deal-workspace/use-deal-mutation-actions";
 import type { DealWorkspacePayload } from "../../features/deal-workspace/types";
 import { cn } from "../../lib/utils";
 
@@ -11,39 +11,33 @@ type Props = {
 
 /** Прогрес по стадіях воронки + зміна поточної стадії. */
 export function DealStageProgress({ data }: Props) {
-  const router = useRouter();
-  const { stages, stage } = data;
-  const currentOrder = stage.sortOrder;
-  const [selectId, setSelectId] = useState(stage.id);
+  const dealActions = useDealMutationActions(data.deal.id);
+  const { stages, stage: initialStage } = data;
+  const [currentStageId, setCurrentStageId] = useState(initialStage.id);
+  const [selectId, setSelectId] = useState(initialStage.id);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [blockers, setBlockers] = useState<string[]>([]);
+  const currentStage = stages.find((s) => s.id === currentStageId) ?? initialStage;
+  const currentOrder = currentStage.sortOrder;
 
   useEffect(() => {
-    setSelectId(stage.id);
-  }, [stage.id]);
+    setCurrentStageId(initialStage.id);
+    setSelectId(initialStage.id);
+  }, [initialStage.id]);
 
   const applyStage = useCallback(async () => {
-    if (selectId === stage.id) return;
+    if (selectId === currentStageId) return;
     setErr(null);
     setBlockers([]);
+    const prevStageId = currentStageId;
+    setCurrentStageId(selectId);
     setSaving(true);
     try {
-      const r = await fetch(`/api/deals/${data.deal.id}/stage`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ stageId: selectId }),
-      });
-      const j = (await r.json().catch(() => ({}))) as {
-        error?: string;
-        blockers?: string[];
-      };
-      if (!r.ok) {
-        setBlockers(Array.isArray(j.blockers) ? j.blockers : []);
-        throw new Error(j.error ?? "Не вдалося змінити стадію");
-      }
-      router.refresh();
+      const j = await dealActions.updateStage(selectId);
+      setBlockers(Array.isArray(j.blockers) ? j.blockers : []);
     } catch (e) {
+      setCurrentStageId(prevStageId);
       if (
         typeof e === "object" &&
         e &&
@@ -57,36 +51,37 @@ export function DealStageProgress({ data }: Props) {
     } finally {
       setSaving(false);
     }
-  }, [data.deal.id, router, selectId, stage.id]);
+  }, [currentStageId, dealActions, selectId]);
 
   const applyNext = useCallback(async () => {
     setErr(null);
     setBlockers([]);
+    const sorted = [...stages].sort((a, b) => a.sortOrder - b.sortOrder);
+    const idx = sorted.findIndex((s) => s.id === currentStageId);
+    const nextStage = idx >= 0 ? sorted[idx + 1] : null;
+    const prevStageId = currentStageId;
+    if (nextStage) {
+      setCurrentStageId(nextStage.id);
+      setSelectId(nextStage.id);
+    }
     setSaving(true);
     try {
-      const r = await fetch(`/api/deals/${data.deal.id}/stage/next`, {
-        method: "POST",
-      });
-      const j = (await r.json().catch(() => ({}))) as {
-        error?: string;
-        blockers?: string[];
-        message?: string;
-      };
-      if (!r.ok) {
-        setBlockers(Array.isArray(j.blockers) ? j.blockers : []);
-        throw new Error(j.error ?? "Перехід заблоковано");
-      }
+      const j = await dealActions.advanceToNextStage();
+      setBlockers(Array.isArray(j.blockers) ? j.blockers : []);
       if (j.message) {
+        setCurrentStageId(prevStageId);
+        setSelectId(prevStageId);
         setErr(j.message);
         return;
       }
-      router.refresh();
     } catch (e) {
+      setCurrentStageId(prevStageId);
+      setSelectId(prevStageId);
       setErr(e instanceof Error ? e.message : "Помилка");
     } finally {
       setSaving(false);
     }
-  }, [data.deal.id, router]);
+  }, [currentStageId, dealActions, stages]);
 
   return (
     <div className="rounded-lg border border-slate-200/90 bg-[var(--enver-card)] px-3 py-2.5 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
@@ -123,11 +118,11 @@ export function DealStageProgress({ data }: Props) {
           </label>
           <button
             type="button"
-            disabled={saving || selectId === stage.id}
+              disabled={saving || selectId === currentStageId}
             onClick={() => void applyStage()}
             className={cn(
               "rounded-lg border px-2.5 py-1 text-[11px] font-medium transition",
-              selectId === stage.id
+                selectId === currentStageId
                 ? "cursor-default border-slate-100 text-slate-400"
                 : "border-[#2563eb] bg-[#2563eb] text-white shadow-sm hover:bg-[#1d4ed8]",
               saving && "opacity-60",
@@ -153,7 +148,7 @@ export function DealStageProgress({ data }: Props) {
       <div className="flex w-full overflow-hidden rounded-md border border-slate-200/90 bg-slate-200/90 p-px">
         {stages.map((s, i) => {
           const reached = s.sortOrder <= currentOrder;
-          const active = s.id === stage.id;
+          const active = s.id === currentStage.id;
           return (
             <div
               key={s.id}

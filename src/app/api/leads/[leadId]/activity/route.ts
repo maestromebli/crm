@@ -7,6 +7,11 @@ import {
 } from "../../../../../lib/authz/api-guard";
 import { P } from "../../../../../lib/authz/permissions";
 import {
+  canonicalEventType,
+  EVENT_FAMILIES,
+  eventFamilyForType,
+} from "../../../../../lib/events/event-catalog";
+import {
   leadActivityCategory,
   leadActivityDetail,
   leadActivityHeadline,
@@ -14,7 +19,7 @@ import {
 
 type Ctx = { params: Promise<{ leadId: string }> };
 
-export async function GET(_req: Request, ctx: Ctx) {
+export async function GET(req: Request, ctx: Ctx) {
   if (!process.env.DATABASE_URL?.trim()) {
     return NextResponse.json(
       { error: "DATABASE_URL не задано" },
@@ -26,6 +31,7 @@ export async function GET(_req: Request, ctx: Ctx) {
   if (user instanceof NextResponse) return user;
 
   const { leadId } = await ctx.params;
+  const category = new URL(req.url).searchParams.get("category");
 
   try {
     const lead = await prisma.lead.findUnique({
@@ -52,9 +58,40 @@ export async function GET(_req: Request, ctx: Ctx) {
         actorUser: { select: { name: true, email: true } },
       },
     });
+    const domainRowsIndexed = await prisma.domainEvent.findMany({
+      where: { entityType: "LEAD", entityId: leadId },
+      orderBy: { createdAt: "desc" },
+      take: 120,
+      select: { id: true, type: true, payload: true, createdAt: true },
+    });
+    const domainRowsLegacy = await prisma.domainEvent.findMany({
+      where: { entityType: null },
+      orderBy: { createdAt: "desc" },
+      take: 200,
+      select: { id: true, type: true, payload: true, createdAt: true },
+    });
+    const seen = new Set<string>();
+    const domainItems = [...domainRowsIndexed, ...domainRowsLegacy]
+      .map((r) => {
+        if (seen.has(r.id)) return null;
+        seen.add(r.id);
+        const data = (r.payload ?? {}) as Record<string, unknown>;
+        if (data.entityType !== "LEAD" || data.entityId !== leadId) return null;
+        const normalizedType = canonicalEventType(r.type);
+        return {
+          id: `ev_${r.id}`,
+          type: normalizedType,
+          headline: leadActivityHeadline("LEAD_UPDATED", r.payload) ?? normalizedType,
+          detail: leadActivityDetail("LEAD_UPDATED", r.payload),
+          category: eventFamilyForType(normalizedType),
+          source: "domain_event",
+          createdAt: r.createdAt.toISOString(),
+          actor: null as string | null,
+        };
+      })
+      .filter((x): x is NonNullable<typeof x> => Boolean(x));
 
-    return NextResponse.json({
-      items: rows.map((r) => {
+    const combined = [...rows.map((r) => {
         const t = r.type as ActivityType;
         return {
           id: r.id,
@@ -68,8 +105,18 @@ export async function GET(_req: Request, ctx: Ctx) {
             ? (r.actorUser.name ?? r.actorUser.email)
             : null,
         };
-      }),
-    });
+      }), ...domainItems].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+    const isKnownCategory =
+      category === EVENT_FAMILIES.LEAD ||
+      category === EVENT_FAMILIES.DEAL ||
+      category === EVENT_FAMILIES.PRODUCTION ||
+      category === EVENT_FAMILIES.AI_AUTOMATION;
+    const filtered =
+      category && isKnownCategory ? combined.filter((x) => x.category === category) : combined;
+
+    return NextResponse.json({ items: filtered });
   } catch (e) {
      
     console.error("[GET leads/[leadId]/activity]", e);

@@ -1,85 +1,20 @@
 import { prisma } from "@/lib/prisma";
-import { computeStepStates } from "./production-step.service";
-import type { ProductionOrderHubView } from "../../types/production";
+import { computeStepStates, getStepLabel } from "./production-step.service";
+import type {
+  ProductionAIInsightType,
+  ProductionFlowStatus,
+  ProductionOrderHubView,
+  ProductionQuestionStatus,
+  ProductionRiskSeverity,
+  ProductionStepKey,
+  ProductionStepState,
+  ProductionTaskStatus,
+  ProductionTaskType,
+} from "../../types/production";
 import { getDemoOrderHubView } from "../demo/production-demo";
 
 export async function getProductionOrderHubView(flowId: string): Promise<ProductionOrderHubView | null> {
-  const productionFlowDelegate = (
-    prisma as unknown as {
-      productionFlow?: {
-        findUnique: (args: unknown) => Promise<
-          | {
-              id: string;
-              number: string;
-              title: string;
-              clientName: string;
-              status: string;
-              currentStepKey: string;
-              readinessPercent: number;
-              riskScore: number;
-              dueDate: Date | null;
-              constructorName: string | null;
-              constructorMode: "INTERNAL" | "OUTSOURCE" | null;
-              constructorWorkspaceUrl: string | null;
-              telegramThreadUrl: string | null;
-              chiefUser: { name: string | null; email: string } | null;
-              steps: Array<{ key: string; state: string; completedAt: Date | null }>;
-              risks: Array<{ id: string; severity: string; title: string; description: string }>;
-              questions: Array<{
-                id: string;
-                authorName: string;
-                source: string;
-                text: string;
-                status: string;
-                createdAt: Date;
-              }>;
-              filePackages: Array<{
-                id: string;
-                packageName: string;
-                versionLabel: string;
-                note: string | null;
-                uploadedAt: Date;
-                uploadedByName: string | null;
-                validationPassed: boolean;
-                approvalStatus: "PENDING" | "APPROVED" | "REJECTED" | null;
-                files: Array<{ id: string }>;
-              }>;
-              tasks: Array<{
-                id: string;
-                type: string;
-                title: string;
-                status: string;
-                dueDate: Date | null;
-                assigneeUser: { name: string | null; email: string } | null;
-              }>;
-              aiInsights: Array<{
-                id: string;
-                type: string;
-                title: string;
-                description: string;
-                severity: string | null;
-                recommendedAction: string | null;
-              }>;
-              events: Array<{
-                id: string;
-                type: string;
-                actorName: string | null;
-                title: string;
-                description: string | null;
-                createdAt: Date;
-              }>;
-            }
-          | null
-        >;
-      };
-    }
-  ).productionFlow;
-
-  if (!productionFlowDelegate) {
-    return getDemoOrderHubView(flowId);
-  }
-
-  const flow = await productionFlowDelegate.findUnique({
+  const flow = await prisma.productionFlow.findUnique({
     where: { id: flowId },
     include: {
       chiefUser: { select: { name: true, email: true } },
@@ -98,29 +33,30 @@ export async function getProductionOrderHubView(flowId: string): Promise<Product
   });
   if (!flow) return getDemoOrderHubView(flowId);
 
-  const states = computeStepStates(
-    flow.currentStepKey,
-    flow.steps.filter((step) => step.state === "BLOCKED").map((step) => step.key),
-  );
+  const blockedKeys = flow.steps
+    .filter((step) => step.state === "BLOCKED")
+    .map((step) => step.key as ProductionStepKey);
+  const states = computeStepStates(flow.currentStepKey as ProductionStepKey, blockedKeys);
   const stateByKey = new Map(states.map((state) => [state.key, state]));
   const steps = flow.steps.map((step) => {
-    const mapped = stateByKey.get(step.key);
+    const key = step.key as ProductionStepKey;
+    const mapped = stateByKey.get(key);
     return {
-      key: step.key,
-      label: mapped?.label ?? step.key,
-      state: mapped?.state ?? step.state,
+      key,
+      label: mapped?.label ?? getStepLabel(key),
+      state: (mapped?.state ?? step.state) as ProductionStepState,
       completedAt: step.completedAt?.toISOString() ?? null,
     };
   });
 
-  return {
+  const view: ProductionOrderHubView = {
     flow: {
       id: flow.id,
       number: flow.number,
       title: flow.title,
       clientName: flow.clientName,
-      status: flow.status,
-      currentStepKey: flow.currentStepKey,
+      status: flow.status as ProductionFlowStatus,
+      currentStepKey: flow.currentStepKey as ProductionStepKey,
       readinessPercent: flow.readinessPercent,
       riskScore: flow.riskScore,
       dueDate: flow.dueDate?.toISOString() ?? null,
@@ -133,7 +69,7 @@ export async function getProductionOrderHubView(flowId: string): Promise<Product
     steps,
     blockers: flow.risks.map((risk) => ({
       id: risk.id,
-      severity: risk.severity,
+      severity: risk.severity as ProductionRiskSeverity,
       title: risk.title,
       description: risk.description,
     })),
@@ -142,7 +78,7 @@ export async function getProductionOrderHubView(flowId: string): Promise<Product
       authorName: question.authorName,
       source: question.source,
       text: question.text,
-      status: question.status,
+      status: question.status as ProductionQuestionStatus,
       createdAt: question.createdAt.toISOString(),
     })),
     filePackages: flow.filePackages.map((pkg) => ({
@@ -158,18 +94,18 @@ export async function getProductionOrderHubView(flowId: string): Promise<Product
     })),
     tasks: flow.tasks.map((task) => ({
       id: task.id,
-      type: task.type,
+      type: task.type as ProductionTaskType,
       title: task.title,
-      status: task.status,
+      status: task.status as ProductionTaskStatus,
       assigneeName: task.assigneeUser?.name ?? task.assigneeUser?.email ?? null,
       dueDate: task.dueDate?.toISOString() ?? null,
     })),
     insights: flow.aiInsights.map((insight) => ({
       id: insight.id,
-      type: insight.type,
+      type: insight.type as ProductionAIInsightType,
       title: insight.title,
       description: insight.description,
-      severity: insight.severity ?? null,
+      severity: (insight.severity ?? null) as ProductionRiskSeverity | null,
       recommendedAction: insight.recommendedAction ?? null,
     })),
     timeline: flow.events.map((event) => ({
@@ -181,4 +117,5 @@ export async function getProductionOrderHubView(flowId: string): Promise<Product
       createdAt: event.createdAt.toISOString(),
     })),
   };
+  return view;
 }

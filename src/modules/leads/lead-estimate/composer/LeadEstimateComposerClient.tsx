@@ -4,6 +4,7 @@ import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { patchLeadEstimateById } from "../../../../features/leads/lead-estimate-api";
 import { parseResponseJson } from "../../../../lib/api/parse-response-json";
 import type { CompareEstimateVersionsResult } from "../../../../lib/estimates/compare-estimate-versions";
 import type { EstimateCategoryKey } from "../../../../lib/estimates/estimate-categories";
@@ -295,22 +296,16 @@ export function LeadEstimateComposerClient({
     setErr(null);
     try {
       const linePayload = draftItemsToLinePayload(draftItems);
-      const r = await fetch(`/api/leads/${leadId}/estimates/${forkBaseEstimateId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          lineItems: linePayload,
-          changeSummary: changeNote.trim().slice(0, 500) || "Нова версія (composer)",
-          versioning: "fork",
-          forceNewVersion: true,
-        }),
-      });
-      const j = await parseResponseJson<{
+      const j = await patchLeadEstimateById<{
         error?: string;
         estimate?: { id: string };
         estimateIdChanged?: boolean;
-      }>(r);
-      if (!r.ok) throw new Error(j.error ?? "Помилка");
+      }>(leadId, forkBaseEstimateId, {
+        lineItems: linePayload,
+        changeSummary: changeNote.trim().slice(0, 500) || "Нова версія (composer)",
+        versioning: "fork",
+        forceNewVersion: true,
+      });
       discardDraft();
       if (j.estimateIdChanged && j.estimate?.id) {
         router.replace(`/leads/${leadId}/estimate/${j.estimate.id}`);

@@ -37,7 +37,6 @@ export type KpiEntry = {
   value: string;
   valueNumeric: number;
   delta: KpiDelta | null;
-  sparkline: number[];
   format: "currency" | "count" | "percent";
 };
 

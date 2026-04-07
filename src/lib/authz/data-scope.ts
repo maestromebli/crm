@@ -11,6 +11,11 @@ export type ScopeUser = { id: string; role: string };
 
 /** Базові ролі менеджерів продажу (цільова видимість для HEAD_MANAGER). */
 const SALES_TEAM_ROLES = ["SALES_MANAGER", "USER"] as const;
+const COMPANY_OPERATIONS_ROLES = [
+  "ACCOUNTANT",
+  "PROCUREMENT_MANAGER",
+  "PRODUCTION_WORKER",
+] as const;
 
 export type AccessContext = {
   /** `null` — без обмеження по owner (SUPER_ADMIN, DIRECTOR). */
@@ -63,6 +68,10 @@ export async function resolveAccessContext(
     teamOwnerIdSet.add(user.id);
     // Backward-compat: if org hasn't migrated `headManagerId` yet, keep self-only scope.
     return { teamOwnerIdSet, measurerLeadIds: null };
+  }
+  if ((COMPANY_OPERATIONS_ROLES as readonly string[]).includes(role)) {
+    // Operations roles need cross-deal visibility for finance/procurement/production hubs.
+    return { teamOwnerIdSet: null, measurerLeadIds: null };
   }
 
   return {

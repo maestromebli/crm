@@ -121,7 +121,7 @@ export async function GET(req: Request) {
           type: "deal" as const,
           id: d.id,
           name: contactName || d.title,
-          value: d.value ?? null,
+          value: d.value != null ? Number(d.value) : null,
           currency: d.currency ?? null,
         };
       }),

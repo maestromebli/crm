@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyClientPortalToken } from "@/lib/client-portal/token";
 import { publishCrmEvent, CRM_EVENT_TYPES } from "@/lib/events/crm-events";
+import { recordWorkflowEvent, WORKFLOW_EVENT_TYPES } from "@/features/event-system";
 
 type Ctx = { params: Promise<{ token: string }> };
 
@@ -62,6 +63,30 @@ export async function POST(req: Request, ctx: Ctx) {
     dealId: deal.id,
     payload: { source: "client.portal", action },
   });
+  await recordWorkflowEvent(
+    WORKFLOW_EVENT_TYPES.QUOTE_APPROVED,
+    { dealId: deal.id, proposalId: "client_portal" },
+    {
+      entityType: "DEAL",
+      entityId: deal.id,
+      dealId: deal.id,
+      userId: null,
+      dedupeKey: `quote-approved:client-portal:${deal.id}:${action}`,
+    },
+  );
+  if (action === "approve_changes") {
+    await recordWorkflowEvent(
+      WORKFLOW_EVENT_TYPES.FILE_APPROVED,
+      { dealId: deal.id, attachmentId: "client_portal_batch" },
+      {
+        entityType: "DEAL",
+        entityId: deal.id,
+        dealId: deal.id,
+        userId: null,
+        dedupeKey: `file-approved:client-portal:${deal.id}`,
+      },
+    );
+  }
 
   return NextResponse.json({ ok: true });
 }

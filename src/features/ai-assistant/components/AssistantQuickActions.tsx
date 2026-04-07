@@ -43,7 +43,7 @@ export function AssistantQuickActions({ actions, className }: Props) {
             }
           }}
           className={cn(
-            "rounded-lg border border-slate-200/90 bg-[var(--enver-card)] px-2.5 py-1.5 text-left text-[11px] text-slate-700 transition hover:border-slate-300 hover:bg-[var(--enver-hover)]",
+            "rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-xs text-slate-700 transition hover:bg-slate-50",
             a.disabled && "cursor-not-allowed opacity-50",
           )}
         >

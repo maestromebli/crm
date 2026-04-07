@@ -21,6 +21,7 @@ import {
   paymentPlanOverdueStats,
 } from "../lib/aggregation";
 import { buildObjectFinanceLedger, consolidateObjectLedger } from "../lib/object-finance";
+import { loadFinanceProjectDetail, loadLiveFinanceOverview } from "@/lib/finance/live-finance-overview";
 
 function executiveToLegacyKpi(e: FinanceExecutiveKpi): FinanceKpi {
   return {
@@ -34,6 +35,17 @@ function executiveToLegacyKpi(e: FinanceExecutiveKpi): FinanceKpi {
 }
 
 export async function getFinanceOverviewData() {
+  if (process.env.DATABASE_URL?.trim()) {
+    try {
+      return await loadLiveFinanceOverview();
+    } catch (e) {
+      console.error("[getFinanceOverviewData] live failed, using mock demo data", e);
+    }
+  }
+  return getMockFinanceOverviewData();
+}
+
+function getMockFinanceOverviewData() {
   const executive = buildExecutiveKpi(
     mockProjects,
     mockTransactions,
@@ -82,7 +94,13 @@ export async function getFinanceOverviewData() {
     d60p: 0,
   };
   for (const p of mockProjects) {
-    const remaining = Math.max(p.contractAmount - mockTransactions.filter((t) => t.projectId === p.id && t.type === "INCOME" && t.status === "CONFIRMED").reduce((acc, t) => acc + t.amount, 0), 0);
+    const remaining = Math.max(
+      p.contractAmount -
+        mockTransactions
+          .filter((t) => t.projectId === p.id && t.type === "INCOME" && t.status === "CONFIRMED")
+          .reduce((acc, t) => acc + t.amount, 0),
+      0,
+    );
     const due = p.dueDate;
     if (!due || remaining <= 0) continue;
     if (due >= referenceDay) receivablesByBucket.current += remaining;
@@ -209,7 +227,9 @@ export async function getFinanceOverviewData() {
       latestIncomeAt,
       overduePlanAmount: overduePlan.overduePlanAmount,
       overduePlanCount: overduePlan.overduePlanCount,
-      cashRunwayDays: Math.round((executive.receivedFromClients - executive.cashOperatingExpenses) / monthlyExpense * 30),
+      cashRunwayDays: Math.round(
+        ((executive.receivedFromClients - executive.cashOperatingExpenses) / monthlyExpense) * 30,
+      ),
       procurementCoveragePct: Number(coveragePct.toFixed(1)),
       topSupplierConcentrationPct: Number(topSupplierShare.toFixed(1)),
       openPayables,
@@ -241,11 +261,7 @@ export async function getFinanceOverviewData() {
           overduePlanAmount: summary.overduePlanAmount,
           payables: summary.supplierDebt,
           status:
-            summary.overduePlanAmount > 0
-              ? "risk"
-              : summary.netProfit < 0
-                ? "warning"
-                : "ok",
+            summary.overduePlanAmount > 0 ? "risk" : summary.netProfit < 0 ? "warning" : "ok",
         };
       }),
       projectNameById: Object.fromEntries(
@@ -257,10 +273,24 @@ export async function getFinanceOverviewData() {
       riskIndex,
       riskLabel,
     },
+    financeAlerts: [
+      { level: "P1" as const, text: "Є прострочені платежі по 2 проєктах." },
+      { level: "P0" as const, text: "Перевищено бюджет закупок у проєкті EN-2026-003." },
+      { level: "P2" as const, text: "Потрібно закрити 3 акти підрядників." },
+    ],
   };
 }
 
 export async function getFinanceProjectData(projectId: string) {
+  if (process.env.DATABASE_URL?.trim()) {
+    try {
+      const live = await loadFinanceProjectDetail(projectId);
+      if (live) return live;
+    } catch (e) {
+      console.error("[getFinanceProjectData] live failed, mock fallback", e);
+    }
+  }
+
   const project = mockProjects.find((p) => p.id === projectId) ?? null;
   if (!project) return null;
   const summary = calculateProjectSummary(
@@ -280,15 +310,11 @@ export async function getFinanceProjectData(projectId: string) {
     summary,
     objects: mockProjectObjects.filter((o) => o.projectId === projectId),
     paymentPlan: mockPaymentPlan.filter((p) => p.projectId === projectId),
-    incomes: mockTransactions.filter(
-      (t) => t.projectId === projectId && t.type === "INCOME",
-    ),
-    expenses: mockTransactions.filter(
-      (t) => t.projectId === projectId && t.type === "EXPENSE",
-    ),
+    incomes: mockTransactions.filter((t) => t.projectId === projectId && t.type === "INCOME"),
+    expenses: mockTransactions.filter((t) => t.projectId === projectId && t.type === "EXPENSE"),
     payroll: mockPayroll.filter((p) => p.projectId === projectId),
     commissions: mockCommissions.filter((c) => c.projectId === projectId),
     transactions: mockTransactions.filter((t) => t.projectId === projectId),
+    clientName: mockClients.find((c) => c.id === project.clientId)?.name ?? "—",
   };
 }
-

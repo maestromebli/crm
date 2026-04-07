@@ -54,7 +54,7 @@ export async function GET(req: Request, ctx: Ctx) {
     include: {
       contract: { select: { status: true } },
       handoff: { select: { status: true } },
-      productionOrders: { take: 1, select: { status: true } },
+      productionFlow: { select: { status: true } },
       _count: { select: { estimates: true } },
     },
   });
@@ -86,7 +86,7 @@ export async function GET(req: Request, ctx: Ctx) {
     meta,
     readinessAllMet: allReadinessMet(readiness),
     handoffStatus: deal.handoff?.status ?? "DRAFT",
-    productionLaunchStatus: deal.productionOrders[0] ? "LAUNCHED" : "NOT_READY",
+    productionLaunchStatus: deal.productionFlow ? "LAUNCHED" : "NOT_READY",
     contractStatus: deal.contract?.status ?? null,
     attachmentsByCategory,
     estimatesCount: deal._count.estimates,

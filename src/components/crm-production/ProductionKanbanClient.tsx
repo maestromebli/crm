@@ -3,13 +3,16 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import type { ProductionOrderStatus } from "@prisma/client";
+import { KanbanBoardSkeleton } from "@/components/shared/KanbanBoardSkeleton";
+import { KanbanEmptyColumn } from "@/components/shared/KanbanEmptyColumn";
+/** Колонки дошки (legacy mapping; API може повертати інший набір статусів). */
+type KanbanOrderStatus = "QUEUED" | "IN_PROGRESS" | "PAUSED" | "COMPLETED";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 type KanbanOrder = {
   id: string;
   dealId: string;
-  status: ProductionOrderStatus;
+  status: KanbanOrderStatus;
   priority: string;
   deadline: string | null;
   atRisk: boolean;
@@ -22,7 +25,7 @@ type KanbanOrder = {
   createdAt: string;
 };
 
-const COLS: { id: ProductionOrderStatus; title: string; hint: string }[] = [
+const COLS: { id: KanbanOrderStatus; title: string; hint: string }[] = [
   {
     id: "QUEUED",
     title: "Черга",
@@ -88,7 +91,7 @@ export function ProductionKanbanClient() {
     void load();
   }, [load]);
 
-  async function moveOrder(orderId: string, status: ProductionOrderStatus) {
+  async function moveOrder(orderId: string, status: KanbanOrderStatus) {
     const r = await fetch(`/api/crm/production/orders/${orderId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -113,7 +116,7 @@ export function ProductionKanbanClient() {
     e.dataTransfer.dropEffect = "move";
   }
 
-  async function onDrop(e: React.DragEvent, status: ProductionOrderStatus) {
+  async function onDrop(e: React.DragEvent, status: KanbanOrderStatus) {
     e.preventDefault();
     const id = dragId ?? e.dataTransfer.getData("text/plain");
     setDragId(null);
@@ -127,11 +130,33 @@ export function ProductionKanbanClient() {
     await moveOrder(id, status);
   }
 
-  const byStatus = (s: ProductionOrderStatus) =>
+  const byStatus = (s: KanbanOrderStatus) =>
     orders.filter((o) => o.status === s);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      <div className="enver-panel flex flex-wrap items-end justify-between gap-3 p-4">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--enver-muted)]">
+            Виробництво
+          </p>
+          <h2 className="mt-0.5 text-lg font-semibold tracking-tight text-[var(--enver-text)]">
+            Дошка замовлень
+          </h2>
+          <p className="mt-1 max-w-xl text-xs text-[var(--enver-text-muted)]">
+            Статуси черги з потоку виробництва. Перетягніть картку між колонками для оновлення.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void load()}
+          disabled={loading}
+          className="rounded-lg border border-[var(--enver-border)] bg-[var(--enver-card)] px-3 py-1.5 text-xs font-medium text-[var(--enver-text)] shadow-[var(--enver-shadow)] transition hover:bg-[var(--enver-hover)] disabled:opacity-50"
+        >
+          {loading ? "Оновлення…" : "Оновити"}
+        </button>
+      </div>
+
       {error ? (
         <p className="rounded-xl border border-[var(--enver-danger)]/30 bg-[var(--enver-danger-soft)] px-3 py-2 text-sm text-[var(--enver-danger)]">
           {error}
@@ -139,7 +164,7 @@ export function ProductionKanbanClient() {
       ) : null}
 
       {loading ? (
-        <p className="text-sm text-[var(--enver-text-muted)]">Завантаження…</p>
+        <KanbanBoardSkeleton columns={4} />
       ) : (
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {COLS.map((col, colIndex) => (
@@ -174,7 +199,9 @@ export function ProductionKanbanClient() {
                     <motion.div
                       key={o.id}
                       draggable
-                      onDragStart={(e) => onDragStart(e, o.id)}
+                      onDragStart={(e) =>
+                        onDragStart(e as unknown as React.DragEvent, o.id)
+                      }
                       className="cursor-grab rounded-xl border border-[var(--enver-border)] bg-[var(--enver-surface)] p-3 transition-[border-color,box-shadow] duration-200 hover:border-[var(--enver-accent)]/35 hover:shadow-md active:cursor-grabbing"
                       whileDrag={
                         reduceMotion
@@ -216,7 +243,7 @@ export function ProductionKanbanClient() {
                   );
                 })}
                 {byStatus(col.id).length === 0 ? (
-                  <p className="text-center text-xs text-[var(--enver-muted)]">Порожньо</p>
+                  <KanbanEmptyColumn message="Немає замовлень у цій колонці" />
                 ) : null}
               </div>
             </motion.section>
@@ -224,7 +251,7 @@ export function ProductionKanbanClient() {
         </div>
       )}
 
-      <p className="text-[11px] text-[var(--enver-text-muted)]">
+      <p className="rounded-lg border border-dashed border-[var(--enver-border)] bg-[var(--enver-surface)]/50 px-3 py-2 text-[11px] text-[var(--enver-text-muted)]">
         Перетягніть картку між колонками. Скасовані замовлення приховані з дошки — керуйте ними з
         картки угоди.
       </p>

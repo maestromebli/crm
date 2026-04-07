@@ -132,7 +132,7 @@ export async function buildCommunicationHub(input: {
         recommendedReply: ins.recommendedReply,
         missingInfoJson: ins.missingInfoJson,
         confidenceScore: ins.confidenceScore,
-        generatedAt: ins.generatedAt.toISOString(),
+        generatedAt: ins.updatedAt.toISOString(),
       };
     }
   }

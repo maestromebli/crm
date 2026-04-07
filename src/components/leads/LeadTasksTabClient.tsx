@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { format } from "date-fns";
 import { uk } from "date-fns/locale";
 import { cn } from "../../lib/utils";
+import { patchTaskById } from "../../lib/api/task-api";
 import { dispatchLeadTasksUpdated } from "../../features/ai-assistant/utils/dispatchLeadTasksUpdated";
 
 type TaskRow = {
@@ -136,16 +137,13 @@ export function LeadTasksTabClient({
   const patchStatus = async (id: string, status: string) => {
     if (!canUpdate) return;
     setBusy(true);
+    setFormErr(null);
     try {
-      const r = await fetch(`/api/tasks/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
-      });
-      const j = (await r.json()) as { error?: string };
-      if (!r.ok) throw new Error(j.error ?? "Помилка");
+      await patchTaskById(id, { status });
       await load();
       dispatchLeadTasksUpdated({ leadId });
+    } catch (e) {
+      setFormErr(e instanceof Error ? e.message : "Помилка");
     } finally {
       setBusy(false);
     }

@@ -59,8 +59,8 @@ export function AssistantChatThread({
       aria-relevant="additions"
     >
       {messages.length === 0 && !loading ? (
-        <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-200/90 bg-white/60 px-4 py-8 text-center">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-violet-100 to-indigo-50 text-violet-600 shadow-inner">
+        <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-200 bg-slate-50/50 px-4 py-8 text-center">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-600">
             <Bot className="h-5 w-5" strokeWidth={1.75} />
           </div>
           <p className="max-w-[280px] text-[12px] leading-relaxed text-slate-600">
@@ -82,7 +82,7 @@ export function AssistantChatThread({
               "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl shadow-sm",
               m.role === "user"
                 ? "bg-slate-700 text-white"
-                : "bg-gradient-to-br from-violet-500 to-indigo-600 text-white shadow-violet-500/20",
+                : "bg-slate-100 text-slate-700",
             )}
             aria-hidden
           >
@@ -98,13 +98,13 @@ export function AssistantChatThread({
               "min-w-0 max-w-[calc(100%-2.75rem)] rounded-2xl px-3.5 py-2.5 shadow-sm",
               m.role === "user"
                 ? "rounded-br-md bg-slate-800 text-white"
-                : "rounded-bl-md border border-violet-100/90 bg-gradient-to-b from-white to-violet-50/40 text-slate-800",
+                : "rounded-bl-md border border-slate-200 bg-white text-slate-800",
             )}
           >
             <p
               className={cn(
                 "mb-1 text-[10px] font-semibold uppercase tracking-wide",
-                m.role === "user" ? "text-slate-300" : "text-violet-600/90",
+                m.role === "user" ? "text-slate-300" : "text-slate-500",
               )}
             >
               {m.role === "user" ? "Ви" : "Помічник"}
@@ -121,7 +121,7 @@ export function AssistantChatThread({
                 <button
                   type="button"
                   onClick={() => void copyMessage(m.id, m.content)}
-                  className="mt-2 inline-flex items-center gap-1 text-[10px] text-slate-400 transition hover:text-violet-600"
+                  className="mt-2 inline-flex items-center gap-1 text-[10px] text-slate-400 transition hover:text-slate-700"
                 >
                   {copiedId === m.id ? (
                     <>
@@ -147,14 +147,14 @@ export function AssistantChatThread({
 
       {loading ? (
         <div className="flex gap-2.5">
-          <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
+          <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
           </div>
-          <div className="flex min-w-0 flex-1 items-center gap-2 rounded-2xl rounded-bl-md border border-violet-100/80 bg-white/90 px-3.5 py-2.5 shadow-sm">
+          <div className="flex min-w-0 flex-1 items-center gap-2 rounded-2xl rounded-bl-md border border-slate-200 bg-white px-3.5 py-2.5 shadow-sm">
             <div className="flex gap-1">
-              <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-violet-400 [animation-delay:-0.3s]" />
-              <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-violet-400 [animation-delay:-0.15s]" />
-              <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-violet-400" />
+              <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 [animation-delay:-0.3s]" />
+              <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 [animation-delay:-0.15s]" />
+              <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" />
             </div>
             <span className="text-[12px] text-slate-500">Думаю над відповіддю…</span>
           </div>

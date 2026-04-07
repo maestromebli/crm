@@ -12,6 +12,7 @@ import { redirect } from "next/navigation";
 import { listDealHubSavedViewsForUser } from "../../../../features/deal-hub/deal-hub-saved-views";
 import type { DealHubSavedViewDTO } from "../../../../features/deal-hub/deal-hub-filters";
 import {
+  listDealBoardStages,
   listDealsForTable,
   type DealListViewId,
 } from "../../../../features/deal-workspace/queries";
@@ -35,6 +36,11 @@ export async function DealsListPage({ view, defaultLayout = "table" }: Props) {
   if (!access) redirect("/login");
   const { rows, error } = await listDealsForTable(access.ctx, { view });
 
+  const boardStages =
+    !error && process.env.DATABASE_URL?.trim()
+      ? await listDealBoardStages(rows.map((r) => ({ pipelineId: r.pipelineId })))
+      : [];
+
   let dealHubSavedViews: DealHubSavedViewDTO[] = [];
   if (process.env.DATABASE_URL?.trim()) {
     try {
@@ -54,6 +60,11 @@ export async function DealsListPage({ view, defaultLayout = "table" }: Props) {
     view !== "pipeline";
 
   const listHref = dealListHrefForView(view);
+
+  const showHub =
+    !error &&
+    !showFilteredEmptyHint &&
+    (rows.length > 0 || view === "pipeline");
 
   return (
     <main className="flex min-h-[calc(100vh-56px)] flex-col bg-[var(--enver-bg)] px-3 py-3 md:px-6 md:py-4">
@@ -155,7 +166,10 @@ export async function DealsListPage({ view, defaultLayout = "table" }: Props) {
           </div>
         ) : null}
 
-        {rows.length === 0 && !error && !showFilteredEmptyHint ? (
+        {rows.length === 0 &&
+        !error &&
+        !showFilteredEmptyHint &&
+        view !== "pipeline" ? (
           <div className="rounded-xl border border-dashed border-[var(--enver-border)] bg-[var(--enver-card)] px-4 py-12 text-center text-sm text-[var(--enver-text-muted)] shadow-[var(--enver-shadow)]">
             <p>
               Немає угод у вашій зоні видимості. Створіть угоду з ліда або
@@ -168,7 +182,7 @@ export async function DealsListPage({ view, defaultLayout = "table" }: Props) {
           </div>
         ) : null}
 
-        {rows.length > 0 ? (
+        {showHub ? (
           <>
             <DealsHubClient
               rows={rows.map((r) => ({
@@ -178,6 +192,7 @@ export async function DealsListPage({ view, defaultLayout = "table" }: Props) {
               initialLayout={defaultLayout}
               serverFiltered={serverFiltered}
               kpiCountLabel={`Показано · ${copy.title}`}
+              boardStages={boardStages}
               savedViewsInitial={dealHubSavedViews}
               savedViewsEnabled={!serverFiltered}
             />

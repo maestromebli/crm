@@ -450,7 +450,7 @@ function ExpenseDrawer({
             ) : null}
             {expenseScope === "GENERAL_CATEGORY" ? (
               <p className="mt-1 text-[11px] text-slate-700">
-                Режим: загальна витрата. Запис буде з категорією "{generalCategory}" без прямої привʼязки до обʼєкта.
+                Режим: загальна витрата. Запис буде з категорією «{generalCategory}» без прямої привʼязки до обʼєкта.
               </p>
             ) : null}
           </div>

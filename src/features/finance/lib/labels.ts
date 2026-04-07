@@ -43,6 +43,7 @@ export function paymentPlanStatusUa(status: string): string {
 
 export const FINANCE_TX_STATUS_UA: Record<string, string> = {
   DRAFT: "Чернетка",
+  PLANNED: "Заплановано",
   CONFIRMED: "Проведено",
   CANCELLED: "Скасовано",
 };

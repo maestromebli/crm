@@ -52,6 +52,9 @@ fs.writeFileSync(readmePath, readme, "utf-8");
 const tarName = "crm-for-chatgpt-analysis.tar.gz";
 const tarPath = path.join(outDir, tarName);
 
+/** Узгоджено з типовими лімітами завантаження файлів у чат (залежить від тарифу; перевірте в UI). */
+const CHAT_UPLOAD_WARN_MB = 512;
+
 const excludes = [
   "node_modules",
   ".next",
@@ -73,6 +76,17 @@ const excludes = [
   ".tmp-kp-zip-full",
   ".tmp-zip-analysis",
 ];
+
+// У корені часто лежать тимчасові розпаковані бекапи `.tmp-*` (гігабайти); tar --exclude ".tmp-*" на Windows ненадійний — додаємо явно.
+try {
+  for (const ent of fs.readdirSync(root, { withFileTypes: true })) {
+    if (ent.isDirectory() && ent.name.startsWith(".tmp") && !excludes.includes(ent.name)) {
+      excludes.push(ent.name);
+    }
+  }
+} catch {
+  // ignore
+}
 
 const tarArgs = [
   "-czf",
@@ -118,8 +132,14 @@ if (zr.status !== 0) {
     (zr.stderr || zr.stdout || "").slice(0, 600),
   );
 } else if (fs.existsSync(zipPath)) {
-  const zMb = (fs.statSync(zipPath).size / (1024 * 1024)).toFixed(2);
+  const zBytes = fs.statSync(zipPath).size;
+  const zMb = (zBytes / (1024 * 1024)).toFixed(2);
   console.log("OK ZIP для GPT →", zipPath, `(${zMb} МБ)`);
+  if (zBytes > CHAT_UPLOAD_WARN_MB * 1024 * 1024) {
+    console.warn(
+      `\n⚠ Розмір ZIP (${zMb} МБ) перевищує орієнтир ~${CHAT_UPLOAD_WARN_MB} МБ для завантаження в чат. Розділіть архів, скоротіть вміст або перевірте ліміт свого тарифу.\n`,
+    );
+  }
 }
 
 const latestPointer = path.join(root, "backups", "LATEST_GPT_BUNDLE.txt");
@@ -138,8 +158,14 @@ fs.writeFileSync(
   "utf-8",
 );
 
+const tarBytes = fs.statSync(tarPath).size;
 console.log("OK архів для GPT:");
 console.log(" ", tarPath);
-console.log("  Розмір:", mb, "МБ");
+console.log("  Розмір .tar.gz:", mb, "МБ");
+if (tarBytes > CHAT_UPLOAD_WARN_MB * 1024 * 1024) {
+  console.warn(
+    `  ⚠ .tar.gz теж великий — для ChatGPT зручніше .zip (див. рядок вище) або розбиття на частини.`,
+  );
+}
 console.log("  Інструкція:", readmePath);
 console.log("  Останній бекап:", latestPointer);

@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireSessionUser } from "@/lib/authz/api-guard";
 import { canProcurementAction } from "@/features/procurement/lib/permissions";
+import { buildOrderedLineMonitorFromPrismaRequests } from "@/features/procurement/lib/ordered-line-monitor";
 
 function n(v: unknown): number {
   if (v == null) return 0;
@@ -224,15 +225,24 @@ export async function GET(req: Request) {
   });
   const sortedSupplierStats = supplierStats.sort((a, b) => b.riskScore - a.riskScore);
   const systemicRiskScore = Math.max(
-    0,
-    Math.min(
-      100,
-      Math.round(
-        (delayed.length * 7 + criticalShortages * 8 + pendingApprovals * 4 + missingDeliveries * 5) /
-          1.6,
+      0,
+      Math.min(
+        100,
+        Math.round(
+          (delayed.length * 7 + criticalShortages * 8 + pendingApprovals * 4 + missingDeliveries * 5) /
+            1.6,
+        ),
       ),
-    ),
-  );
+    );
+
+    const orderedLineMonitor = buildOrderedLineMonitorFromPrismaRequests(requests).slice(0, 120).map((row) => ({
+      ...row,
+      plannedValue: Math.round(row.plannedValue),
+      orderedValue: Math.round(row.orderedValue),
+      receivedValue: Math.round(row.receivedValue),
+      valueRemainingPlanned: Math.round(row.valueRemainingPlanned),
+      unitPriceDelta: Math.round(row.unitPriceDelta * 100) / 100,
+    }));
 
     return NextResponse.json({
       suppliers,
@@ -281,6 +291,7 @@ export async function GET(req: Request) {
         criticalShortages,
         priceDeviations,
         varianceControl,
+        orderedLineMonitor,
       },
       enterprise: {
         supplierRiskRadar: sortedSupplierStats.slice(0, 20),

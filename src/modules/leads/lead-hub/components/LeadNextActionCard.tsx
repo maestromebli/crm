@@ -1,11 +1,10 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { addDays, format, isSameDay, startOfDay } from "date-fns";
 import { uk } from "date-fns/locale";
 import { useCallback, useEffect, useState } from "react";
+import { useLeadMutationActions } from "../../../../features/leads/use-lead-mutation-actions";
 import type { LeadDetailRow } from "../../../../features/leads/queries";
-import { parseResponseJson } from "../../../../lib/api/parse-response-json";
 import { dateToNextStepDateString } from "../../../../lib/leads/next-step-date";
 import { cn } from "../../../../lib/utils";
 
@@ -29,14 +28,14 @@ export function LeadNextActionCard({
   lead,
   canUpdateLead,
 }: Props) {
-  const router = useRouter();
+  const leadActions = useLeadMutationActions(lead.id);
   const [nextStep, setNextStep] = useState(lead.nextStep ?? "");
   const [nextStepDate, setNextStepDate] = useState(
     () => dateToNextStepDateString(lead.nextContactAt) ?? "",
   );
-  const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
+  const saving = leadActions.isPending;
 
   useEffect(() => {
     setNextStep(lead.nextStep ?? "");
@@ -53,42 +52,24 @@ export function LeadNextActionCard({
     return "future" as const;
   })();
 
-  const patchLead = useCallback(
-    async (body: Record<string, unknown>) => {
-      const r = await fetch(`/api/leads/${lead.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const j = await parseResponseJson<{ error?: string }>(r);
-      if (!r.ok) throw new Error(j.error ?? "Помилка");
-      router.refresh();
-    },
-    [lead.id, router],
-  );
-
   const save = useCallback(async () => {
     if (!canUpdateLead) return;
-    setSaving(true);
     setErr(null);
     try {
-      await patchLead({
+      await leadActions.updateNextStep({
         nextStep: nextStep.trim() || null,
         nextStepDate: nextStepDate.trim() || null,
       });
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Помилка");
-    } finally {
-      setSaving(false);
     }
-  }, [canUpdateLead, nextStep, nextStepDate, patchLead]);
+  }, [canUpdateLead, leadActions, nextStep, nextStepDate]);
 
   const markDone = async () => {
     if (!canUpdateLead) return;
-    setSaving(true);
     setErr(null);
     try {
-      await patchLead({
+      await leadActions.patch({
         nextStep: null,
         nextStepDate: null,
         recordTouch: true,
@@ -97,8 +78,6 @@ export function LeadNextActionCard({
       setNextStepDate("");
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Помилка");
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -108,15 +87,12 @@ export function LeadNextActionCard({
       ? new Date(lead.nextContactAt)
       : new Date();
     const next = addDays(startOfDay(base), days);
-    setSaving(true);
     setErr(null);
     try {
-      await patchLead({ nextStepDate: toYmd(next) });
+      await leadActions.patch({ nextStepDate: toYmd(next) });
       setNextStepDate(toYmd(next));
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Помилка");
-    } finally {
-      setSaving(false);
     }
   };
 

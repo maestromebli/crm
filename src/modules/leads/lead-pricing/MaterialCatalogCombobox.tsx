@@ -1,13 +1,47 @@
 "use client";
 
 /**
- * Поле назви з пошуком по локальному каталозі прайсів (MaterialCatalogItem).
+ * Поле назви з пошуком по каталозі прайсів.
+ * Список — портал (fixed), щоб не обрізався overflow таблиці.
+ * Відкривається лише для зфокусованого поля (не для кожного рядка з тим самим текстом).
  */
 import { Loader2, Search } from "lucide-react";
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
 import { parseResponseJson } from "../../../lib/api/parse-response-json";
 import { cn } from "../../../lib/utils";
 import type { MaterialSearchHit } from "../../../lib/materials/material-provider";
+
+export type CatalogMenuRect = {
+  top: number;
+  left: number;
+  width: number;
+  maxHeight: number;
+};
+
+function measureMenuRect(el: HTMLElement): CatalogMenuRect {
+  const rect = el.getBoundingClientRect();
+  const gap = 8;
+  const vw = typeof window !== "undefined" ? window.innerWidth : 1200;
+  const vh = typeof window !== "undefined" ? window.innerHeight : 600;
+  const spaceBelow = vh - rect.bottom - gap;
+  const maxHeight = Math.min(360, Math.max(140, Math.floor(spaceBelow)));
+  const width = Math.max(rect.width, 220);
+  const maxLeft = Math.max(gap, vw - width - gap);
+  return {
+    top: rect.bottom + 3,
+    left: Math.min(Math.max(gap, rect.left), maxLeft),
+    width,
+    maxHeight,
+  };
+}
 
 type Props = {
   value: string;
@@ -15,7 +49,6 @@ type Props = {
   onCatalogPick: (hit: MaterialSearchHit) => void;
   disabled?: boolean;
   className?: string;
-  /** Мінімальна довжина запиту для пошуку */
   minQueryLength?: number;
 };
 
@@ -30,7 +63,11 @@ export function MaterialCatalogCombobox({
   const listId = useId();
   const hintId = useId();
   const wrapRef = useRef<HTMLDivElement>(null);
-  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+  const [menuRect, setMenuRect] = useState<CatalogMenuRect | null>(null);
+  /** Список показуємо лише поки фокус у цьому полі (інакше всі рядки таблиці з довгою назвою відкриють портал). */
+  const [inputFocused, setInputFocused] = useState(false);
   const [items, setItems] = useState<MaterialSearchHit[]>([]);
   const [loading, setLoading] = useState(false);
   const [highlight, setHighlight] = useState(-1);
@@ -51,7 +88,6 @@ export function MaterialCatalogCombobox({
     const q = value.trim();
     if (q.length < minQueryLength) {
       setItems([]);
-      setOpen(false);
       setLoading(false);
       setNoMatches(false);
       return;
@@ -59,7 +95,6 @@ export function MaterialCatalogCombobox({
     if (skipSearchRef.current) {
       skipSearchRef.current = false;
       setItems([]);
-      setOpen(false);
       setNoMatches(false);
       return;
     }
@@ -67,12 +102,11 @@ export function MaterialCatalogCombobox({
     const ac = new AbortController();
     const t = window.setTimeout(() => {
       setLoading(true);
-      setOpen(true);
       setNoMatches(false);
       void (async () => {
         try {
           const r = await fetch(
-            `/api/materials/search?q=${encodeURIComponent(q)}&limit=14`,
+            `/api/materials/search?q=${encodeURIComponent(q)}&limit=20`,
             { signal: ac.signal },
           );
           const j = await parseResponseJson<{
@@ -80,19 +114,16 @@ export function MaterialCatalogCombobox({
           }>(r);
           if (!r.ok) {
             setItems([]);
-            setOpen(false);
             setNoMatches(false);
             return;
           }
           const next = j.items ?? [];
           setItems(next);
           setNoMatches(next.length === 0);
-          setOpen(true);
           setHighlight(next.length > 0 ? 0 : -1);
         } catch {
           if (!ac.signal.aborted) {
             setItems([]);
-            setOpen(false);
             setNoMatches(false);
           }
         } finally {
@@ -107,29 +138,180 @@ export function MaterialCatalogCombobox({
     };
   }, [value, minQueryLength]);
 
+  const hasQuery = qTrim.length >= minQueryLength;
+  const showDropdown = inputFocused && hasQuery;
+  const showList = showDropdown && !loading && items.length > 0;
+  const showEmpty = showDropdown && !loading && noMatches && items.length === 0;
+
+  const syncMenuPosition = useCallback(() => {
+    const el = wrapRef.current;
+    if (!el || !showDropdown) {
+      setMenuRect(null);
+      return;
+    }
+    setMenuRect(measureMenuRect(el));
+  }, [showDropdown]);
+
+  useLayoutEffect(() => {
+    syncMenuPosition();
+  }, [syncMenuPosition, showDropdown, loading, items.length, noMatches]);
+
+  useEffect(() => {
+    if (!showDropdown) return;
+    const onScrollOrResize = () => syncMenuPosition();
+    window.addEventListener("resize", onScrollOrResize);
+    window.addEventListener("scroll", onScrollOrResize, true);
+    return () => {
+      window.removeEventListener("resize", onScrollOrResize);
+      window.removeEventListener("scroll", onScrollOrResize, true);
+    };
+  }, [showDropdown, syncMenuPosition]);
+
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
-      const el = wrapRef.current;
-      if (!el?.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      if (wrapRef.current?.contains(t)) return;
+      if (menuRef.current?.contains(t)) return;
+      setInputFocused(false);
     };
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
   }, []);
 
+  useEffect(() => {
+    if (!showList || highlight < 0 || !listRef.current) return;
+    const row = listRef.current.querySelector<HTMLElement>(
+      `[data-catalog-idx="${highlight}"]`,
+    );
+    row?.scrollIntoView({ block: "nearest" });
+  }, [highlight, showList]);
+
   const pick = useCallback(
     (hit: MaterialSearchHit) => {
       skipSearchRef.current = true;
       onCatalogPick(hit);
-      setOpen(false);
+      setInputFocused(false);
       setItems([]);
       setNoMatches(false);
+      setMenuRect(null);
     },
     [onCatalogPick],
   );
 
-  const showDropdown = open && qTrim.length >= minQueryLength;
-  const showList = showDropdown && !loading && items.length > 0;
-  const showEmpty = showDropdown && !loading && noMatches && items.length === 0;
+  const chromeHeader = 28;
+  const chromeFooter = 26;
+  const chromeLoading = 44;
+  const listMaxPx =
+    menuRect == null
+      ? 220
+      : Math.max(
+          100,
+          menuRect.maxHeight -
+            chromeHeader -
+            (loading ? chromeLoading : 0) -
+            (showList || showEmpty ? chromeFooter : 0),
+        );
+
+  const dropdownContent =
+    showDropdown && menuRect && typeof document !== "undefined" ? (
+      <div
+        ref={menuRef}
+        id={listId}
+        role="listbox"
+        onMouseDown={(e) => e.preventDefault()}
+        style={{
+          position: "fixed",
+          top: menuRect.top,
+          left: menuRect.left,
+          width: menuRect.width,
+          maxHeight: menuRect.maxHeight,
+          zIndex: 200,
+        }}
+        className="flex flex-col overflow-hidden rounded-md border border-slate-200 bg-white text-left shadow-md"
+      >
+        <div className="shrink-0 border-b border-slate-100 bg-slate-50 px-2 py-1">
+          <p className="text-[10px] text-slate-500">
+            Прайс · Enter — вибрати · Esc — закрити
+          </p>
+        </div>
+
+        {loading ? (
+          <div className="flex shrink-0 items-center gap-2 px-2 py-2 text-[11px] text-slate-600">
+            <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-sky-600" />
+            Пошук…
+          </div>
+        ) : null}
+
+        {showList ? (
+          <ul
+            ref={listRef}
+            style={{ maxHeight: listMaxPx }}
+            className="divide-y divide-slate-100 overflow-y-auto overscroll-contain"
+          >
+            {items.map((hit, i) => {
+              const price =
+                typeof hit.unitPrice === "number"
+                  ? `${hit.unitPrice.toLocaleString("uk-UA")} ${hit.currency ?? "грн"}/${hit.unit ?? "од."}`
+                  : null;
+              const meta = [hit.category, hit.brand, hit.providerKey]
+                .filter(Boolean)
+                .slice(0, 2)
+                .join(" · ");
+              return (
+                <li key={`${hit.id}-${i}`} role="presentation">
+                  <button
+                    type="button"
+                    role="option"
+                    data-catalog-idx={i}
+                    aria-selected={i === highlight}
+                    className={cn(
+                      "flex w-full flex-col gap-0.5 px-2 py-1.5 text-left text-[11px] leading-snug transition-colors",
+                      i === highlight
+                        ? "bg-sky-100 text-slate-900"
+                        : "text-slate-800 hover:bg-slate-50",
+                    )}
+                    onMouseEnter={() => setHighlight(i)}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => pick(hit)}
+                  >
+                    <span className="flex items-start justify-between gap-2">
+                      <span className="min-w-0 flex-1 break-words font-medium">
+                        {hit.label}
+                      </span>
+                      {price ? (
+                        <span className="shrink-0 tabular-nums text-emerald-800">
+                          {price}
+                        </span>
+                      ) : null}
+                    </span>
+                    {meta ? (
+                      <span className="line-clamp-1 text-[10px] text-slate-500">
+                        {meta}
+                      </span>
+                    ) : null}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        ) : null}
+
+        {showEmpty ? (
+          <div className="shrink-0 px-2 py-2 text-[11px] text-slate-600">
+            <span className="font-medium text-slate-800">Нічого не знайдено</span>
+            <span className="mt-0.5 block text-[10px] text-slate-500">
+              Залиште свою назву або змініть запит.
+            </span>
+          </div>
+        ) : null}
+
+        {!loading && (showList || showEmpty) ? (
+          <div className="shrink-0 border-t border-slate-100 px-2 py-1 text-[9px] text-slate-400">
+            ↑ ↓ навігація
+          </div>
+        ) : null}
+      </div>
+    ) : null;
 
   return (
     <div ref={wrapRef} className="relative w-full min-w-0">
@@ -145,20 +327,18 @@ export function MaterialCatalogCombobox({
           id={hintId}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          onFocus={() => {
-            if (items.length > 0 || noMatches || loading) setOpen(true);
-          }}
+          onFocus={() => setInputFocused(true)}
           onKeyDown={(e) => {
             if (!showList) {
-              if (e.key === "ArrowDown" && items.length > 0) {
-                setOpen(true);
+              if (e.key === "ArrowDown" && items.length > 0 && hasQuery) {
+                setInputFocused(true);
                 setHighlight(0);
               }
               return;
             }
             if (e.key === "Escape") {
               e.preventDefault();
-              setOpen(false);
+              setInputFocused(false);
               return;
             }
             if (e.key === "ArrowDown") {
@@ -205,95 +385,9 @@ export function MaterialCatalogCombobox({
         </p>
       ) : null}
 
-      {showDropdown ? (
-        <div
-          id={listId}
-          role="listbox"
-          className="absolute left-0 right-0 top-full z-[70] mt-1 overflow-hidden rounded-xl border border-slate-200 bg-white text-left shadow-lg ring-1 ring-black/5"
-        >
-          <div className="border-b border-slate-100 bg-slate-50/95 px-2.5 py-1.5">
-            <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500">
-              Каталог прайсів
-            </p>
-            <p className="text-[11px] text-slate-600">
-              Оберіть рядок — підставляться назва, ціна та од. виміру. Або
-              введіть текст без вибору.
-            </p>
-          </div>
-
-          {loading ? (
-            <div className="flex items-center gap-2 px-3 py-4 text-[11px] text-slate-600">
-              <Loader2 className="h-4 w-4 shrink-0 animate-spin text-sky-600" />
-              Шукаю в базі прайсів…
-            </div>
-          ) : null}
-
-          {showList ? (
-            <ul className="max-h-52 overflow-auto py-1">
-              {items.map((hit, i) => {
-                const price =
-                  typeof hit.unitPrice === "number"
-                    ? `${hit.unitPrice.toLocaleString("uk-UA")} ${hit.currency ?? "грн"}/${hit.unit ?? "од."}`
-                    : null;
-                const meta = [hit.category, hit.brand, hit.providerKey]
-                  .filter(Boolean)
-                  .slice(0, 2)
-                  .join(" · ");
-                return (
-                  <li key={hit.id} role="presentation">
-                    <button
-                      type="button"
-                      role="option"
-                      aria-selected={i === highlight}
-                      className={cn(
-                        "flex w-full flex-col gap-0.5 border-l-2 border-transparent px-2.5 py-2 text-left text-[11px] leading-tight transition-colors hover:border-sky-400 hover:bg-sky-50/90",
-                        i === highlight &&
-                          "border-sky-500 bg-sky-50/90",
-                      )}
-                      onMouseEnter={() => setHighlight(i)}
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => pick(hit)}
-                    >
-                      <span className="font-medium text-slate-900">
-                        {hit.label}
-                      </span>
-                      {price ? (
-                        <span className="tabular-nums text-emerald-800">
-                          {price}
-                        </span>
-                      ) : null}
-                      {meta ? (
-                        <span className="text-[10px] text-slate-500">
-                          {meta}
-                        </span>
-                      ) : null}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : null}
-
-          {showEmpty ? (
-            <div className="px-3 py-4 text-[11px] leading-snug text-slate-600">
-              <p className="font-medium text-slate-800">Нічого не знайдено</p>
-              <p className="mt-1">
-                Можна залишити свою назву — сума все одно порахується. Спробуйте
-                інше ключове слово або коротшу назву.
-              </p>
-            </div>
-          ) : null}
-
-          {!loading && (showList || showEmpty) ? (
-            <div className="border-t border-slate-100 bg-slate-50/80 px-2.5 py-1.5 text-[10px] text-slate-500">
-              <span className="hidden sm:inline">
-                ↑ ↓ — рухатися · Enter — вибрати · Esc — закрити
-              </span>
-              <span className="sm:hidden">Натисніть рядок, щоб обрати</span>
-            </div>
-          ) : null}
-        </div>
-      ) : null}
+      {dropdownContent
+        ? createPortal(dropdownContent, document.body)
+        : null}
     </div>
   );
 }

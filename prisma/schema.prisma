@@ -12,6 +12,9 @@ model User {
   name          String?
   passwordHash  String
   role          Role      @default(USER)
+  headManagerId String?
+  headManager   User?     @relation("UserHeadManager", fields: [headManagerId], references: [id], onDelete: SetNull)
+  subordinates  User[]    @relation("UserHeadManager")
   /** Обмеження пунктів бокового меню: ключ = id секції з NAV_SECTIONS; "all" або список subItem.id. Null = усі підпункти (лише базові права P.*). */
   menuAccess    Json?
   permissions   PermissionOnUser[]
@@ -55,6 +58,16 @@ model User {
 
   /** Збережені власні вигляди списку угод (фільтри / таблиця / дошка). */
   dealHubSavedViews DealHubSavedView[]
+
+  moneyTransactionsCreated MoneyTransaction[] @relation("MoneyTransactionCreatedBy")
+  financeTransactionsCreated FinanceTransaction[] @relation("FinanceTransactionCreatedBy")
+  invoicesCreated Invoice[] @relation("InvoiceCreatedBy")
+  financeJournalEntriesCreated FinanceJournalEntry[] @relation("FinanceJournalEntryCreatedBy")
+  dealConstructorRoomsAssignedBy DealConstructorRoom[] @relation("DealConstructorRoomAssignedBy")
+  dealConstructorRoomsAssignedUser DealConstructorRoom[] @relation("DealConstructorRoomAssignedUser")
+  constructorRoomMessagesAuthored DealConstructorRoomMessage[] @relation("ConstructorRoomMessageAuthor")
+  aiAssistantLogs AiAssistantLog[]
+  warehouseStockMovementsCreated WarehouseStockMovement[] @relation("WarehouseStockMovementCreatedBy")
 }
 
 /** Збережені користувацькі пресети для модуля «Угоди» (DealsHubClient). */
@@ -252,6 +265,9 @@ model LeadProposal {
   notes        String?            @db.Text
   /** Знімок смети на момент створення КП (addon contract: стабільна оферта). */
   snapshotJson Json?
+  /** Умови оплати / комерційні поля окремо від snapshotJson. */
+  commercialTermsJson Json?
+  visualizationUrl String?
   createdById  String
   createdBy    User               @relation("LeadProposalCreatedBy", fields: [createdById], references: [id])
   createdAt    DateTime           @default(now())
@@ -455,6 +471,7 @@ enum AttachmentEntityType {
   HANDOFF
   EVENT
   TASK
+  CONSTRUCTOR_ROOM
 }
 
 enum HandoffStatus {
@@ -487,6 +504,7 @@ enum ActivityEntityType {
   TASK
   EVENT
   HANDOFF
+  FINANCE
 }
 
 enum ActivityType {
@@ -507,6 +525,20 @@ enum ActivityType {
   HANDOFF_ACCEPTED
   HANDOFF_REJECTED
   READINESS_SNAPSHOT_SAVED
+  CONSTRUCTOR_ROOM_CREATED
+  CONSTRUCTOR_ROOM_SENT
+  CONSTRUCTOR_ROOM_REVIEWED
+  CONSTRUCTOR_ROOM_FILE_DELIVERED
+  FINANCE_CSV_EXPORTED
+  BANK_SYNC_REQUESTED
+  FINANCE_INVOICE_CREATED
+  FINANCE_INVOICE_UPDATED
+  CLIENT_PAYMENT_RECORDED
+  CLIENT_PAYMENT_VOIDED
+  DEAL_FINANCE_SNAPSHOT_SAVED
+  PRODUCTION_NOTIFICATION
+  FINANCE_JOURNAL_POSTED
+  FINANCE_JOURNAL_VOIDED
 }
 
 /** Pre-deal Lead Hub: узгоджений стан для конверсії (не плутати з Deal readiness production). */
@@ -531,6 +563,7 @@ enum LeadHubFileCategory {
 /** Комерційна пропозиція (КП) до створення угоди. */
 enum LeadProposalStatus {
   DRAFT
+  READY_TO_SEND
   SENT
   CLIENT_REVIEWING
   APPROVED
@@ -711,6 +744,8 @@ model ProductionTask {
   metadataJson   Json?
   createdAt      DateTime             @default(now())
   updatedAt      DateTime             @updatedAt
+
+  stockReservations StockReservation[]
 
   @@index([flowId, type, status])
   @@index([assigneeUserId, status])
@@ -941,11 +976,17 @@ model Deal {
   installationDate    DateTime?
 
   expectedCloseDate DateTime?
-  value           Float?
+  value           Decimal? @db.Decimal(18, 2)
   currency        String?
 
   /** Платежі, готовність до виробництва, SLA — гнучкий стан для UI воркспейсу. */
   workspaceMeta   Json?
+  /** Дубль контрольного заміру (також може бути в workspaceMeta). */
+  controlMeasurementJson Json?
+  /** Заморожений знімок КП після конверсії (див. `deal_commercial_snapshot_v1`). */
+  commercialSnapshotJson            Json?
+  commercialSnapshotSourceProposalId String?
+  commercialSnapshotFrozenAt         DateTime?
 
   orders          Order[]
   stageHistory    DealStageHistory[]
@@ -961,6 +1002,22 @@ model Deal {
   leadConversionAudits     LeadConversionAudit[]
   /** Новий production flow engine: один активний/єдиний потік на угоду. */
   productionFlow           ProductionFlow?
+
+  dealPaymentPlan          DealPaymentPlan?
+  moneyTransactions        MoneyTransaction[]
+  financeTransactions      FinanceTransaction[]
+  operatingExpenses        OperatingExpense[]
+  payrollEntries           PayrollEntry[]
+  commissions              Commission[]
+  procurementRequests      ProcurementRequest[]
+  purchaseOrders           PurchaseOrder[]
+  dealPurchaseOrders       DealPurchaseOrder[]
+  invoices                 Invoice[]
+  paymentPlanEntries       PaymentPlanEntry[]
+  projects                 Project[]
+  constructorRoom          DealConstructorRoom?
+  financeSnapshots         DealFinanceSnapshot[]
+  financeJournalEntries    FinanceJournalEntry[]
 
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
@@ -1271,6 +1328,7 @@ model Attachment {
   paymentMilestoneProofs DealPaymentMilestone[]
   leadAttachmentMeta     LeadAttachmentMeta?
   leadProposalPdf        LeadProposal?        @relation("LeadProposalPdf")
+  fileAiExtraction       FileAiExtraction?
 
   @@index([entityType, entityId])
   @@index([fileAssetId])
@@ -1418,12 +1476,17 @@ model DomainEvent {
   type        String
   dedupeKey   String?   @unique
   payload     Json
+  entityType  String?
+  entityId    String?
+  userId      String?
   dealId      String?
   deal        Deal?     @relation(fields: [dealId], references: [id], onDelete: Cascade)
   processedAt DateTime?
   createdAt   DateTime  @default(now())
 
   @@index([dealId, createdAt])
+  @@index([entityType, entityId, createdAt])
+  @@index([userId, createdAt])
   @@index([type, processedAt])
 }
 
@@ -1475,6 +1538,9 @@ enum EstimateLineType {
   INSTALLATION
   DISCOUNT
   OTHER
+  MATERIAL
+  FITTING
+  WORK
 }
 
 /** Етап 1: задачі по лидах/угодах (follow-up, КП, оплата тощо). */
@@ -1523,6 +1589,7 @@ model Estimate {
   leadId           String?
   lead             Lead?           @relation(fields: [leadId], references: [id], onDelete: Cascade)
   version          Int             @default(1)
+  name             String?
   status           EstimateStatus  @default(DRAFT)
   totalPrice       Float?
   totalCost        Float?
@@ -1531,6 +1598,7 @@ model Estimate {
   deliveryCost     Float?
   installationCost Float?
   notes            String?         @db.Text
+  changeSummary    String?         @db.Text
   /** Шаблон швидкого розрахунку (kitchen, wardrobe, …) */
   templateKey      String?
   createdById      String
@@ -1540,6 +1608,7 @@ model Estimate {
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
   lineItems        EstimateLineItem[]
+  sections         EstimateSection[]
   proposals        LeadProposal[]
   /** Лід, для якого ця смета позначена активною в Hub (опційно). */
   leadActiveFor    Lead?           @relation("LeadActiveEstimate")
@@ -1553,6 +1622,19 @@ model Estimate {
   @@index([leadId, status])
 }
 
+model EstimateSection {
+  id         String   @id @default(cuid())
+  estimateId String
+  estimate   Estimate @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+  title      String
+  sortOrder  Int      @default(0)
+  key        String?
+
+  lineItems EstimateLineItem[]
+
+  @@index([estimateId, sortOrder])
+}
+
 model EstimateLineItem {
   id           String           @id @default(cuid())
   estimateId   String
@@ -1560,6 +1642,13 @@ model EstimateLineItem {
   type         EstimateLineType
   category     String?
   productName  String
+  sortOrder    Int              @default(0)
+  sectionId    String?
+  section      EstimateSection? @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  code         String?
+  stableLineId String?
+  supplierRef  String?
+  notes        String?          @db.Text
   qty          Float
   unit         String
   salePrice    Float
@@ -1582,6 +1671,11 @@ enum Role {
   DIRECTOR
   HEAD_MANAGER
   SALES_MANAGER
+  TEAM_LEAD
+  PRODUCTION_WORKER
+  MEASURER
+  ACCOUNTANT
+  PROCUREMENT_MANAGER
 }
 
 enum PermissionKey {
@@ -1643,6 +1737,12 @@ enum PermissionKey {
   HANDOFF_ACCEPT
   PRODUCTION_LAUNCH
   PAYMENT_CONFIRM
+  AI_USE
+  AI_ANALYTICS
+  PRODUCTION_ORDERS_VIEW
+  PRODUCTION_ORDERS_MANAGE
+  PRODUCTION_ORCHESTRATION_VIEW
+  PRODUCTION_ORCHESTRATION_MANAGE
 }
 
 // --- Document / contract / signature / readiness (architecture redesign) ---
@@ -1711,4 +1811,690 @@ enum ReadinessOverrideStatus {
   APPROVED
   REJECTED
   REVOKED
+}
+
+// --- ERP / додаткові сутності CRM (фінанси, закупівлі, кімната конструктора) ---
+
+enum MoneyTransactionType {
+  INCOME
+  EXPENSE
+}
+
+enum MoneyTransactionStatus {
+  PENDING
+  PAID
+  CANCELLED
+}
+
+enum MoneyTransactionCategory {
+  PREPAYMENT
+  FINAL_PAYMENT
+  MATERIALS
+  SALARY
+  OTHER
+}
+
+model MoneyTransaction {
+  id          String                  @id @default(cuid())
+  dealId      String
+  deal        Deal                    @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  type        MoneyTransactionType
+  category    MoneyTransactionCategory
+  amount      Decimal                 @db.Decimal(18, 2)
+  currency    String                  @default("UAH")
+  status      MoneyTransactionStatus
+  paidAt      DateTime?
+  dueDate     DateTime?
+  description String?                 @db.Text
+  createdById String?
+  createdBy   User?                   @relation("MoneyTransactionCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+
+  @@index([dealId])
+  @@index([paidAt])
+}
+
+model FinanceTransaction {
+  id          String   @id @default(cuid())
+  dealId      String
+  deal        Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  type        String
+  amount      Decimal  @db.Decimal(18, 2)
+  currency    String   @default("UAH")
+  date        DateTime
+  status      String
+  category    String
+  affectsCash Boolean  @default(true)
+  createdById String?
+  createdBy   User?    @relation("FinanceTransactionCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([dealId])
+}
+
+model OperatingExpense {
+  id            String   @id @default(cuid())
+  dealId        String
+  deal          Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  title         String
+  category      String
+  amountActual  Decimal? @db.Decimal(18, 2)
+  amountPlanned Decimal? @db.Decimal(18, 2)
+  status        String
+  expenseDate   DateTime
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([dealId])
+}
+
+model PayrollEntry {
+  id         String   @id @default(cuid())
+  dealId     String
+  deal       Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  employeeId String
+  amount     Decimal  @db.Decimal(18, 2)
+  type       String
+  status     String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([dealId])
+}
+
+model Commission {
+  id        String   @id @default(cuid())
+  dealId    String
+  deal      Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  userId    String
+  amount    Decimal  @db.Decimal(18, 2)
+  percent   Decimal? @db.Decimal(9, 4)
+  status    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([dealId])
+}
+
+model ProcurementRequest {
+  id           String                   @id @default(cuid())
+  dealId       String
+  deal         Deal                     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  source       String
+  status       String
+  priority     String?
+  neededByDate DateTime?
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
+  items        ProcurementRequestItem[]
+
+  @@index([dealId])
+}
+
+model ProcurementRequestItem {
+  id           String             @id @default(cuid())
+  requestId    String
+  request      ProcurementRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  name         String?
+  qtyPlanned   Float?
+  qtyOrdered   Float?
+  qtyReceived  Float?
+  costPlanned  Decimal            @db.Decimal(18, 2)
+  costActual   Decimal            @db.Decimal(18, 2)
+  status       String?
+
+  @@index([requestId])
+  @@map("ProcurementItem")
+}
+
+model PurchaseOrder {
+  id            String    @id @default(cuid())
+  dealId        String
+  deal          Deal      @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  totalAmount   Decimal   @db.Decimal(18, 2)
+  status        String
+  expectedDate  DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([dealId])
+}
+
+model Supplier {
+  id                 String             @id @default(cuid())
+  name               String
+  category           String
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  dealPurchaseOrders DealPurchaseOrder[]
+  materials          Material[]
+}
+
+model DealPurchaseOrder {
+  id           String   @id @default(cuid())
+  orderNumber  String   @unique
+  supplierId   String
+  supplier     Supplier @relation(fields: [supplierId], references: [id])
+  dealId       String
+  deal         Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  itemsJson    Json
+  total        Decimal  @db.Decimal(18, 2)
+  status       String
+  expectedDate DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([dealId])
+}
+
+enum CrmInvoiceType {
+  INCOMING
+  OUTGOING
+  PREPAYMENT_70
+  FINAL_30
+  CUSTOM
+}
+
+enum CrmInvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  CANCELLED
+}
+
+model Invoice {
+  id          String         @id @default(cuid())
+  dealId      String
+  deal        Deal           @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  type        CrmInvoiceType
+  /** Загальна сума до сплати (з ПДВ, якщо застосовується). */
+  amount      Decimal        @db.Decimal(18, 2)
+  status      CrmInvoiceStatus @default(DRAFT)
+  dueDate     DateTime?
+  pdfUrl      String?
+  /** Номер рахунку / первинки для обліку. */
+  documentNumber String?     @db.VarChar(64)
+  issueDate   DateTime?
+  counterpartyName  String?
+  counterpartyEdrpou String?  @db.VarChar(12)
+  /** Ставка ПДВ, % (наприклад 20.00). */
+  vatRatePercent    Decimal?  @db.Decimal(5, 2)
+  /** Без ПДВ. */
+  amountWithoutVat  Decimal?  @db.Decimal(18, 2)
+  vatAmount         Decimal?  @db.Decimal(18, 2)
+  createdById String?
+  createdBy   User?          @relation("InvoiceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([dealId])
+}
+
+/** Класифікація рахунків бухгалтерського плану (спрощена). */
+enum LedgerAccountKind {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+}
+
+enum FinanceJournalEntryStatus {
+  DRAFT
+  POSTED
+  VOIDED
+}
+
+/** Рахунок з плану рахунків (подвійний запис). */
+model LedgerAccount {
+  id        String            @id @default(cuid())
+  code      String            @unique @db.VarChar(16)
+  name      String
+  kind      LedgerAccountKind
+  isActive  Boolean           @default(true)
+  sortOrder Int               @default(0)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  lines     FinanceJournalLine[]
+}
+
+/** Заголовок проводки: дебет = кредит. */
+model FinanceJournalEntry {
+  id          String                    @id @default(cuid())
+  dealId      String?
+  deal        Deal?                     @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  postedAt    DateTime
+  status      FinanceJournalEntryStatus @default(DRAFT)
+  memo        String?                   @db.Text
+  createdById String?
+  createdBy   User?                     @relation("FinanceJournalEntryCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  lines       FinanceJournalLine[]
+  createdAt   DateTime                  @default(now())
+  updatedAt   DateTime                  @updatedAt
+
+  @@index([dealId])
+  @@index([postedAt])
+  @@index([status])
+}
+
+/** Рядок проводки: одна сторона — дебет або кредит. */
+model FinanceJournalLine {
+  id              String              @id @default(cuid())
+  entryId         String
+  entry           FinanceJournalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  ledgerAccountId String
+  ledgerAccount   LedgerAccount       @relation(fields: [ledgerAccountId], references: [id], onDelete: Restrict)
+  debitAmount     Decimal             @default(0) @db.Decimal(18, 2)
+  creditAmount    Decimal             @default(0) @db.Decimal(18, 2)
+  lineMemo        String?             @db.VarChar(512)
+
+  @@index([entryId])
+  @@index([ledgerAccountId])
+}
+
+model PaymentPlanEntry {
+  id              String   @id @default(cuid())
+  dealId          String?
+  deal            Deal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  amount          Decimal  @db.Decimal(18, 2)
+  remainingAmount Decimal? @db.Decimal(18, 2)
+  dueDate         DateTime
+  status          String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([dealId])
+}
+
+model Project {
+  id        String   @id @default(cuid())
+  dealId    String?
+  deal      Deal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  code      String?
+  title     String?
+  status    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([dealId])
+}
+
+model DealPaymentPlan {
+  id              String   @id @default(cuid())
+  dealId          String   @unique
+  deal            Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  stepsJson       Json
+  reasonIfChanged String?  @db.Text
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Material {
+  id         String    @id @default(cuid())
+  name       String
+  code       String?
+  price      Float?
+  supplierId String?
+  supplier   Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  stockItems StockItem[]
+}
+
+model StockItem {
+  id         String    @id @default(cuid())
+  sku        String?
+  materialId String?
+  material   Material? @relation(fields: [materialId], references: [id], onDelete: SetNull)
+  quantity   Float     @default(0)
+  reserved   Float     @default(0)
+  storageZoneId String?
+  storageZone   WarehouseStorageZone? @relation(fields: [storageZoneId], references: [id], onDelete: SetNull)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  stockReservations StockReservation[]
+  stockMovements    WarehouseStockMovement[]
+
+  @@index([storageZoneId])
+}
+
+/** Зона / стелаж / ряд — штрихкод для сканерів ТСД. */
+model WarehouseStorageZone {
+  id        String   @id @default(cuid())
+  name      String
+  /** Короткий код (A1, R2-Б) для етикеток. */
+  code      String
+  /** Унікальний штрихкод / QR payload. */
+  barcode   String   @unique
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  stockItems StockItem[]
+
+  movementsFrom WarehouseStockMovement[] @relation("MovementFromZone")
+  movementsTo   WarehouseStockMovement[] @relation("MovementToZone")
+
+  @@index([code])
+}
+
+enum WarehouseMovementKind {
+  RECEIPT
+  ISSUE
+  TRANSFER
+  ADJUSTMENT
+  RESERVE
+  UNRESERVE
+}
+
+enum WarehouseRefKind {
+  PURCHASE_ORDER
+  PRODUCTION_TASK
+  PRODUCTION_FLOW
+  MANUAL
+  DEAL
+}
+
+/** Журнал руху по складу (аудит). */
+model WarehouseStockMovement {
+  id            String               @id @default(cuid())
+  stockItemId   String
+  stockItem     StockItem            @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+  kind          WarehouseMovementKind
+  /** Зміна кількості: + надходження / резерв, − вибуття / зняття резерву. */
+  quantityDelta Float
+  refKind       WarehouseRefKind?
+  refId         String?
+  note          String?              @db.Text
+  fromZoneId    String?
+  fromZone      WarehouseStorageZone? @relation("MovementFromZone", fields: [fromZoneId], references: [id], onDelete: SetNull)
+  toZoneId      String?
+  toZone        WarehouseStorageZone? @relation("MovementToZone", fields: [toZoneId], references: [id], onDelete: SetNull)
+  createdById   String?
+  createdBy     User?                 @relation("WarehouseStockMovementCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt     DateTime              @default(now())
+
+  @@index([stockItemId, createdAt])
+  @@index([createdAt])
+  @@index([refKind, refId])
+}
+
+enum StockReservationStatus {
+  ACTIVE
+  RELEASED
+}
+
+/** Рядок резерву під виробничу задачу або вручну. */
+model StockReservation {
+  id         String   @id @default(cuid())
+  stockItemId String
+  stockItem  StockItem @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+  productionTaskId String?
+  productionTask   ProductionTask? @relation(fields: [productionTaskId], references: [id], onDelete: Cascade)
+  quantity   Float
+  status     StockReservationStatus @default(ACTIVE)
+  note       String?                @db.Text
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([stockItemId, status])
+  @@index([productionTaskId])
+}
+
+enum ConstructorRoomStatus {
+  DRAFT
+  PENDING_ASSIGNMENT
+  SENT_TO_CONSTRUCTOR
+  IN_PROGRESS
+  DELIVERED
+  REVIEWED
+}
+
+model DealConstructorRoom {
+  id                       String                @id @default(cuid())
+  dealId                   String                @unique
+  deal                     Deal                  @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  status                   ConstructorRoomStatus @default(DRAFT)
+  publicToken              String                @unique
+  assignedById             String?
+  assignedUserId           String?
+  externalConstructorLabel String?
+  telegramInviteUrl        String?
+  telegramChatId           String?
+  aiQaJson                 Json?
+  priority                 TaskPriority          @default(NORMAL)
+  dueAt                    DateTime?
+  sentToConstructorAt      DateTime?
+  deliveredAt              DateTime?
+  reviewedAt               DateTime?
+  createdAt                DateTime              @default(now())
+  updatedAt                DateTime              @updatedAt
+  assignedBy               User?                 @relation("DealConstructorRoomAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+  assignedUser             User?                 @relation("DealConstructorRoomAssignedUser", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  messages                 DealConstructorRoomMessage[]
+}
+
+model DealConstructorRoomMessage {
+  id          String              @id @default(cuid())
+  roomId      String
+  room        DealConstructorRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  body        String              @db.Text
+  author      String              @default("INTERNAL")
+  createdById String?
+  createdBy   User?               @relation("ConstructorRoomMessageAuthor", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime            @default(now())
+
+  @@index([roomId])
+}
+
+enum CommEntityType {
+  LEAD
+  DEAL
+  CONTACT
+}
+
+model CommConversationInsight {
+  id                         String         @id @default(cuid())
+  threadId                   String         @unique
+  entityType                 CommEntityType
+  entityId                   String
+  summaryShort               String         @db.Text
+  summaryDetailed            String         @db.Text
+  clientIntent               String?
+  extractedNeedsJson         Json?
+  extractedMeasurementsJson  Json?
+  extractedMaterialsJson     Json?
+  extractedBudgetJson        Json?
+  extractedDatesJson         Json?
+  extractedRisksJson         Json?
+  missingInfoJson            Json?
+  recommendedNextStep        String?
+  recommendedReply           String?
+  confidenceScore            Float?
+  createdAt                  DateTime       @default(now())
+  updatedAt                  DateTime       @updatedAt
+}
+
+enum AiDetectedFileCategory {
+  PROJECT
+  PHOTO
+  DIMENSIONS
+  MEASUREMENT
+  COMMERCIAL_PROPOSAL
+  CONTRACT
+  INVOICE
+  TECHNICAL
+  VISUALIZATION
+  MESSENGER_SCREENSHOT
+  OTHER
+}
+
+enum AiFileProcessingStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  SKIPPED_NO_LOCAL_FILE
+  SKIPPED_NO_AI_KEY
+}
+
+model FileAiExtraction {
+  id                      String                  @id @default(cuid())
+  attachmentId            String                  @unique
+  attachment              Attachment              @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
+  entityType              AttachmentEntityType
+  entityId                String
+  mimeType                String
+  originalFilename        String
+  userConfirmedCategory   AiDetectedFileCategory?
+  processingStatus        AiFileProcessingStatus  @default(PENDING)
+  processingError         String?                 @db.Text
+  extractedText           String?                 @db.Text
+  detectedCategory        AiDetectedFileCategory?
+  shortSummary            String?                 @db.Text
+  detailedSummary         String?                 @db.Text
+  extractedEntities       Json?
+  extractedMeasurements   Json?
+  extractedAmounts        Json?
+  extractedDates          Json?
+  extractedPeople         Json?
+  extractedMaterials      Json?
+  extractedRisks          Json?
+  confidenceScore         Float?
+  processedAt             DateTime?
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+}
+
+model AiAssistantLog {
+  id           String   @id @default(cuid())
+  userId       String?
+  user         User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action       String
+  entityType   String?
+  entityId     String?
+  model        String?
+  tokensApprox Int?
+  metadata     Json?
+  ok           Boolean  @default(true)
+  errorMessage String?  @db.Text
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+model DealFinanceSnapshot {
+  id          String   @id @default(cuid())
+  dealId      String
+  deal        Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  revenueUah  Decimal  @db.Decimal(18, 2)
+  expensesUah Decimal  @db.Decimal(18, 2)
+  profitUah   Decimal  @db.Decimal(18, 2)
+  marginPct   Decimal? @db.Decimal(9, 4)
+  source      String
+  metaJson    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([dealId, createdAt])
+}
+
+// --- Communication hub (threads / messages; optional until channels are wired) ---
+
+enum CommChannelType {
+  TELEGRAM
+  INSTAGRAM
+  CALL_LOG
+  INTERNAL_NOTE
+  OTHER
+}
+
+enum CommMessageDirection {
+  INBOUND
+  OUTBOUND
+  INTERNAL
+}
+
+enum CommMessageKind {
+  TEXT
+  ATTACHMENT
+  NOTE
+  OTHER
+}
+
+enum CommSenderType {
+  CLIENT
+  MANAGER
+  SYSTEM
+}
+
+enum CommThreadStatus {
+  OPEN
+  ARCHIVED
+}
+
+model CommChannelAccount {
+  id           String          @id @default(cuid())
+  type         CommChannelType
+  title        String
+  syncStatus   String          @default("DISCONNECTED")
+  lastSyncedAt DateTime?
+  lastError    String?         @db.Text
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+}
+
+model CommThread {
+  id                 String            @id @default(cuid())
+  entityType         CommEntityType
+  entityId           String
+  channelType        CommChannelType
+  title              String?
+  participantName  String?
+  lastMessageAt      DateTime?
+  unreadCount        Int               @default(0)
+  status             CommThreadStatus  @default(OPEN)
+  needsReply         Boolean           @default(false)
+  followUpAt         DateTime?
+  aiSummary          String?           @db.Text
+  aiSummaryUpdatedAt DateTime?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  messages           CommMessage[]
+
+  @@unique([entityType, entityId, channelType])
+  @@index([entityType, entityId])
+  @@index([lastMessageAt])
+}
+
+model CommMessage {
+  id                  String               @id @default(cuid())
+  threadId            String
+  thread              CommThread           @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  direction           CommMessageDirection
+  senderName          String?
+  text                String               @db.Text
+  sentAt              DateTime             @default(now())
+  messageKind         CommMessageKind      @default(TEXT)
+  senderType          CommSenderType?
+  legacyLeadMessageId String?              @unique
+
+  @@index([threadId, sentAt])
+}
+
+model CommFollowUpSuggestion {
+  id          String         @id @default(cuid())
+  entityType  CommEntityType
+  entityId    String
+  reason      String         @db.Text
+  draftMessage String?       @db.Text
+  dueAt       DateTime?
+  urgency     String?
+  status      String         @default("OPEN")
+  suggestedAt DateTime       @default(now())
+
+  @@index([entityType, entityId, status])
 }

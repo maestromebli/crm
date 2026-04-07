@@ -11,7 +11,7 @@ import {
   type ExecutiveKpiNoteRow,
   type ExecutiveKpiNotesMap,
 } from "../lib/executive-kpi-notes";
-import { SummaryCard } from "../../../components/shared/SummaryCard";
+import { SummaryCard } from "@/components/shared/SummaryCard";
 import { Button } from "../../../components/ui/button";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle } from "../../../components/ui/sheet";
 import {

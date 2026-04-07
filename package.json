@@ -22,6 +22,9 @@
     "db:migrate-roles": "node scripts/migrate-roles-phase1.mjs",
     "db:ensure-admin": "node scripts/ensure-admin.mjs",
     "db:check-admin": "node scripts/check-admin.mjs",
+    "db:ensure-permissions": "node scripts/ensure-permission-rows.mjs",
+    "audit:users": "node scripts/audit-users-access.mjs",
+    "realign:permissions": "node scripts/realign-permissions-to-policy.mjs",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
     "backup:full": "node scripts/full-backup.mjs",
@@ -29,6 +32,7 @@
     "backup:gpt:production": "node scripts/gpt-production-bundle.mjs",
     "backup:gpt:lead-pricing": "node scripts/gpt-lead-pricing-bundle.mjs",
     "backup:gpt:finance-procurement": "node scripts/gpt-finance-procurement-bundle.mjs",
+    "core:v2:verify": "node scripts/core-v2-verify.mjs",
     "screenshots:install": "playwright install chromium",
     "screenshots:site": "playwright test tests/e2e/site-screenshots.spec.ts",
     "assistant:process-face": "node scripts/process-assistant-face.mjs"

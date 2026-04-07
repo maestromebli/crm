@@ -2,10 +2,14 @@
  * Чернетка смети з вільного тексту без зовнішнього API (евристики + ключові слова).
  * Для OpenAI — розширити окремим викликом за наявності ключа.
  */
+import type { EstimateLineType } from "@prisma/client";
+
+import type { EstimateCategoryKey } from "./estimate-categories";
 
 export type DraftLine = {
-  type: "PRODUCT";
+  type: EstimateLineType;
   category: string | null;
+  categoryKey?: EstimateCategoryKey;
   productName: string;
   qty: number;
   unit: string;

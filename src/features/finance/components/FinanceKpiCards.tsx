@@ -8,7 +8,9 @@ function money(v: number): string {
 export function FinanceKpiCards({ kpi }: { kpi: FinanceKpi }) {
   return (
     <div className="space-y-3">
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Ключові показники портфеля</p>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--enver-muted)]">
+        Ключові показники портфеля
+      </p>
       <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
       <SummaryCard label="Дохід" value={money(kpi.revenue)} tone="neutral" />
       <SummaryCard label="Отримано" value={money(kpi.received)} tone="income" />

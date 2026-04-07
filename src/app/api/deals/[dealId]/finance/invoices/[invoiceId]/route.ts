@@ -58,6 +58,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
       invoiceId,
       dealId,
       status: statusRaw as CrmInvoiceStatus,
+      actorUserId: user.id,
     });
     return NextResponse.json({ ok: true });
   } catch (e) {

@@ -14,6 +14,7 @@ import {
   requireSessionUser,
 } from "../../../../../lib/authz/api-guard";
 import { P } from "../../../../../lib/authz/permissions";
+import { recordWorkflowEvent, WORKFLOW_EVENT_TYPES } from "@/features/event-system";
 
 type Ctx = { params: Promise<{ dealId: string }> };
 
@@ -72,7 +73,12 @@ export async function PATCH(req: Request, ctx: Ctx) {
     });
     if (denied) return denied;
 
+    const prevMeasurement =
+      parseDealControlMeasurement(deal.controlMeasurementJson) ??
+      emptyControlMeasurement();
     const nextJson = mergeMeasurement(deal.controlMeasurementJson, patch);
+    const nextMeasurement =
+      parseDealControlMeasurement(nextJson) ?? emptyControlMeasurement();
 
     await prisma.deal.update({
       where: { id: dealId },
@@ -88,6 +94,32 @@ export async function PATCH(req: Request, ctx: Ctx) {
     });
 
     await persistReadinessSnapshot(dealId, user.id);
+    if (!prevMeasurement.scheduledAt && nextMeasurement.scheduledAt) {
+      await recordWorkflowEvent(
+        WORKFLOW_EVENT_TYPES.CONTROL_MEASUREMENT_SCHEDULED,
+        { dealId, eventId: "control_measurement" },
+        {
+          entityType: "DEAL",
+          entityId: dealId,
+          dealId,
+          userId: user.id,
+          dedupeKey: `control-measurement-scheduled:${dealId}`,
+        },
+      );
+    }
+    if (!prevMeasurement.completedAt && nextMeasurement.completedAt) {
+      await recordWorkflowEvent(
+        WORKFLOW_EVENT_TYPES.CONTROL_MEASUREMENT_DONE,
+        { dealId, eventId: "control_measurement" },
+        {
+          entityType: "DEAL",
+          entityId: dealId,
+          dealId,
+          userId: user.id,
+          dedupeKey: `control-measurement-done:${dealId}`,
+        },
+      );
+    }
 
     revalidatePath(`/deals/${dealId}/workspace`);
     return NextResponse.json({ ok: true });

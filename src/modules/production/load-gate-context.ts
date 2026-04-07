@@ -74,16 +74,18 @@ export async function loadProductionReadinessGateForDeal(
     where: { id: dealId },
     select: {
       workspaceMeta: true,
-      controlMeasurementJson: true,
-      commercialSnapshotFrozenAt: true,
       contract: { select: { status: true } },
       handoff: { select: { status: true, manifestJson: true } },
-      paymentPlan: { select: { stepsJson: true } },
     },
   });
   if (!deal) {
     throw new Error("Deal not found");
   }
+
+  const paymentPlan = await prisma.dealPaymentPlan.findUnique({
+    where: { dealId },
+    select: { stepsJson: true },
+  });
 
   const attachments = await prisma.attachment.findMany({
     where: { entityType: "DEAL", entityId: dealId },
@@ -96,12 +98,16 @@ export async function loadProductionReadinessGateForDeal(
   }
 
   const meta = parseMeta(deal.workspaceMeta);
+  const ext = meta as unknown as {
+    controlMeasurement?: DealControlMeasurementV1;
+    commercialSnapshotFrozenAt?: string;
+  };
   const manifest = parseHandoffManifest(deal.handoff?.manifestJson);
   const handoffHasSelectedFiles =
     manifest.selectedAttachmentIds.length > 0 ||
     manifest.selectedFileAssetIds.length > 0;
 
-  const planRows = milestonesFromPaymentPlan(deal.paymentPlan);
+  const planRows = milestonesFromPaymentPlan(paymentPlan);
   const effectivePaymentMilestones = getEffectivePaymentMilestonesFromParts(
     meta,
     planRows,
@@ -114,10 +120,12 @@ export async function loadProductionReadinessGateForDeal(
     contractStatus: deal.contract?.status ?? null,
     attachmentsByCategory,
     effectivePaymentMilestones,
-    controlMeasurement: parseControlMeasurement(deal.controlMeasurementJson),
+    controlMeasurement:
+      ext.controlMeasurement ??
+      parseControlMeasurement(null),
     handoffStatus: deal.handoff?.status ?? null,
     handoffHasSelectedFiles,
-    hasCommercialSnapshot: deal.commercialSnapshotFrozenAt != null,
+    hasCommercialSnapshot: Boolean(ext.commercialSnapshotFrozenAt),
     procurement,
   };
 

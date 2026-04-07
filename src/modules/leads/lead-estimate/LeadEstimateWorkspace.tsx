@@ -19,6 +19,7 @@ import {
 import { buildEstimateLinePayload } from "../../../lib/estimates/build-estimate-line-payload";
 import { estimateVersionPreviewStorageKey } from "../../../lib/estimates/estimate-version-preview-storage";
 import type { CompareEstimateVersionsResult } from "../../../lib/estimates/compare-estimate-versions";
+import { patchLeadEstimateById } from "../../../features/leads/lead-estimate-api";
 import { cn } from "../../../lib/utils";
 import { CreateProposalModal } from "./CreateProposalModal";
 
@@ -392,12 +393,7 @@ export function LeadEstimateWorkspace({
           body.versioning = opts?.versioning ?? "auto";
           if (opts?.forceNewVersion === true) body.forceNewVersion = true;
         }
-        const r = await fetch(`/api/leads/${leadId}/estimates/${estimateId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
-        const j = (await r.json()) as {
+        const j = await patchLeadEstimateById<{
           error?: string;
           estimate?: EstPayload;
           estimateIdChanged?: boolean;
@@ -405,8 +401,7 @@ export function LeadEstimateWorkspace({
           versioningReason?: string;
           isCurrent?: boolean;
           leadTitle?: string;
-        };
-        if (!r.ok) throw new Error(j.error ?? "Помилка");
+        }>(leadId, estimateId, body);
         if (j.estimateIdChanged && j.estimate?.id) {
           setSaveState("idle");
           router.replace(`/leads/${leadId}/estimate/${j.estimate.id}`);
@@ -558,17 +553,11 @@ export function LeadEstimateWorkspace({
   const setCurrent = async () => {
     setErr(null);
     try {
-      const r = await fetch(`/api/leads/${leadId}/estimates/${estimateId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ setCurrent: true }),
-      });
-      const j = (await r.json()) as {
+      const j = await patchLeadEstimateById<{
         error?: string;
         isCurrent?: boolean;
         estimate?: EstPayload;
-      };
-      if (!r.ok) throw new Error(j.error ?? "Помилка");
+      }>(leadId, estimateId, { setCurrent: true });
       if (j.estimate) setEst(j.estimate);
       setIsCurrent(Boolean(j.isCurrent));
       router.refresh();

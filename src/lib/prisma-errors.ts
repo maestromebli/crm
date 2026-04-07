@@ -2,6 +2,15 @@
  * Людинозчитні повідомлення для типових помилок Prisma (підключення, тощо).
  */
 
+import { Prisma } from "@prisma/client";
+
+/** P2021 — таблиці немає в БД (міграції не застосовані або інша база). */
+export function isPrismaMissingTableError(e: unknown): boolean {
+  return (
+    e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2021"
+  );
+}
+
 function isObjectWithCode(e: unknown): e is { code: string; message?: string } {
   return (
     typeof e === "object" &&

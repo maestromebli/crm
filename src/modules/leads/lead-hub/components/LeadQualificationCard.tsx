@@ -1,7 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { useLeadMutationActions } from "../../../../features/leads/use-lead-mutation-actions";
 import type { LeadDetailRow } from "../../../../features/leads/queries";
 import type { LeadQualification } from "../../../../lib/leads/lead-qualification";
 
@@ -11,11 +11,11 @@ type Props = {
 };
 
 export function LeadQualificationCard({ lead, canUpdateLead }: Props) {
-  const router = useRouter();
+  const leadActions = useLeadMutationActions(lead.id);
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState<LeadQualification>(lead.qualification);
-  const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const saving = leadActions.isPending;
 
   useEffect(() => {
     setQ(lead.qualification);
@@ -24,26 +24,16 @@ export function LeadQualificationCard({ lead, canUpdateLead }: Props) {
   const savePatch = useCallback(
     async (patch: Partial<LeadQualification>) => {
       if (!canUpdateLead) return;
-      setSaving(true);
       setErr(null);
       try {
         const next = { ...q, ...patch };
-        const r = await fetch(`/api/leads/${lead.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ qualification: next }),
-        });
-        const j = (await r.json()) as { error?: string };
-        if (!r.ok) throw new Error(j.error ?? "Помилка");
+        await leadActions.patch({ qualification: next });
         setQ(next);
-        router.refresh();
       } catch (e) {
         setErr(e instanceof Error ? e.message : "Помилка");
-      } finally {
-        setSaving(false);
       }
     },
-    [canUpdateLead, lead.id, q, router],
+    [canUpdateLead, leadActions, q],
   );
 
   const tempUa: Record<string, string> = {

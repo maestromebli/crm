@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireSessionUser } from "@/lib/authz/api-guard";
 import { loadDealFinancialBreakdown } from "@/lib/finance/deal-financial-summary";
+import { moneyFromDb } from "@/lib/finance/money";
 import { canFinanceAction } from "@/features/finance/lib/permissions";
 
 function monthStart(d: Date) {
@@ -14,10 +15,7 @@ function addDays(d: Date, days: number) {
 }
 
 function n(v: unknown): number {
-  if (v == null) return 0;
-  if (typeof v === "number") return Number.isFinite(v) ? v : 0;
-  const parsed = Number(v);
-  return Number.isFinite(parsed) ? parsed : 0;
+  return moneyFromDb(v);
 }
 
 function agingBucket(diffDays: number): "current" | "d1_7" | "d7_30" | "d30_plus" {

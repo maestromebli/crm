@@ -1,8 +1,4 @@
-import type {
-  Prisma,
-  PrismaClient,
-  ProductionOrderPriority,
-} from "@prisma/client";
+import type { Prisma, PrismaClient } from "@prisma/client";
 import {
   allReadinessMet,
   evaluateReadiness,
@@ -10,8 +6,7 @@ import {
 import type { DealWorkspaceMeta } from "@/lib/deal-core/workspace-types";
 import { getEffectivePaymentMilestonesFromParts } from "@/lib/deal-core/payment-aggregate";
 import { parseDealControlMeasurement } from "@/lib/deals/control-measurement";
-import { defaultStageSequence } from "./default-stages";
-import { stageLabelUa } from "./default-stages";
+import { createProductionFlowFromDealHandoff } from "@/features/production/server/services/production-flow.service";
 
 function parseMeta(raw: Prisma.JsonValue | null): DealWorkspaceMeta {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
@@ -87,30 +82,38 @@ export type CreateProductionOrderResult =
 export async function createProductionOrderFromDeal(
   prisma: PrismaClient,
   dealId: string,
-  opts: {
-    priority?: ProductionOrderPriority;
+  _opts: {
+    priority?: string;
     includePainting?: boolean;
     deadline?: Date | null;
   } = {},
 ): Promise<CreateProductionOrderResult> {
-  const existing = await prisma.productionOrder.findUnique({
+  const existing = await prisma.productionFlow.findUnique({
     where: { dealId },
     select: { id: true },
   });
   if (existing) {
-    return { ok: false, code: "ALREADY_EXISTS", message: "Виробниче замовлення вже створено." };
+    return {
+      ok: false,
+      code: "ALREADY_EXISTS",
+      message: "Виробничий потік для цієї угоди вже створено.",
+    };
   }
 
   const deal = await prisma.deal.findUnique({
     where: { id: dealId },
     include: {
       contract: { select: { status: true } },
-      paymentPlan: { select: { stepsJson: true } },
     },
   });
   if (!deal) {
     return { ok: false, code: "VALIDATION", message: "Угоду не знайдено." };
   }
+
+  const plan = await prisma.dealPaymentPlan.findUnique({
+    where: { dealId },
+    select: { stepsJson: true },
+  });
 
   const attachments = await prisma.attachment.findMany({
     where: { entityType: "DEAL", entityId: dealId, deletedAt: null },
@@ -123,7 +126,12 @@ export async function createProductionOrderFromDeal(
   }
 
   const meta = parseMeta(deal.workspaceMeta);
-  const controlMeasurement = parseDealControlMeasurement(deal.controlMeasurementJson);
+  const ext = meta as unknown as {
+    controlMeasurement?: ReturnType<typeof parseDealControlMeasurement>;
+  };
+  const controlMeasurement =
+    ext.controlMeasurement ??
+    parseDealControlMeasurement(null);
 
   const checks = evaluateReadiness({
     meta,
@@ -132,7 +140,7 @@ export async function createProductionOrderFromDeal(
     controlMeasurement,
   });
 
-  const prepayOk = hasSeventyPercentPaid(meta, deal.paymentPlan);
+  const prepayOk = hasSeventyPercentPaid(meta, plan);
   if (!prepayOk) {
     return {
       ok: false,
@@ -151,66 +159,9 @@ export async function createProductionOrderFromDeal(
     };
   }
 
-  const includePainting = opts.includePainting ?? true;
-  const sequence = defaultStageSequence(includePainting);
-  const deadline =
-    opts.deadline ??
-    deal.installationDate ??
-    deal.expectedCloseDate ??
-    null;
-
-  const order = await prisma.$transaction(async (tx) => {
-    const o = await tx.productionOrder.create({
-      data: {
-        dealId,
-        status: "QUEUED",
-        priority: opts.priority ?? "MEDIUM",
-        startDate: new Date(),
-        deadline,
-        includePainting,
-      },
-    });
-
-    for (let i = 0; i < sequence.length; i++) {
-      const name = sequence[i]!;
-      const stage = await tx.productionStage.create({
-        data: {
-          orderId: o.id,
-          name,
-          sortOrder: i,
-          status: "PENDING",
-        },
-      });
-      await tx.productionTask.create({
-        data: {
-          orderId: o.id,
-          stageId: stage.id,
-          title: `${stageLabelUa(name)} — основні роботи`,
-          description: `Автозадача для етапу «${stageLabelUa(name)}».`,
-          status: "TODO",
-        },
-      });
-    }
-
-    await tx.activityLog.create({
-      data: {
-        entityType: "DEAL",
-        entityId: dealId,
-        type: "PRODUCTION_ORDER_CREATED",
-        source: "SYSTEM",
-        data: { productionOrderId: o.id },
-      },
-    });
-
-    await tx.domainEvent.create({
-      data: {
-        type: "PRODUCTION_ORDER_CREATED",
-        dealId,
-        payload: { productionOrderId: o.id },
-      },
-    });
-
-    return o;
+  const { flow } = await createProductionFlowFromDealHandoff({
+    dealId,
+    actorName: "createProductionOrderFromDeal",
   });
 
   await prisma.deal.update({
@@ -223,5 +174,23 @@ export async function createProductionOrderFromDeal(
     },
   });
 
-  return { ok: true, orderId: order.id };
+  await prisma.activityLog.create({
+    data: {
+      entityType: "DEAL",
+      entityId: dealId,
+      type: "DEAL_UPDATED",
+      source: "SYSTEM",
+      data: { productionFlowId: flow.id },
+    },
+  });
+
+  await prisma.domainEvent.create({
+    data: {
+      type: "PRODUCTION_FLOW_CREATED",
+      dealId,
+      payload: { productionFlowId: flow.id },
+    },
+  });
+
+  return { ok: true, orderId: flow.id };
 }

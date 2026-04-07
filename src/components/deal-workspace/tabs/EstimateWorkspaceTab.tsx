@@ -17,6 +17,7 @@ export function EstimateWorkspaceTab({
       dealId={data.deal.id}
       dealTitle={data.deal.title}
       estimateVisibility={estimateVisibility}
+      workspacePayload={data}
     />
   );
 }

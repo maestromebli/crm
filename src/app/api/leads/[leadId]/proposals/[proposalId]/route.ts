@@ -13,6 +13,8 @@ import {
   prisma,
   prismaCodegenIncludesLeadProposalVisualizationUrl,
 } from "../../../../../../lib/prisma";
+import { CORE_EVENT_TYPES, publishEntityEvent } from "../../../../../../lib/events/crm-events";
+import { recordWorkflowEvent, WORKFLOW_EVENT_TYPES } from "../../../../../../features/event-system";
 
 type Ctx = { params: Promise<{ leadId: string; proposalId: string }> };
 
@@ -156,6 +158,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
   }
 
   let status = row.status;
+  const prevStatus = row.status;
   if (typeof body.status === "string" && STATUSES.includes(body.status)) {
     status = body.status;
   }
@@ -220,6 +223,64 @@ export async function PATCH(req: Request, ctx: Ctx) {
       ...(canVis && visUrl !== undefined ? { visualizationUrl: visUrl } : {}),
     },
   });
+  if (status !== prevStatus) {
+    await publishEntityEvent({
+      type: CORE_EVENT_TYPES.STATUS_CHANGED,
+      entityType: "QUOTE",
+      entityId: row.id,
+      userId: user.id,
+      payload: {
+        leadId,
+        from: prevStatus,
+        to: status,
+      },
+    });
+  }
+  if (status === "SENT" && prevStatus !== "SENT") {
+    await publishEntityEvent({
+      type: CORE_EVENT_TYPES.QUOTE_SENT,
+      entityType: "LEAD",
+      entityId: leadId,
+      userId: user.id,
+      payload: {
+        proposalId: row.id,
+      },
+    });
+    await recordWorkflowEvent(
+      WORKFLOW_EVENT_TYPES.QUOTE_SENT,
+      { leadId, proposalId: row.id },
+      {
+        entityType: "LEAD",
+        entityId: leadId,
+        userId: user.id,
+        dedupeKey: `quote-sent:${row.id}`,
+      },
+    );
+  }
+  if (status === "APPROVED" && prevStatus !== "APPROVED") {
+    await recordWorkflowEvent(
+      WORKFLOW_EVENT_TYPES.QUOTE_APPROVED,
+      { leadId, proposalId: row.id },
+      {
+        entityType: "LEAD",
+        entityId: leadId,
+        userId: user.id,
+        dedupeKey: `quote-approved:${row.id}`,
+      },
+    );
+  }
+  if (status === "REJECTED" && prevStatus !== "REJECTED") {
+    await recordWorkflowEvent(
+      WORKFLOW_EVENT_TYPES.QUOTE_REJECTED,
+      { leadId, proposalId: row.id },
+      {
+        entityType: "LEAD",
+        entityId: leadId,
+        userId: user.id,
+        dedupeKey: `quote-rejected:${row.id}`,
+      },
+    );
+  }
 
   revalidatePath(`/leads/${leadId}`);
   revalidatePath(`/leads/${leadId}/pricing`);

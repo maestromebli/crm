@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { format } from "date-fns";
 import { uk } from "date-fns/locale";
 import { motion, useReducedMotion } from "framer-motion";
@@ -22,6 +23,10 @@ export type LeadHubClientHeaderProps = {
   stageBusy: boolean;
   canUpdateLead: boolean;
   onStageChange: (stageId: string) => void;
+  /** Головний CTA (Наступний крок) — рівень 1. */
+  primaryCta?: ReactNode;
+  /** Другорядні швидкі дії — рівень 2. */
+  quickActions?: ReactNode;
 };
 
 export function LeadHubClientHeader({
@@ -30,6 +35,8 @@ export function LeadHubClientHeader({
   stageBusy,
   canUpdateLead,
   onStageChange,
+  primaryCta,
+  quickActions,
 }: LeadHubClientHeaderProps) {
   const reduceMotion = useReducedMotion();
   const displayName =
@@ -97,7 +104,29 @@ export function LeadHubClientHeader({
         )}
       </div>
 
-      <dl className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <dl className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <motion.div
+              className="cursor-default rounded-[12px] border border-[var(--enver-border)] bg-[var(--enver-bg)] px-3 py-2"
+              whileHover={reduceMotion ? undefined : { y: -1, transition: { duration: 0.18 } }}
+            >
+              <dt className="text-[12px] text-[var(--enver-muted)]">
+                Останній дотик
+              </dt>
+              <dd className="mt-0.5 text-[14px] font-medium text-[var(--enver-text)]">
+                {lead.lastActivityAt
+                  ? format(new Date(lead.lastActivityAt), "d MMM HH:mm", {
+                      locale: uk,
+                    })
+                  : "—"}
+              </dd>
+            </motion.div>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-[16rem]">
+            Остання зафіксована активність по ліду.
+          </TooltipContent>
+        </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>
             <motion.div
@@ -184,6 +213,15 @@ export function LeadHubClientHeader({
           </TooltipContent>
         </Tooltip>
       </dl>
+
+      {primaryCta || quickActions ? (
+        <div className="mt-5 space-y-3 border-t border-[var(--enver-border)] pt-4">
+          {primaryCta ? <div className="min-w-0">{primaryCta}</div> : null}
+          {quickActions ? (
+            <div className="flex justify-end">{quickActions}</div>
+          ) : null}
+        </div>
+      ) : null}
     </motion.header>
   );
 }

@@ -1,9 +1,9 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { DealWorkspacePayload } from "../../features/deal-workspace/types";
 import type { DealWorkspaceTabId } from "../../features/deal-workspace/types";
+import { useDealMutationActions } from "../../features/deal-workspace/use-deal-mutation-actions";
 import { cn } from "../../lib/utils";
 
 type Props = {
@@ -20,10 +20,14 @@ export function DealWorkspacePrimaryActions({
   onTab,
   onRequestEditHeader,
 }: Props) {
-  const router = useRouter();
-  const [busy, setBusy] = useState(false);
+  const dealActions = useDealMutationActions(data.deal.id);
+  const [localStatus, setLocalStatus] = useState(data.deal.status);
   const tel = data.primaryContact?.phone?.replace(/\s+/g, "") ?? "";
-  const canAct = data.deal.status === "OPEN" || data.deal.status === "ON_HOLD";
+  const canAct = localStatus === "OPEN" || localStatus === "ON_HOLD";
+
+  useEffect(() => {
+    setLocalStatus(data.deal.status);
+  }, [data.deal.status]);
 
   const patchStatus = useCallback(
     async (status: "WON" | "LOST") => {
@@ -36,23 +40,16 @@ export function DealWorkspacePrimaryActions({
       ) {
         return;
       }
-      setBusy(true);
+      const prevStatus = localStatus;
+      setLocalStatus(status);
       try {
-        const r = await fetch(`/api/deals/${data.deal.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status }),
-        });
-        const j = (await r.json().catch(() => ({}))) as { error?: string };
-        if (!r.ok) throw new Error(j.error ?? "Помилка");
-        router.refresh();
+        await dealActions.updateStatus(status);
       } catch (e) {
+        setLocalStatus(prevStatus);
         alert(e instanceof Error ? e.message : "Помилка");
-      } finally {
-        setBusy(false);
       }
     },
-    [data.deal.id, router],
+    [dealActions, localStatus],
   );
 
   return (
@@ -127,7 +124,7 @@ export function DealWorkspacePrimaryActions({
         </button>
         <button
           type="button"
-          disabled={busy || !canAct}
+          disabled={dealActions.isStatusPending || !canAct}
           className={cn(
             pill,
             "border-emerald-300 bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-40",
@@ -138,7 +135,7 @@ export function DealWorkspacePrimaryActions({
         </button>
         <button
           type="button"
-          disabled={busy || !canAct}
+          disabled={dealActions.isStatusPending || !canAct}
           className={cn(
             pill,
             "border-rose-200 bg-rose-50 text-rose-900 hover:bg-rose-100 disabled:opacity-40",

@@ -58,7 +58,7 @@ export async function POST(req: Request, ctx: Ctx) {
     messageToManager: body.messageToManager,
   });
 
-  if (!r.ok) {
+  if (r.ok === false) {
     return NextResponse.json({ error: r.error }, { status: 400 });
   }
 

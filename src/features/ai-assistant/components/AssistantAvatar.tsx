@@ -114,7 +114,10 @@ export function AssistantAvatar(props: AssistantAvatarProps) {
   if (assistantConfig.avatar.memojiSheet.enabled) {
     return <MemojiSheetAvatar {...props} />;
   }
+  return <AssistantDefaultAvatar {...props} />;
+}
 
+function AssistantDefaultAvatar(props: AssistantAvatarProps) {
   const {
     state,
     size = "md",

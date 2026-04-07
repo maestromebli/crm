@@ -69,6 +69,7 @@ function collectUrls(): { href: string; label: string; group: string }[] {
 }
 
 test.describe.configure({ mode: "serial" });
+test.setTimeout(20 * 60 * 1000);
 
 test("site screenshots for restoration", async ({ page, baseURL }) => {
   fs.mkdirSync(OUT_DIR, { recursive: true });
@@ -97,19 +98,36 @@ test("site screenshots for restoration", async ({ page, baseURL }) => {
     const name = `${String(index).padStart(3, "0")}_${slugifyPath(href)}.png`;
     const filePath = path.join(OUT_DIR, name);
     try {
-      const res = await page.goto(href, {
-        waitUntil: "domcontentloaded",
-        timeout: 45_000,
-      });
-      if (res && res.status() >= 400) {
-        manifest.errors.push({ href, message: `HTTP ${res.status()}` });
+      let success = false;
+      let lastError: unknown = null;
+      for (let attempt = 1; attempt <= 2; attempt += 1) {
+        try {
+          const res = await page.goto(href, {
+            waitUntil: "domcontentloaded",
+            timeout: 60_000,
+          });
+          if (res && res.status() >= 400) {
+            manifest.errors.push({ href, message: `HTTP ${res.status()}` });
+            return;
+          }
+          await page.waitForTimeout(200);
+          await page.screenshot({
+            path: filePath,
+            fullPage: opts?.fullPage !== false,
+          });
+          manifest.files.push({ file: name, href, label, group });
+          success = true;
+          break;
+        } catch (e) {
+          lastError = e;
+          if (attempt === 1) {
+            await page.waitForTimeout(600);
+          }
+        }
       }
-      await page.waitForTimeout(500);
-      await page.screenshot({
-        path: filePath,
-        fullPage: opts?.fullPage !== false,
-      });
-      manifest.files.push({ file: name, href, label, group });
+      if (!success) {
+        throw lastError instanceof Error ? lastError : new Error(String(lastError));
+      }
     } catch (e) {
       manifest.errors.push({
         href,

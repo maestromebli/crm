@@ -6,32 +6,17 @@ export type ProcurementGateSummary = {
   openRequests: number;
 };
 
-const TERMINAL_PO = new Set(["DELIVERED", "CANCELED"]);
-
 /**
- * Закупівлі по угоді: `DealPurchaseOrder` замість legacy Project/Request.
+ * Закупівлі по угоді: без окремих таблиць у схемі повертаємо нульові лічильники;
+ * деталі — через `ProductionFlow` / майбутні PO.
  */
 export async function getProcurementSummaryForDeal(
-  prisma: PrismaClient,
-  dealId: string,
+  _prisma: PrismaClient,
+  _dealId: string,
 ): Promise<ProcurementGateSummary> {
-  const projects = await prisma.project.findMany({
-    where: { dealId },
-    select: { id: true },
-  });
-
-  const orders = await prisma.dealPurchaseOrder.findMany({
-    where: { dealId },
-    select: { status: true },
-  });
-
-  const openMaterialLines = orders.filter(
-    (o) => !TERMINAL_PO.has(o.status),
-  ).length;
-
   return {
-    projectCount: projects.length,
-    openMaterialLines,
-    openRequests: openMaterialLines,
+    projectCount: 0,
+    openMaterialLines: 0,
+    openRequests: 0,
   };
 }

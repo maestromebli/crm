@@ -55,9 +55,7 @@ export async function GET(req: Request) {
       ownerId: true,
       workspaceMeta: true,
       handoff: { select: { status: true, submittedAt: true, acceptedAt: true } },
-      productionOrders: {
-        take: 1,
-        orderBy: { createdAt: "desc" },
+      productionFlow: {
         select: { id: true, status: true, createdAt: true },
       },
       owner: { select: { name: true, email: true } },
@@ -70,8 +68,8 @@ export async function GET(req: Request) {
   return NextResponse.json({
     items: deals.map((d) => {
       const meta = parseMeta(d.workspaceMeta);
-      const po = d.productionOrders[0];
-      const launched = Boolean(po);
+      const flow = d.productionFlow;
+      const launched = Boolean(flow);
       const orderCreated = Boolean(meta.productionOrderCreated) || launched;
       return {
         id: d.id,
@@ -85,8 +83,8 @@ export async function GET(req: Request) {
         acceptedAt: d.handoff?.acceptedAt?.toISOString() ?? null,
         productionOrderCreated: orderCreated,
         productionLaunchStatus: launched ? "LAUNCHED" : "NOT_READY",
-        queuedAt: po?.createdAt.toISOString() ?? null,
-        launchedAt: po?.createdAt.toISOString() ?? null,
+        queuedAt: flow?.createdAt.toISOString() ?? null,
+        launchedAt: flow?.createdAt.toISOString() ?? null,
         launchError: null,
         queueState: launched
           ? "launched"

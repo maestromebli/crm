@@ -7,7 +7,13 @@ import {
 import { P } from "../../../../../../lib/authz/permissions";
 import { recordIncomingPayment } from "../../../../../../lib/finance/invoice-payment-service";
 import type { MoneyTransactionCategory } from "@prisma/client";
-import { publishCrmEvent, CRM_EVENT_TYPES } from "@/lib/events/crm-events";
+import {
+  publishCrmEvent,
+  publishEntityEvent,
+  CRM_EVENT_TYPES,
+  CORE_EVENT_TYPES,
+} from "@/lib/events/crm-events";
+import { recordWorkflowEvent, WORKFLOW_EVENT_TYPES } from "@/features/event-system";
 
 type Ctx = { params: Promise<{ dealId: string }> };
 
@@ -157,6 +163,28 @@ export async function POST(req: Request, ctx: Ctx) {
       },
       dedupeKey: `payment:${row.id}`,
     });
+    await publishEntityEvent({
+      type: CORE_EVENT_TYPES.PAYMENT_RECEIVED,
+      entityType: "DEAL",
+      entityId: dealId,
+      userId: user.id,
+      payload: {
+        transactionId: row.id,
+        amount: amountNum,
+      },
+      dedupeKey: `payment:core:${row.id}`,
+    });
+    await recordWorkflowEvent(
+      WORKFLOW_EVENT_TYPES.PAYMENT_RECEIVED,
+      { dealId, paymentId: row.id },
+      {
+        entityType: "DEAL",
+        entityId: dealId,
+        dealId,
+        userId: user.id,
+        dedupeKey: `payment-received:${row.id}`,
+      },
+    );
     return NextResponse.json({ id: row.id }, { status: 201 });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Помилка";

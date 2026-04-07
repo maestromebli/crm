@@ -32,8 +32,8 @@ export default async function ProductionInstallationSchedulePage() {
       r.installationDate
         ? new Date(r.installationDate).toLocaleString("uk-UA")
         : "—",
-      r.productionOrders?.[0]?.stages?.[0]?.name
-        ? floorStageShortUa(r.productionOrders[0].stages[0].name)
+      r.productionFlow?.currentStepKey
+        ? floorStageShortUa(r.productionFlow.currentStepKey)
         : null,
     ]
       .filter(Boolean)

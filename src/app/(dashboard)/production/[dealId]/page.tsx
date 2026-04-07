@@ -6,12 +6,12 @@ type PageProps = { params: Promise<{ dealId: string }> };
 export default async function ProductionDealRedirectPage(props: PageProps) {
   const { dealId } = await props.params;
   try {
-    const po = await prisma.productionOrder.findUnique({
+    const flow = await prisma.productionFlow.findUnique({
       where: { dealId },
       select: { id: true },
     });
-    if (po) {
-      redirect(`/crm/production/${po.id}`);
+    if (flow) {
+      redirect(`/crm/production/${flow.id}`);
     }
   } catch {
     /* таблиці ще немає після міграції */

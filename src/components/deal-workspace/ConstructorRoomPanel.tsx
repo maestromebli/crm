@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { dealQueryKeys } from "../../features/deal-workspace/deal-query-keys";
 import type { DealWorkspacePayload } from "../../features/deal-workspace/types";
+import { patchDealConstructorRoomByDealId } from "../../features/deal-workspace/use-deal-mutation-actions";
 import { cn } from "../../lib/utils";
 import { qaRowParts } from "../../lib/constructor-room/qa-format";
 import {
@@ -52,7 +54,7 @@ export function ConstructorRoomPanel({
   canUse: boolean;
   initialRoom: DealWorkspacePayload["constructorRoom"];
 }) {
-  const router = useRouter();
+  const queryClient = useQueryClient();
   const { showToast } = useDealWorkspaceToast();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -160,14 +162,16 @@ export function ConstructorRoomPanel({
       setErr(null);
       try {
         await fn();
-        router.refresh();
+        void queryClient.invalidateQueries({
+          queryKey: dealQueryKeys.workspace(dealId),
+        });
       } catch (e) {
         setErr(e instanceof Error ? e.message : "Помилка");
       } finally {
         setBusy(false);
       }
     },
-    [router],
+    [dealId, queryClient],
   );
 
   const copyLink = useCallback(async () => {
@@ -192,9 +196,10 @@ export function ConstructorRoomPanel({
         room?: Room;
       };
       if (!r.ok) throw new Error(j.error ?? "Не вдалося створити кімнату");
+      if (j.room) applyServerRoom(j.room);
       showToast("Кімнату конструктора створено", { tone: "success" });
     });
-  }, [dealId, run, showToast]);
+  }, [applyServerRoom, dealId, run, showToast]);
 
   const saveMeta = useCallback(() => {
     void run(async () => {
@@ -208,10 +213,7 @@ export function ConstructorRoomPanel({
         }
       }
       const dueAtIso = localDatetimeValueToIso(dueAtLocal);
-      const r = await fetch(`/api/deals/${dealId}/constructor-room`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const j = await patchDealConstructorRoomByDealId<{ room?: Room }>(dealId, {
           assignedUserId: assignUserId.trim() || null,
           externalConstructorLabel: externalLabel.trim() || null,
           telegramInviteUrl: tgUrl.trim() || null,
@@ -219,13 +221,7 @@ export function ConstructorRoomPanel({
           aiQaJson,
           priority,
           dueAt: dueAtIso,
-        }),
       });
-      const j = (await r.json().catch(() => ({}))) as {
-        error?: string;
-        room?: Room;
-      };
-      if (!r.ok) throw new Error(j.error ?? "Не збережено");
       if (j.room) applyServerRoom(j.room);
       showToast("Збережено", { tone: "info" });
     });
@@ -285,7 +281,11 @@ export function ConstructorRoomPanel({
               : "Q&A вставлено в поле (натисніть «Зберегти поля» для збереження)",
             { tone: "success" },
           );
-          if (saveToRoom) router.refresh();
+          if (saveToRoom) {
+            void queryClient.invalidateQueries({
+              queryKey: dealQueryKeys.workspace(dealId),
+            });
+          }
         } catch (e) {
           setErr(e instanceof Error ? e.message : "Помилка");
         } finally {
@@ -293,39 +293,26 @@ export function ConstructorRoomPanel({
         }
       })();
     },
-    [dealId, router, showToast, telegramTranscript],
+    [dealId, queryClient, showToast, telegramTranscript],
   );
 
   const sendToConstructor = useCallback(() => {
     void run(async () => {
-      const r = await fetch(`/api/deals/${dealId}/constructor-room`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sendToConstructor: true }),
+      const j = await patchDealConstructorRoomByDealId<{ room?: Room }>(dealId, {
+        sendToConstructor: true,
       });
-      const j = (await r.json().catch(() => ({}))) as {
-        error?: string;
-        room?: Room;
-      };
-      if (!r.ok) throw new Error(j.error ?? "Не вдалося надіслати");
+      if (j.room) applyServerRoom(j.room);
       showToast("Завдання надіслано конструктору (посилання активне)", {
         tone: "success",
       });
     });
-  }, [dealId, run, showToast]);
+  }, [applyServerRoom, dealId, run, showToast]);
 
   const markReviewed = useCallback(() => {
     void run(async () => {
-      const r = await fetch(`/api/deals/${dealId}/constructor-room`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ markReviewed: true }),
+      const j = await patchDealConstructorRoomByDealId<{ room?: Room }>(dealId, {
+        markReviewed: true,
       });
-      const j = (await r.json().catch(() => ({}))) as {
-        error?: string;
-        room?: Room;
-      };
-      if (!r.ok) throw new Error(j.error ?? "Не вдалося позначити");
       if (j.room) applyServerRoom(j.room);
       showToast("Позначено як перевірено головним конструктором", {
         tone: "success",

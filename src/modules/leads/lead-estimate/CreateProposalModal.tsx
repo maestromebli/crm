@@ -19,6 +19,8 @@ type Props = {
   defaultSummary?: string;
   /** Рядки КП (як у таблиці) — по одному полю URL на позицію, індекс 1:1. */
   kpVisualizationRows: { title: string }[];
+  /** URL зображень з файлів ліда — автоматично підставляються у поля «Віз» (по порядку). */
+  leadImageUrls?: string[];
 };
 
 const btn =
@@ -46,6 +48,7 @@ export function CreateProposalModal({
   summaryHint,
   defaultSummary = "",
   kpVisualizationRows,
+  leadImageUrls,
 }: Props) {
   const router = useRouter();
   const [title, setTitle] = useState(defaultTitle);
@@ -55,14 +58,40 @@ export function CreateProposalModal({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  const fillVisualizationsFromLeadFiles = () => {
+    const len = kpVisualizationRows.length;
+    if (len === 0 || !leadImageUrls?.length) return;
+    setVisualizationUrls(() => {
+      const next = Array(len).fill("") as string[];
+      for (let i = 0; i < len; i++) {
+        next[i] = leadImageUrls[i]?.trim() ?? "";
+      }
+      return next;
+    });
+  };
+
   useEffect(() => {
     if (!open) return;
     setTitle(defaultTitle);
     setSummary(defaultSummary.trim() || "");
-    setVisualizationUrls(Array(kpVisualizationRows.length).fill(""));
+    const len = kpVisualizationRows.length;
+    const initial = Array(len).fill("") as string[];
+    if (leadImageUrls?.length && len > 0) {
+      for (let i = 0; i < Math.min(len, leadImageUrls.length); i++) {
+        const u = leadImageUrls[i]?.trim();
+        if (u) initial[i] = u;
+      }
+    }
+    setVisualizationUrls(initial);
     setNotes("");
     setErr(null);
-  }, [open, defaultTitle, defaultSummary, kpVisualizationRows.length]);
+  }, [
+    open,
+    defaultTitle,
+    defaultSummary,
+    kpVisualizationRows.length,
+    leadImageUrls?.join("|"),
+  ]);
 
   if (!open) return null;
 
@@ -184,8 +213,20 @@ export function CreateProposalModal({
             </span>
             <span className="block text-[10px] font-normal text-slate-500">
               Колонка «Віз» у таблиці КП: по одному URL на рядок (позиція 1, 2, …).
-              Якщо поле порожнє — підставиться фото з файлів ліда, якщо є.
+              Якщо на ліді завантажені зображення — вони підставляються автоматично
+              (можна змінити вручну).
             </span>
+            {kpVisualizationRows.length > 0 &&
+            leadImageUrls &&
+            leadImageUrls.length > 0 ? (
+              <button
+                type="button"
+                className="mt-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50"
+                onClick={fillVisualizationsFromLeadFiles}
+              >
+                Підставити з файлу ліда (перезаписати поля)
+              </button>
+            ) : null}
             {kpVisualizationRows.length === 0 ? (
               <p className="mt-2 rounded-lg border border-amber-100 bg-amber-50/80 px-2 py-2 text-[11px] text-amber-900">
                 У розрахунку немає згрупованих позицій для КП — додайте рядки в

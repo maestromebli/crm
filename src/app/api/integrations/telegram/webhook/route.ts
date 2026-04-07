@@ -3,6 +3,7 @@ import { resolveLeadTarget, storeInboundLeadMessage } from "../../../../../lib/m
 import { appendUnlinkedInbound } from "../../../../../lib/messaging/unlinked-inbox-log";
 import { seenInboundExternalId } from "../../../../../lib/messaging/webhook-security";
 import { markChannelHealth } from "../../../../../lib/messaging/communications-health";
+import { recordWorkflowEvent, WORKFLOW_EVENT_TYPES } from "@/features/event-system";
 
 type TelegramWebhook = {
   update_id?: number;
@@ -84,6 +85,16 @@ export async function POST(req: Request) {
     occurredAt,
     from: username ?? undefined,
   });
+  await recordWorkflowEvent(
+    WORKFLOW_EVENT_TYPES.TELEGRAM_MESSAGE_SYNCED,
+    { leadId: target.leadId },
+    {
+      entityType: "LEAD",
+      entityId: target.leadId,
+      userId: target.ownerId,
+      dedupeKey: `telegram-synced:${target.leadId}:${externalId}`,
+    },
+  );
   await markChannelHealth({
     userId: target.ownerId,
     channel: "telegram",

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { patchLeadEstimateById } from "../../../../features/leads/lead-estimate-api";
 import { buildEstimateLinePayload } from "../../../../lib/estimates/build-estimate-line-payload";
 import type { EstimateCategoryKey } from "../../../../lib/estimates/estimate-categories";
 import { estimateVersionPreviewStorageKey } from "../../../../lib/estimates/estimate-version-preview-storage";
@@ -295,27 +296,21 @@ export function EstimateVersionPreviewClient({
     setErr(null);
     try {
       const linePayload = buildEstimateLinePayload(storedPreview.lines);
-      const r = await fetch(`/api/leads/${leadId}/estimates/${estimateId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          lineItems: linePayload,
-          notes: storedPreview.notes,
-          discountAmount: storedPreview.discountAmount,
-          deliveryCost: storedPreview.deliveryCost,
-          installationCost: storedPreview.installationCost,
-          versioning: "fork",
-          forceNewVersion: true,
-          changeSummary:
-            summaryBullets[0]?.slice(0, 500) ?? "Нова версія з екрану перегляду",
-        }),
-      });
-      const j = (await r.json()) as {
+      const j = await patchLeadEstimateById<{
         error?: string;
         estimate?: { id: string };
         estimateIdChanged?: boolean;
-      };
-      if (!r.ok) throw new Error(j.error ?? "Помилка");
+      }>(leadId, estimateId, {
+        lineItems: linePayload,
+        notes: storedPreview.notes,
+        discountAmount: storedPreview.discountAmount,
+        deliveryCost: storedPreview.deliveryCost,
+        installationCost: storedPreview.installationCost,
+        versioning: "fork",
+        forceNewVersion: true,
+        changeSummary:
+          summaryBullets[0]?.slice(0, 500) ?? "Нова версія з екрану перегляду",
+      });
       sessionStorage.removeItem(
         estimateVersionPreviewStorageKey(leadId, estimateId),
       );

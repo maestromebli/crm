@@ -1,19 +1,61 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
-import type { EstimateLineType } from "@prisma/client";
+import { Prisma, type EstimateLineType } from "@prisma/client";
 import {
   forbidUnlessLeadAccess,
   forbidUnlessPermission,
   requireSessionUser,
 } from "../../../../../lib/authz/api-guard";
 import { P } from "../../../../../lib/authz/permissions";
+import {
+  buildFurnitureSheetLinesForDb,
+  FURNITURE_TEMPLATE_KEYS,
+  KITCHEN_NO_COUNTER_TEMPLATE_KEY,
+  type FurnitureTemplateKey,
+} from "../../../../../lib/estimates/kitchen-cost-sheet-template";
+import { newEstimateStableLineId } from "../../../../../lib/estimates/new-stable-line-id";
 import { recalculateEstimateTotals } from "../../../../../lib/estimates/recalculate";
 import {
   prisma,
   prismaCodegenIncludesEstimateLeadId,
+  prismaCodegenIncludesEstimateName,
 } from "../../../../../lib/prisma";
+import { CORE_EVENT_TYPES, publishEntityEvent } from "../../../../../lib/events/crm-events";
+import { recordWorkflowEvent, WORKFLOW_EVENT_TYPES } from "../../../../../features/event-system";
 
 type Ctx = { params: Promise<{ leadId: string }> };
+
+const FURNITURE_TEMPLATE_KEY_SET = new Set<string>(FURNITURE_TEMPLATE_KEYS);
+
+function mapKitchenSeedLines(
+  lines: ReturnType<typeof buildFurnitureSheetLinesForDb>,
+): Array<{
+  type: EstimateLineType;
+  category: string | null;
+  productName: string;
+  qty: number;
+  unit: string;
+  salePrice: number;
+  costPrice: number | null;
+  amountSale: number;
+  amountCost: number | null;
+  margin: number | null;
+  metadataJson?: unknown;
+}> {
+  return lines.map((l) => ({
+    type: l.type,
+    category: l.category,
+    productName: l.productName,
+    qty: l.qty,
+    unit: l.unit,
+    salePrice: l.salePrice,
+    costPrice: l.costPrice,
+    amountSale: l.amountSale,
+    amountCost: l.amountCost,
+    margin: l.margin,
+    metadataJson: l.metadataJson,
+  }));
+}
 
 export async function GET(_req: Request, ctx: Ctx) {
   if (!process.env.DATABASE_URL?.trim()) {
@@ -112,6 +154,8 @@ export async function POST(req: Request, ctx: Ctx) {
   let body: {
     templateKey?: string | null;
     cloneFromEstimateId?: string | null;
+    /** Підтримка клієнта «Розрахунок вартості» (LeadPricingWorkspaceClient). */
+    estimateName?: string | null;
   };
   try {
     body = (await req.json()) as typeof body;
@@ -122,6 +166,11 @@ export async function POST(req: Request, ctx: Ctx) {
   const templateKey =
     typeof body.templateKey === "string" && body.templateKey.trim()
       ? body.templateKey.trim().slice(0, 64)
+      : null;
+
+  const estimateName =
+    typeof body.estimateName === "string" && body.estimateName.trim()
+      ? body.estimateName.trim().slice(0, 200)
       : null;
 
   try {
@@ -144,6 +193,9 @@ export async function POST(req: Request, ctx: Ctx) {
       amountCost: number | null;
       margin: number | null;
       metadataJson?: unknown;
+      /** Якщо клонуємо з іншої смети — зберігаємо стабільний id рядка. */
+      stableLineId?: string | null;
+      sortOrder?: number;
     }> = [];
 
     if (
@@ -167,27 +219,39 @@ export async function POST(req: Request, ctx: Ctx) {
           amountCost: li.amountCost,
           margin: li.margin,
           metadataJson: li.metadataJson ?? undefined,
+          stableLineId: li.stableLineId ?? null,
+          sortOrder: li.sortOrder,
         }));
       }
     }
 
     if (lineData.length === 0) {
-      lineData = [
-        {
-          type: "PRODUCT",
-          category: templateKey,
-          productName: templateKey
-            ? `Шаблон: ${templateKey}`
-            : "Позиція 1",
-          qty: 1,
-          unit: "шт",
-          salePrice: 0,
-          costPrice: null,
-          amountSale: 0,
-          amountCost: null,
-          margin: null,
-        },
-      ];
+      if (templateKey && FURNITURE_TEMPLATE_KEY_SET.has(templateKey)) {
+        lineData = mapKitchenSeedLines(
+          buildFurnitureSheetLinesForDb(templateKey as FurnitureTemplateKey),
+        );
+      } else if (templateKey === "kitchen") {
+        lineData = mapKitchenSeedLines(
+          buildFurnitureSheetLinesForDb(KITCHEN_NO_COUNTER_TEMPLATE_KEY),
+        );
+      } else {
+        lineData = [
+          {
+            type: "PRODUCT",
+            category: templateKey,
+            productName: templateKey
+              ? `Шаблон: ${templateKey}`
+              : "Позиція 1",
+            qty: 1,
+            unit: "шт",
+            salePrice: 0,
+            costPrice: null,
+            amountSale: 0,
+            amountCost: null,
+            margin: null,
+          },
+        ];
+      }
     }
 
     const discountAmount = 0;
@@ -211,6 +275,9 @@ export async function POST(req: Request, ctx: Ctx) {
           version,
           status: "DRAFT",
           templateKey,
+          ...(prismaCodegenIncludesEstimateName() && estimateName
+            ? { name: estimateName }
+            : {}),
           totalPrice: totals.totalPrice,
           totalCost: totals.totalCost,
           grossMargin: totals.grossMargin,
@@ -219,7 +286,7 @@ export async function POST(req: Request, ctx: Ctx) {
           installationCost,
           createdById: user.id,
           lineItems: {
-            create: lineData.map((l) => ({
+            create: lineData.map((l, idx) => ({
               type: l.type,
               category: l.category,
               productName: l.productName,
@@ -230,6 +297,14 @@ export async function POST(req: Request, ctx: Ctx) {
               amountSale: l.amountSale,
               amountCost: l.amountCost,
               margin: l.margin,
+              stableLineId:
+                typeof l.stableLineId === "string" && l.stableLineId.trim()
+                  ? l.stableLineId.trim()
+                  : newEstimateStableLineId(),
+              sortOrder:
+                typeof l.sortOrder === "number" && Number.isFinite(l.sortOrder)
+                  ? l.sortOrder
+                  : idx,
               ...(l.metadataJson !== undefined && l.metadataJson !== null
                 ? { metadataJson: l.metadataJson as object }
                 : {}),
@@ -242,6 +317,26 @@ export async function POST(req: Request, ctx: Ctx) {
 
     revalidatePath(`/leads/${leadId}`);
     revalidatePath(`/leads/${leadId}/files`);
+    await publishEntityEvent({
+      type: CORE_EVENT_TYPES.ESTIMATE_CREATED,
+      entityType: "LEAD",
+      entityId: leadId,
+      userId: user.id,
+      payload: {
+        estimateId: created.id,
+        estimateVersion: created.version,
+      },
+    });
+    await recordWorkflowEvent(
+      WORKFLOW_EVENT_TYPES.CALCULATION_VERSION_CREATED,
+      { leadId, estimateId: created.id },
+      {
+        entityType: "LEAD",
+        entityId: leadId,
+        userId: user.id,
+        dedupeKey: `estimate-created:${created.id}`,
+      },
+    );
 
     return NextResponse.json({
       ok: true,
@@ -257,8 +352,28 @@ export async function POST(req: Request, ctx: Ctx) {
   } catch (e) {
     // eslint-disable-next-line no-console
     console.error("[POST leads/[leadId]/estimates]", e);
+    if (e instanceof Prisma.PrismaClientKnownRequestError) {
+      if (e.code === "P2002") {
+        return NextResponse.json(
+          {
+            error:
+              "Конфлікт версії розрахунку — оновіть сторінку й спробуйте ще раз.",
+          },
+          { status: 409 },
+        );
+      }
+      if (e.code === "P2003") {
+        return NextResponse.json(
+          {
+            error:
+              "Не вдалося зберегти розрахунок (порушення зв’язків у БД). Перевірте користувача та лід.",
+          },
+          { status: 400 },
+        );
+      }
+    }
     return NextResponse.json(
-      { error: "Не вдалося створити прорахунок" },
+      { error: "Не вдалося створити розрахунок" },
       { status: 500 },
     );
   }

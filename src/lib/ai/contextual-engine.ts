@@ -42,8 +42,9 @@ export async function buildAiContextResult(input: {
       include: {
         stage: true,
         contract: true,
-        paymentPlan: true,
-        _count: { select: { estimates: true, dealPurchaseOrders: true, productionOrders: true } },
+        dealPaymentPlan: true,
+        productionFlow: { select: { id: true } },
+        _count: { select: { estimates: true, dealPurchaseOrders: true } },
       },
     });
     if (!deal) return result;
@@ -60,7 +61,7 @@ export async function buildAiContextResult(input: {
         },
       });
     }
-    if (deal._count.dealPurchaseOrders === 0 && deal._count.productionOrders === 0) {
+    if (deal._count.dealPurchaseOrders === 0 && !deal.productionFlow) {
       result.recommendations.push("Prepare procurement flow after payment milestone 70%.");
     }
   }
@@ -82,9 +83,9 @@ export async function buildAiContextResult(input: {
   }
 
   if (input.context === "production" && input.dealId) {
-    const order = await prisma.productionOrder.findUnique({
+    const order = await prisma.productionFlow.findUnique({
       where: { dealId: input.dealId },
-      select: { id: true, status: true, atRisk: true },
+      select: { id: true, status: true, riskScore: true },
     });
     if (!order) {
       result.recommendations.push("Production order is not created yet.");
@@ -94,8 +95,8 @@ export async function buildAiContextResult(input: {
       });
     } else {
       result.insights.push(`Production status: ${order.status}`);
-      if (order.atRisk) {
-        result.risks.push("Production order marked as at-risk.");
+      if (order.riskScore >= 60) {
+        result.risks.push("Production flow marked as high risk.");
         await publishCrmEvent({
           type: CRM_EVENT_TYPES.PRODUCTION_DELAYED,
           dealId: input.dealId,

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { useErpBridge } from "@/components/erp/ErpBridgeProvider";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { tryReadResponseJson } from "@/lib/http/read-response-json";
 
 type Dashboard = {
   kpi: {
@@ -55,6 +56,25 @@ type Dashboard = {
   };
 };
 
+const DEFAULT_FINANCE_RISK = {
+  riskIndexWarn: 55,
+  arOutstandingWarn: 900000,
+  apOutstandingWarn: 700000,
+  weekNetWarn: -120000,
+};
+
+function readFinanceRiskFromStorage() {
+  if (typeof window === "undefined") return DEFAULT_FINANCE_RISK;
+  try {
+    const raw = localStorage.getItem("finance-hub-risk");
+    if (!raw) return DEFAULT_FINANCE_RISK;
+    const p = JSON.parse(raw) as Partial<typeof DEFAULT_FINANCE_RISK>;
+    return { ...DEFAULT_FINANCE_RISK, ...p };
+  } catch {
+    return DEFAULT_FINANCE_RISK;
+  }
+}
+
 export function FinanceHubClient() {
   const [data, setData] = useState<Dashboard | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -74,12 +94,8 @@ export function FinanceHubClient() {
     trancheLabel: "Аванс",
   });
   const [auditFeed, setAuditFeed] = useState<string[]>([]);
-  const [riskConfig, setRiskConfig] = useState({
-    riskIndexWarn: 55,
-    arOutstandingWarn: 900000,
-    apOutstandingWarn: 700000,
-    weekNetWarn: -120000,
-  });
+  const [riskConfig, setRiskConfig] = useState(DEFAULT_FINANCE_RISK);
+  const skipFirstRiskPersist = useRef(true);
   const firedAlertsRef = useRef<Set<string>>(new Set());
   const {
     productionOrders,
@@ -91,15 +107,33 @@ export function FinanceHubClient() {
   } = useErpBridge();
 
   const load = useCallback(async () => {
+    setErr(null);
     try {
-      const r = await fetch("/api/crm/finance/dashboard");
-      const j = (await r.json()) as Dashboard & { error?: string };
-      if (!r.ok) throw new Error(j.error ?? "Помилка");
+      const r = await fetch("/api/crm/finance/dashboard", { cache: "no-store" });
+      const j = await tryReadResponseJson<Dashboard & { error?: string }>(r);
+      if (!r.ok) throw new Error(j?.error ?? "Помилка");
+      if (!j) throw new Error("Порожня відповідь сервера");
       setData(j);
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Помилка");
     }
   }, []);
+
+  useEffect(() => {
+    setRiskConfig(readFinanceRiskFromStorage());
+  }, []);
+
+  useEffect(() => {
+    if (skipFirstRiskPersist.current) {
+      skipFirstRiskPersist.current = false;
+      return;
+    }
+    try {
+      localStorage.setItem("finance-hub-risk", JSON.stringify(riskConfig));
+    } catch {
+      /* ignore */
+    }
+  }, [riskConfig]);
 
   useEffect(() => {
     void load();
@@ -266,6 +300,42 @@ export function FinanceHubClient() {
             <p className="mt-1 text-sm text-slate-300">
               Cash-flow, P&amp;L, платіжна дисципліна та фінансовий контроль виробничих замовлень.
             </p>
+            <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1.5 text-xs font-medium">
+              <Link
+                href="/crm/finance"
+                className="text-cyan-200/95 underline-offset-2 hover:text-white hover:underline"
+              >
+                Аналітика фінансів
+              </Link>
+              <span className="text-slate-600">·</span>
+              <Link
+                href="/crm/finance/journal"
+                className="text-cyan-200/95 underline-offset-2 hover:text-white hover:underline"
+              >
+                Журнал проводок
+              </Link>
+              <span className="text-slate-600">·</span>
+              <Link
+                href="/crm/production"
+                className="text-cyan-200/95 underline-offset-2 hover:text-white hover:underline"
+              >
+                Виробництво
+              </Link>
+              <span className="text-slate-600">·</span>
+              <Link
+                href="/crm/procurement"
+                className="text-cyan-200/95 underline-offset-2 hover:text-white hover:underline"
+              >
+                Закупівлі
+              </Link>
+              <span className="text-slate-600">·</span>
+              <Link
+                href="/crm/production/workshop"
+                className="text-cyan-200/95 underline-offset-2 hover:text-white hover:underline"
+              >
+                Kanban цеху
+              </Link>
+            </div>
           </div>
           <div className="rounded-2xl border border-slate-700 bg-slate-900/70 px-4 py-3 text-right text-sm">
             <p className="text-slate-400">Фінансовий статус</p>
@@ -734,6 +804,7 @@ export function FinanceHubClient() {
               </div>
               <div className="grid gap-2">
               <QuickLink href="/crm/production" title="Виробничий контур" subtitle="готовність замовлень і ризики строків" />
+              <QuickLink href="/warehouse" title="Склад WMS" subtitle="залишки, резерви, оцінка запасів" />
               <QuickLink href="/crm/procurement" title="Контур закупівлі" subtitle="PO, постачальники, склад" />
               <QuickLink href="/crm/erp" title="Global ERP Command" subtitle="approval trail і наскрізний timeline" />
               </div>

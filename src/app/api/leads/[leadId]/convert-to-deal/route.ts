@@ -25,6 +25,7 @@ import {
 } from "../../../../../lib/leads/convert-lead-to-deal";
 import { prisma } from "../../../../../lib/prisma";
 import { publishCrmEvent, CRM_EVENT_TYPES } from "@/lib/events/crm-events";
+import { recordWorkflowEvent, WORKFLOW_EVENT_TYPES } from "@/features/event-system";
 
 type Ctx = { params: Promise<{ leadId: string }> };
 
@@ -191,6 +192,16 @@ export async function POST(req: Request, ctx: Ctx) {
       },
       dedupeKey: `deal:created:${result.deal.id}`,
     });
+    await recordWorkflowEvent(
+      WORKFLOW_EVENT_TYPES.DEAL_CREATED,
+      { dealId: result.deal.id, leadId: lead.id },
+      {
+        entityType: "DEAL",
+        entityId: result.deal.id,
+        dealId: result.deal.id,
+        userId: actorId,
+      },
+    );
 
     revalidatePath("/leads");
     revalidatePath("/leads/new");

@@ -17,17 +17,17 @@ export function AssistantContextCard({ resolved }: Props) {
     resolved.overdueTasks > 0;
 
   return (
-    <div className="rounded-lg bg-slate-50 px-2.5 py-2">
-      <p className="text-[11px] text-slate-500">Сторінка</p>
+    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+      <p className="text-[11px] font-medium text-slate-500">Контекст</p>
       <p className="mt-1 text-xs leading-snug text-slate-700">
         {resolved.contextKind !== "unknown"
           ? labelKind(resolved.contextKind)
           : "розділ"}
         <span className="text-slate-400"> · </span>
-        <span className="break-all text-slate-500">{resolved.route}</span>
+        <span className="truncate text-slate-500">{resolved.route}</span>
       </p>
       {hasEntityMeta ? (
-        <dl className="mt-2 space-y-1 border-t border-slate-200/80 pt-2 text-[11px] text-slate-600">
+        <dl className="mt-2 grid grid-cols-1 gap-1.5 border-t border-slate-100 pt-2 text-[11px] text-slate-600">
           {resolved.entityTitle ? (
             <div className="flex justify-between gap-2">
               <dt className="text-slate-400">Об’єкт</dt>
@@ -76,7 +76,7 @@ export function AssistantContextCard({ resolved }: Props) {
           ) : null}
         </dl>
       ) : (
-        <p className="mt-2 border-t border-slate-200/80 pt-2 text-[11px] text-slate-500">
+        <p className="mt-2 border-t border-slate-100 pt-2 text-[11px] text-slate-500">
           Додаткові поля з’являться, коли відкрито картку об’єкта.
         </p>
       )}

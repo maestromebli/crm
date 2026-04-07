@@ -10,7 +10,12 @@ import {
 } from "@/lib/authz/api-guard";
 import { P } from "@/lib/authz/permissions";
 import { createProductionFlowFromDealHandoff } from "@/features/production/server/services/production-flow.service";
-import { publishCrmEvent, CRM_EVENT_TYPES } from "@/lib/events/crm-events";
+import {
+  publishCrmEvent,
+  publishEntityEvent,
+  CRM_EVENT_TYPES,
+  CORE_EVENT_TYPES,
+} from "@/lib/events/crm-events";
 
 type Ctx = { params: Promise<{ dealId: string }> };
 
@@ -40,7 +45,7 @@ export async function POST(_req: Request, ctx: Ctx) {
     const denied = await forbidUnlessDealAccess(user, P.PRODUCTION_LAUNCH, deal);
     if (denied) return denied;
 
-    const flow = await createProductionFlowFromDealHandoff({
+    const { flow, handoffImportedFileCount } = await createProductionFlowFromDealHandoff({
       dealId,
       actorName: user.id,
       defaultChiefUserId: user.id,
@@ -51,7 +56,7 @@ export async function POST(_req: Request, ctx: Ctx) {
       entityId: dealId,
       type: "DEAL_UPDATED",
       actorUserId: user.id,
-      data: { productionFlowId: flow.id },
+      data: { productionFlowId: flow.id, handoffImportedFileCount },
     });
 
     await persistReadinessSnapshot(dealId, user.id);
@@ -67,6 +72,14 @@ export async function POST(_req: Request, ctx: Ctx) {
       payload: { productionFlowId: flow.id },
       dedupeKey: `production:start:${flow.id}`,
     });
+    await publishEntityEvent({
+      type: CORE_EVENT_TYPES.SENT_TO_PRODUCTION,
+      entityType: "DEAL",
+      entityId: dealId,
+      userId: user.id,
+      payload: { productionFlowId: flow.id },
+      dedupeKey: `production:core:${flow.id}`,
+    });
 
     revalidatePath(`/deals/${dealId}/workspace`);
     revalidatePath("/crm/production");
@@ -76,6 +89,7 @@ export async function POST(_req: Request, ctx: Ctx) {
       productionFlowId: flow.id,
       launched: true,
       flowUrl: `/crm/production/${flow.id}`,
+      handoffImportedFileCount,
     });
   } catch (e) {
     console.error("[POST production-launch]", e);
@@ -159,13 +173,18 @@ export async function PATCH(req: Request, ctx: Ctx) {
 
   const action = typeof body.action === "string" ? body.action : "";
   if (action === "retry") {
-    const flow = await createProductionFlowFromDealHandoff({
+    const { flow, handoffImportedFileCount } = await createProductionFlowFromDealHandoff({
       dealId,
       actorName: user.id,
       defaultChiefUserId: user.id,
     });
     revalidatePath(`/deals/${dealId}/workspace`);
-    return NextResponse.json({ ok: true, status: "QUEUED", productionFlowId: flow.id });
+    return NextResponse.json({
+      ok: true,
+      status: "QUEUED",
+      productionFlowId: flow.id,
+      handoffImportedFileCount,
+    });
   }
 
   return NextResponse.json({

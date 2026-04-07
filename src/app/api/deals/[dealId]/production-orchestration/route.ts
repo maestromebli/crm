@@ -38,54 +38,66 @@ export async function GET(_req: Request, ctx: Ctx) {
     return NextResponse.json({ error: "Недостатньо прав" }, { status: 403 });
   }
 
-  const orch = await prisma.productionOrchestration.findUnique({
+  const flow = await prisma.productionFlow.findUnique({
     where: { dealId },
     include: {
-      acceptedBy: { select: { id: true, name: true, email: true } },
-      constructorUser: { select: { id: true, name: true, email: true } },
+      chiefUser: { select: { id: true, name: true, email: true } },
     },
   });
 
-  const clarifications = await prisma.productionHandoffClarification.findMany({
-    where: { dealId },
-    orderBy: { createdAt: "desc" },
-    take: 10,
-    select: {
-      id: true,
-      status: true,
-      issuesJson: true,
-      messageToManager: true,
-      createdAt: true,
-      resolvedAt: true,
-    },
-  });
+  const clarifications = flow
+    ? await prisma.productionQuestion.findMany({
+        where: { flowId: flow.id, source: "HANDOFF" },
+        orderBy: { createdAt: "desc" },
+        take: 10,
+        select: {
+          id: true,
+          status: true,
+          text: true,
+          createdAt: true,
+          answeredAt: true,
+        },
+      })
+    : [];
 
   return NextResponse.json({
-    orchestration: orch
+    orchestration: flow
       ? {
-          id: orch.id,
-          productionNumber: orch.productionNumber,
-          status: orch.status,
-          estimateId: orch.estimateId,
-          acceptedAt: orch.acceptedAt?.toISOString() ?? null,
-          acceptedBy: orch.acceptedBy,
-          constructorType: orch.constructorType,
-          constructorUser: orch.constructorUser,
-          constructorExternalName: orch.constructorExternalName,
-          constructorExternalPhone: orch.constructorExternalPhone,
-          constructorExternalEmail: orch.constructorExternalEmail,
-          externalWorkspaceToken: orch.externalWorkspaceToken,
-          productionNotes: orch.productionNotes,
-          designStatus: orch.designStatus,
-          procurementStatus: orch.procurementStatus,
-          giblabStatus: orch.giblabStatus,
-          giblabExportStatus: orch.giblabExportStatus,
-          dueDate: orch.dueDate?.toISOString() ?? null,
-          riskLevel: orch.riskLevel,
-          designLockedAt: orch.designLockedAt?.toISOString() ?? null,
-          updatedAt: orch.updatedAt.toISOString(),
+          id: flow.id,
+          productionNumber: flow.number,
+          status: flow.status,
+          estimateId: null,
+          acceptedAt: flow.acceptedAt?.toISOString() ?? null,
+          acceptedBy: flow.chiefUser,
+          constructorType:
+            flow.constructorMode === "INTERNAL"
+              ? "INTERNAL"
+              : flow.constructorMode === "OUTSOURCE"
+                ? "OUTSOURCED"
+                : null,
+          constructorUser: flow.chiefUser,
+          constructorExternalName: flow.constructorName,
+          constructorExternalPhone: null,
+          constructorExternalEmail: null,
+          externalWorkspaceToken: flow.constructorWorkspaceUrl,
+          productionNotes: flow.productSummary,
+          designStatus: null,
+          procurementStatus: null,
+          giblabStatus: null,
+          giblabExportStatus: null,
+          dueDate: flow.dueDate?.toISOString() ?? null,
+          riskLevel: null,
+          designLockedAt: null,
+          updatedAt: flow.updatedAt.toISOString(),
         }
       : null,
-    clarifications,
+    clarifications: clarifications.map((c) => ({
+      id: c.id,
+      status: c.status,
+      issuesJson: [],
+      messageToManager: c.text,
+      createdAt: c.createdAt.toISOString(),
+      resolvedAt: c.answeredAt?.toISOString() ?? null,
+    })),
   });
 }

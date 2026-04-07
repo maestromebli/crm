@@ -1,6 +1,15 @@
-import type { ProductionStageName } from "@prisma/client";
+/** Лінійні етапи цеху (legacy UI), без Prisma enum. */
+export type LegacyProductionStageName =
+  | "CUTTING"
+  | "EDGING"
+  | "DRILLING"
+  | "ASSEMBLY"
+  | "PAINTING"
+  | "PACKAGING"
+  | "DELIVERY"
+  | "INSTALLATION";
 
-const LABEL_UA: Record<ProductionStageName, string> = {
+const LABEL_UA: Record<string, string> = {
   CUTTING: "Розкрій",
   EDGING: "Крайкування",
   DRILLING: "Присадка",
@@ -11,12 +20,14 @@ const LABEL_UA: Record<ProductionStageName, string> = {
   INSTALLATION: "Монтаж",
 };
 
-export function stageLabelUa(name: ProductionStageName): string {
+export function stageLabelUa(name: string): string {
   return LABEL_UA[name] ?? name;
 }
 
-export function defaultStageSequence(includePainting: boolean): ProductionStageName[] {
-  const base: ProductionStageName[] = [
+export function defaultStageSequence(
+  includePainting: boolean,
+): LegacyProductionStageName[] {
+  const base: LegacyProductionStageName[] = [
     "CUTTING",
     "EDGING",
     "DRILLING",

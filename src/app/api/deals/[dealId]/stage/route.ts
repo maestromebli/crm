@@ -10,6 +10,8 @@ import {
 import { P } from "../../../../../lib/authz/permissions";
 import { canMoveToNextStage } from "@/lib/deal-os/flow-engine";
 import { publishCrmEvent, CRM_EVENT_TYPES } from "@/lib/events/crm-events";
+import { evaluateDealStageTransitionGuard } from "@/lib/workflow/stage-policy";
+import { recordWorkflowEvent, WORKFLOW_EVENT_TYPES } from "@/features/event-system";
 
 type Ctx = { params: Promise<{ dealId: string }> };
 
@@ -53,12 +55,12 @@ export async function PATCH(req: Request, ctx: Ctx) {
         workspaceMeta: true,
         stage: { select: { id: true, name: true, slug: true, sortOrder: true } },
         contract: { select: { status: true } },
-        paymentPlan: { select: { stepsJson: true } },
+        dealPaymentPlan: { select: { stepsJson: true } },
+        productionFlow: { select: { id: true } },
         _count: {
           select: {
             estimates: true,
             dealPurchaseOrders: true,
-            productionOrders: true,
           },
         },
       },
@@ -125,15 +127,27 @@ export async function PATCH(req: Request, ctx: Ctx) {
         contractSigned: deal.contract?.status === "FULLY_SIGNED",
         payment70Done: percentPaid >= 70,
         procurementCreated: deal._count.dealPurchaseOrders > 0,
-        productionStarted: deal._count.productionOrders > 0,
+        productionStarted: Boolean(deal.productionFlow),
+      });
+      const guard = evaluateDealStageTransitionGuard({
+        currentStageSlug: deal.stage.slug,
+        nextStageSlug: nextStage.slug,
+        hasEstimate: deal._count.estimates > 0,
+        hasQuote: proposalSent,
+        contractSigned: deal.contract?.status === "FULLY_SIGNED",
+        payment70Done: percentPaid >= 70,
+        productionStarted: Boolean(deal.productionFlow),
       });
 
-      if (!validation.ok) {
+      if (!validation.ok || !guard.ok) {
         return NextResponse.json(
           {
             error: "Перехід заблоковано Flow Engine.",
             checklist: validation.checklist,
-            blockers: validation.blockers,
+            blockers: [
+              ...validation.blockers,
+              ...guard.blockers.map((x) => ({ id: x.code, label: x.message })),
+            ],
             stage: validation.stage,
             nextStage: validation.nextStage,
           },
@@ -174,6 +188,19 @@ export async function PATCH(req: Request, ctx: Ctx) {
       },
       dedupeKey: `stage:${dealId}:${deal.stageId}:${nextStage.id}:${Date.now()}`,
     });
+    if (nextStage.slug.toLowerCase().includes("production")) {
+      await recordWorkflowEvent(
+        WORKFLOW_EVENT_TYPES.PRODUCTION_TRANSFERRED,
+        { dealId },
+        {
+          entityType: "DEAL",
+          entityId: dealId,
+          dealId,
+          userId,
+          dedupeKey: `production-transferred:${dealId}:${nextStage.id}`,
+        },
+      );
+    }
 
     revalidatePath(`/deals/${dealId}/workspace`);
     return NextResponse.json({

@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../prisma";
+import { moneyFromDb } from "@/lib/finance/money";
 import {
   parseDealCommercialSnapshot,
   totalFromProposalSnapshotJson,
@@ -37,9 +38,7 @@ export async function computeDealFinanceRollup(dealId: string): Promise<DealFina
   const snap = parseDealCommercialSnapshot(deal.commercialSnapshotJson);
   const fromProposal =
     snap != null ? totalFromProposalSnapshotJson(snap.snapshotJson) : null;
-  const revenueNum =
-    fromProposal ??
-    (typeof deal.value === "number" && Number.isFinite(deal.value) ? deal.value : 0);
+  const revenueNum = fromProposal ?? moneyFromDb(deal.value);
   const revenueUah = toDecimal(revenueNum);
 
   const [expenseAgg, paidAgg] = await Promise.all([

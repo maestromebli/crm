@@ -5,6 +5,7 @@ import { forbidUnlessPermission, requireSessionUser } from "../../../../lib/auth
 import { P } from "../../../../lib/authz/permissions";
 import { canAccessOwner, resolveAccessContext } from "../../../../lib/authz/data-scope";
 import { prisma } from "../../../../lib/prisma";
+import { recordWorkflowEvent, WORKFLOW_EVENT_TYPES } from "@/features/event-system";
 
 const TYPES: CalendarEventType[] = [
   "MEETING",
@@ -115,6 +116,18 @@ export async function POST(req: Request) {
       },
       select: { id: true },
     });
+    if (body.type === "MEASUREMENT" && leadId) {
+      await recordWorkflowEvent(
+        WORKFLOW_EVENT_TYPES.MEASUREMENT_SCHEDULED,
+        { leadId, eventId: event.id },
+        {
+          entityType: "LEAD",
+          entityId: leadId,
+          userId,
+          dedupeKey: `measurement-scheduled:${event.id}`,
+        },
+      );
+    }
 
     revalidatePath("/calendar");
     revalidatePath("/calendar", "layout");

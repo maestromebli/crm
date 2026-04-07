@@ -42,7 +42,7 @@ export function dealConstructorRoomApiSelect() {
 
 type PrismaRoomRow = {
   id: string;
-  status: WorkspaceConstructorRoom["status"];
+  status: WorkspaceConstructorRoom["status"] | "DRAFT";
   publicToken: string;
   externalConstructorLabel: string | null;
   telegramInviteUrl: string | null;
@@ -62,7 +62,7 @@ type PrismaRoomRow = {
   messages: Array<{
     id: string;
     body: string;
-    author: "INTERNAL" | "CONSTRUCTOR";
+    author: string;
     createdAt: Date;
     createdBy: { name: string | null; email: string } | null;
   }>;
@@ -74,7 +74,10 @@ export function mapPrismaConstructorRoomToWorkspacePayload(
 ): WorkspaceConstructorRoom {
   return {
     id: cr.id,
-    status: cr.status,
+    status:
+      cr.status === "DRAFT"
+        ? "PENDING_ASSIGNMENT"
+        : (cr.status as WorkspaceConstructorRoom["status"]),
     publicToken: cr.publicToken,
     externalConstructorLabel: cr.externalConstructorLabel,
     telegramInviteUrl: cr.telegramInviteUrl,
@@ -96,7 +99,7 @@ export function mapPrismaConstructorRoomToWorkspacePayload(
     messages: cr.messages.map((m) => ({
       id: m.id,
       body: m.body,
-      author: m.author,
+      author: m.author === "CONSTRUCTOR" ? "CONSTRUCTOR" : "INTERNAL",
       createdAt: m.createdAt.toISOString(),
       authorLabel:
         m.author === "INTERNAL"

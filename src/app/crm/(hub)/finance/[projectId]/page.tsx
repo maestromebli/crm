@@ -7,7 +7,7 @@ import { SummaryCard } from "../../../../../components/shared/SummaryCard";
 import { FinanceTransactionsTable } from "../../../../../features/finance/components/FinanceTransactionsTable";
 import { PaymentPlanTable } from "../../../../../features/finance/components/PaymentPlanTable";
 import { getFinanceProjectData } from "../../../../../features/finance/data/repository";
-import { mockClients, mockFinanceCategories, mockProjects } from "../../../../../features/shared/data/mock-crm";
+import { FINANCE_CATEGORY_CATALOG } from "../../../../../lib/finance/finance-dictionaries";
 import { EmptyState } from "../../../../../components/shared/EmptyState";
 import { canAccess, resolveRole } from "../../../../../features/shared/lib/rbac";
 
@@ -18,15 +18,15 @@ export default async function FinanceProjectPage({ params, searchParams }: Props
   const role = resolveRole((await searchParams)?.role);
   const data = await getFinanceProjectData(projectId);
   if (!data) return notFound();
-  const client = mockClients.find((c) => c.id === data.project.clientId);
-  const projectNameById = Object.fromEntries(mockProjects.map((p) => [p.id, `${p.code} · ${p.title}`]));
-  const categoryNameById = Object.fromEntries(mockFinanceCategories.map((c) => [c.id, c.name]));
+  const clientName = data.clientName ?? "—";
+  const projectNameById = { [data.project.id]: `${data.project.code} · ${data.project.title}` };
+  const categoryNameById = Object.fromEntries(FINANCE_CATEGORY_CATALOG.map((c) => [c.id, c.name]));
 
   return (
     <main className="space-y-4 p-4">
       <PageHeader
         title={`${data.project.title} (${data.project.code})`}
-        subtitle={`Клієнт: ${client?.name ?? "—"} · Менеджер: ${data.project.managerId}`}
+        subtitle={`Клієнт: ${clientName} · Менеджер: ${data.project.managerId}`}
         actions={[{ label: "Додати транзакцію" }, { label: "Експорт по проєкту" }]}
       />
       <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
@@ -55,7 +55,7 @@ export default async function FinanceProjectPage({ params, searchParams }: Props
                     href={`/crm/procurement/${projectId}`}
                     className="text-xs font-medium text-amber-900 underline-offset-2 hover:underline"
                   >
-                    Закупівлі об'єкта
+                    Закупівлі об&apos;єкта
                   </Link>
                 </div>
               ))}

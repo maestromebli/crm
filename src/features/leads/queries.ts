@@ -784,22 +784,38 @@ export async function getLeadById(
 export async function leadsGroupedByStage(
   ctx: AccessContext,
 ): Promise<{ stage: LeadListRow["stage"]; leads: LeadListRow[] }[]> {
-  const { rows, error } = await listLeadsByView("all", ctx);
-  if (error || !rows.length) {
+  if (!process.env.DATABASE_URL?.trim()) return [];
+  try {
+    const leadPipeline = await prisma.pipeline.findFirst({
+      where: { entityType: "LEAD" },
+      orderBy: [{ isDefault: "desc" }, { id: "asc" }],
+      include: { stages: { orderBy: { sortOrder: "asc" } } },
+    });
+    if (!leadPipeline?.stages.length) return [];
+
+    const { rows, error } = await listLeadsByView("all", ctx);
+    if (error) return [];
+
+    const byStage = new Map<string, LeadListRow[]>();
+    for (const lead of rows) {
+      if (!byStage.has(lead.stageId)) byStage.set(lead.stageId, []);
+      byStage.get(lead.stageId)!.push(lead);
+    }
+
+    return leadPipeline.stages.map((stage) => ({
+      stage: {
+        id: stage.id,
+        pipelineId: stage.pipelineId,
+        name: stage.name,
+        slug: stage.slug,
+        sortOrder: stage.sortOrder,
+        isFinal: stage.isFinal,
+        finalType: stage.finalType,
+      },
+      leads: byStage.get(stage.id) ?? [],
+    }));
+  } catch (e) {
+    logPrismaError("leadsGroupedByStage", e);
     return [];
   }
-  const map = new Map<
-    string,
-    { stage: LeadListRow["stage"]; leads: LeadListRow[] }
-  >();
-  for (const lead of rows) {
-    const sid = lead.stageId;
-    if (!map.has(sid)) {
-      map.set(sid, { stage: lead.stage, leads: [] });
-    }
-    map.get(sid)!.leads.push(lead);
-  }
-  return [...map.values()].sort(
-    (a, b) => a.stage.sortOrder - b.stage.sortOrder,
-  );
 }

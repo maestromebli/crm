@@ -14,6 +14,7 @@ import {
   requireSessionUser,
 } from "../../../../../../lib/authz/api-guard";
 import { P } from "../../../../../../lib/authz/permissions";
+import { moneyFromDb } from "@/lib/finance/money";
 
 type Ctx = { params: Promise<{ dealId: string }> };
 
@@ -91,9 +92,9 @@ export async function POST(req: Request, ctx: Ctx) {
     });
     if (denied) return denied;
 
-    const total = deal.value;
+    const total = moneyFromDb(deal.value);
     const currency = deal.currency?.trim() || "UAH";
-    if (total == null || total <= 0) {
+    if (total <= 0) {
       return NextResponse.json(
         { error: "Спочатку задайте суму угоди." },
         { status: 400 },

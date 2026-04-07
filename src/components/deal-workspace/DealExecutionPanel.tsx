@@ -3,14 +3,14 @@
 import Link from "next/link";
 import { format } from "date-fns";
 import { uk } from "date-fns/locale";
-import { useRouter } from "next/navigation";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
   DealWorkspaceMeta,
   DealWorkspacePayload,
 } from "../../features/deal-workspace/types";
 import type { DealWorkspaceTabId } from "../../features/deal-workspace/types";
 import { derivePaymentStripSummaryForPayload } from "../../features/deal-workspace/payment-aggregate";
+import { useDealMutationActions } from "../../features/deal-workspace/use-deal-mutation-actions";
 import { cn } from "../../lib/utils";
 
 type Props = {
@@ -31,30 +31,21 @@ const CHECK_DEF: Array<{
   { key: "installationScheduled", label: "Монтаж заплановано" },
 ];
 
-async function patchMeta(
-  dealId: string,
-  patch: Partial<DealWorkspaceMeta>,
-): Promise<void> {
-  const r = await fetch(`/api/deals/${dealId}/workspace-meta`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(patch),
-  });
-  const j = (await r.json().catch(() => ({}))) as { error?: string };
-  if (!r.ok) throw new Error(j.error ?? "Помилка збереження");
-}
-
 export function DealExecutionPanel({ data, onTab }: Props) {
-  const router = useRouter();
+  const dealActions = useDealMutationActions(data.deal.id);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [checklistState, setChecklistState] = useState<
+    NonNullable<DealWorkspaceMeta["executionChecklist"]>
+  >(data.meta.executionChecklist ?? {});
 
-  const checklist = useMemo(
-    () => data.meta.executionChecklist ?? {},
-    [data.meta.executionChecklist],
-  );
+  const checklist = checklistState;
   const pay = derivePaymentStripSummaryForPayload(data);
   const contract = data.contract;
+
+  useEffect(() => {
+    setChecklistState(data.meta.executionChecklist ?? {});
+  }, [data.meta.executionChecklist]);
 
   const toggleCheck = useCallback(
     async (
@@ -62,20 +53,22 @@ export function DealExecutionPanel({ data, onTab }: Props) {
     ) => {
       setBusy(true);
       setErr(null);
+      const prevChecklist = checklistState;
       const next: NonNullable<DealWorkspaceMeta["executionChecklist"]> = {
-        ...checklist,
-        [key]: !checklist[key],
+        ...checklistState,
+        [key]: !checklistState[key],
       };
+      setChecklistState(next);
       try {
-        await patchMeta(data.deal.id, { executionChecklist: next });
-        router.refresh();
+        await dealActions.patchWorkspaceMeta({ executionChecklist: next });
       } catch (e) {
+        setChecklistState(prevChecklist);
         setErr(e instanceof Error ? e.message : "Помилка");
       } finally {
         setBusy(false);
       }
     },
-    [checklist, data.deal.id, router],
+    [checklistState, dealActions],
   );
 
   const leadHref = data.leadId ? `/leads/${data.leadId}` : null;

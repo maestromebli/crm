@@ -10,6 +10,7 @@ import {
 import { P } from "../../../../lib/authz/permissions";
 import { hasTaskAssignScope } from "../../../../lib/authz/roles";
 import { taskListWhereForUser } from "../../../../lib/tasks/prisma-scope";
+import { recordWorkflowEvent, WORKFLOW_EVENT_TYPES } from "@/features/event-system";
 
 const STATUSES: TaskStatus[] = ["OPEN", "IN_PROGRESS", "DONE", "CANCELLED"];
 
@@ -123,6 +124,26 @@ export async function PATCH(req: Request, ctx: Ctx) {
         assignee: { select: { name: true, email: true } },
       },
     });
+    if (
+      row.dueAt &&
+      row.status !== "DONE" &&
+      row.status !== "CANCELLED" &&
+      row.dueAt.getTime() < Date.now()
+    ) {
+      await recordWorkflowEvent(
+        WORKFLOW_EVENT_TYPES.TASK_OVERDUE,
+        row.entityType === "LEAD"
+          ? { leadId: row.entityId, taskId: row.id }
+          : { dealId: row.entityId, taskId: row.id },
+        {
+          entityType: row.entityType,
+          entityId: row.entityId,
+          dealId: row.entityType === "DEAL" ? row.entityId : null,
+          userId: user.id,
+          dedupeKey: `task-overdue:${row.id}:${new Date().toISOString().slice(0, 10)}`,
+        },
+      );
+    }
 
     revalidatePath("/tasks");
     if (row.entityType === "DEAL") {

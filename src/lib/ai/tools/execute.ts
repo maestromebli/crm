@@ -175,9 +175,7 @@ async function toolListDeals(
       pipeline: { select: { name: true } },
       owner: { select: { id: true, name: true, email: true } },
       client: { select: { id: true, name: true } },
-      productionOrders: {
-        take: 1,
-        orderBy: { createdAt: "desc" },
+      productionFlow: {
         select: { id: true, status: true, createdAt: true },
       },
     },
@@ -193,15 +191,15 @@ async function toolListDeals(
       pipeline: r.pipeline.name,
       owner: r.owner.name ?? r.owner.email,
       client: r.client.name,
-      value: r.value,
+      value: r.value != null ? Number(r.value) : null,
       currency: r.currency,
       expected_close: r.expectedCloseDate?.toISOString() ?? null,
       installation_date: r.installationDate?.toISOString() ?? null,
-      production: r.productionOrders[0]
+      production: r.productionFlow
         ? {
-            status: r.productionOrders[0].status,
-            launched_at: r.productionOrders[0].createdAt.toISOString(),
-            queued_at: r.productionOrders[0].createdAt.toISOString(),
+            status: r.productionFlow.status,
+            launched_at: r.productionFlow.createdAt.toISOString(),
+            queued_at: r.productionFlow.createdAt.toISOString(),
           }
         : null,
       updated_at: r.updatedAt.toISOString(),
@@ -329,9 +327,7 @@ async function toolGetDeal(
       pipeline: { select: { name: true } },
       owner: { select: { id: true, name: true, email: true } },
       client: { select: { id: true, name: true } },
-      productionOrders: {
-        take: 1,
-        orderBy: { createdAt: "desc" },
+      productionFlow: {
         select: { id: true, status: true, createdAt: true },
       },
       productionManager: { select: { name: true, email: true } },
@@ -354,17 +350,17 @@ async function toolGetDeal(
     pipeline: deal.pipeline.name,
     owner: deal.owner.name ?? deal.owner.email,
     client: deal.client.name,
-    value: deal.value,
+    value: deal.value != null ? Number(deal.value) : null,
     currency: deal.currency,
     expected_close: deal.expectedCloseDate?.toISOString() ?? null,
     installation_date: deal.installationDate?.toISOString() ?? null,
     production_manager:
       deal.productionManager?.name ?? deal.productionManager?.email ?? null,
-    production: deal.productionOrders[0]
+    production: deal.productionFlow
       ? {
-          status: deal.productionOrders[0].status,
-          launched_at: deal.productionOrders[0].createdAt.toISOString(),
-          queued_at: deal.productionOrders[0].createdAt.toISOString(),
+          status: deal.productionFlow.status,
+          launched_at: deal.productionFlow.createdAt.toISOString(),
+          queued_at: deal.productionFlow.createdAt.toISOString(),
           error: null,
         }
       : null,

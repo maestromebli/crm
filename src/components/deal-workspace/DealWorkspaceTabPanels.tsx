@@ -5,12 +5,14 @@ import type {
   DealContractStatus,
   HandoffStatus,
 } from "@prisma/client";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
+  DealAttachmentSummary,
   DealContractDraft,
   DealWorkspacePayload,
+  HandoffManifest,
 } from "../../features/deal-workspace/types";
 import type { DealWorkspaceTabId } from "../../features/deal-workspace/types";
 import { DEAL_WORKSPACE_TABS } from "./deal-workspace-tabs";
@@ -28,6 +30,20 @@ import { useDealWorkspaceToast } from "./DealWorkspaceToast";
 import { CommunicationHub } from "../../features/communication/ui/CommunicationHub";
 import { readResponseJson } from "@/lib/http/read-response-json";
 import { ProductionOrchestrationHandoffPanel } from "./ProductionOrchestrationHandoffPanel";
+import {
+  getEstimateVersusDealValueHint,
+} from "../../features/deal-workspace/deal-workspace-warnings";
+import {
+  patchDealContractByDealId,
+  patchDealHandoffByDealId,
+  patchDealProductionLaunchByDealId,
+  patchTaskById,
+  patchWorkspaceMetaByDealId,
+} from "../../features/deal-workspace/use-deal-mutation-actions";
+import { SyncDealValueFromEstimateButton } from "./SyncDealValueFromEstimateButton";
+import { derivePaymentStripSummaryForPayload } from "../../features/deal-workspace/payment-aggregate";
+import { REALTIME_POLICY } from "../../config/realtime-policy";
+import { dealQueryKeys } from "../../features/deal-workspace/deal-query-keys";
 
 function renderTemplatePreview(
   contentHtml: string,
@@ -143,44 +159,9 @@ const btn =
 const btnGhost =
   "rounded-lg border border-slate-200 bg-[var(--enver-card)] px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-[var(--enver-hover)]";
 
-async function patchMeta(
-  dealId: string,
-  patch: Record<string, unknown>,
-): Promise<void> {
-  const r = await fetch(`/api/deals/${dealId}/workspace-meta`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(patch),
-  });
-  const j = (await r.json().catch(() => ({}))) as { error?: string };
-  if (!r.ok) throw new Error(j.error ?? "Помилка збереження");
-}
-
-async function patchHandoff(
-  dealId: string,
-  patch: Record<string, unknown>,
-): Promise<void> {
-  const r = await fetch(`/api/deals/${dealId}/handoff`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(patch),
-  });
-  const j = (await r.json().catch(() => ({}))) as { error?: string };
-  if (!r.ok) throw new Error(j.error ?? "Помилка збереження");
-}
-
-async function patchProductionLaunch(
-  dealId: string,
-  patch: Record<string, unknown>,
-): Promise<void> {
-  const r = await fetch(`/api/deals/${dealId}/production-launch`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(patch),
-  });
-  const j = (await r.json().catch(() => ({}))) as { error?: string };
-  if (!r.ok) throw new Error(j.error ?? "Помилка оновлення запуску");
-}
+const patchMeta = patchWorkspaceMetaByDealId;
+const patchHandoff = patchDealHandoffByDealId;
+const patchProductionLaunch = patchDealProductionLaunchByDealId;
 
 function handoffStatusUa(s: HandoffStatus): string {
   const m: Record<HandoffStatus, string> = {
@@ -192,8 +173,42 @@ function handoffStatusUa(s: HandoffStatus): string {
   return m[s];
 }
 
-function useWorkspaceRun() {
-  const router = useRouter();
+function attachmentCategoryLabel(category: AttachmentCategory): string {
+  return ATTACH_CATEGORIES.find((c) => c.value === category)?.label ?? category;
+}
+
+/** Повертає id вкладень для UI з маніфесту (у т.ч. legacy лише по fileAssetId). */
+function initialHandoffSelectedAttachmentIds(
+  attachments: DealAttachmentSummary[],
+  manifest: HandoffManifest,
+): string[] {
+  if (manifest.selectedAttachmentIds.length > 0) return manifest.selectedAttachmentIds;
+  if (manifest.selectedFileAssetIds.length === 0) return [];
+  const assetSet = new Set(manifest.selectedFileAssetIds);
+  const ids: string[] = [];
+  for (const a of attachments) {
+    if (a.fileAssetId && assetSet.has(a.fileAssetId)) ids.push(a.id);
+  }
+  return ids;
+}
+
+function deriveHandoffManifestFiles(
+  attachments: DealAttachmentSummary[],
+  selectedAttachmentIds: string[],
+): Pick<HandoffManifest, "selectedAttachmentIds" | "selectedFileAssetIds"> {
+  const sel = new Set(selectedAttachmentIds);
+  const fileAssetIds: string[] = [];
+  for (const a of attachments) {
+    if (sel.has(a.id) && a.fileAssetId) fileAssetIds.push(a.fileAssetId);
+  }
+  return {
+    selectedAttachmentIds: [...selectedAttachmentIds],
+    selectedFileAssetIds: [...new Set(fileAssetIds)],
+  };
+}
+
+function useWorkspaceRun(dealId: string) {
+  const queryClient = useQueryClient();
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const run = useCallback(
@@ -202,14 +217,16 @@ function useWorkspaceRun() {
       setBusy(true);
       try {
         await fn();
-        router.refresh();
+        await queryClient.invalidateQueries({
+          queryKey: dealQueryKeys.workspace(dealId),
+        });
       } catch (e) {
         setErr(e instanceof Error ? e.message : "Помилка");
       } finally {
         setBusy(false);
       }
     },
-    [router],
+    [dealId, queryClient],
   );
   return { err, busy, run };
 }
@@ -311,7 +328,7 @@ function ContractTab({
   data: DealWorkspacePayload;
   roleView: "director" | "head" | "sales";
 }) {
-  const { err, busy, run } = useWorkspaceRun();
+  const { err, busy, run } = useWorkspaceRun(data.deal.id);
   const [cStatus, setCStatus] = useState(
     data.contract?.status ?? "DRAFT",
   );
@@ -426,8 +443,9 @@ function ContractTab({
     Math.min(100, Math.round(((requiredKeys.length - missingRequired.length) / requiredKeys.length) * 100)),
   );
   const overallReadiness = Math.round((qualityScore + templateQualityScore) / 2);
-  const nextActionLabel =
-    missingRequired.length > 0
+  const nextActionLabel = !data.contract
+    ? "Створіть чернетку договору"
+    : missingRequired.length > 0
       ? "Заповніть обовʼязкові поля"
       : emptyTemplateKeys.length > 0
         ? "Заповніть змінні шаблону ({{...}})"
@@ -528,52 +546,109 @@ function ContractTab({
     data.attachmentsByCategory.CONTRACT > 0 ||
     data.attachmentsByCategory.SPEC > 0;
   const step1Done = draftReady;
-  const step2Done = data.contract.version > 1;
+  const step2Done = data.contract ? data.contract.version > 1 : false;
   const step3Done = hasDocumentArtifacts;
-  const nextBestAction = missingRequired.length > 0
+  const paymentStripContract = useMemo(
+    () => derivePaymentStripSummaryForPayload(data),
+    [data],
+  );
+  const estimateVersusDealHint = useMemo(
+    () => getEstimateVersusDealValueHint(data),
+    [data],
+  );
+  const contractHappySteps = useMemo(() => {
+    if (!data.contract) return null;
+    const c = data.contract;
+    const signed =
+      c.status === "FULLY_SIGNED" ||
+      c.status === "CLIENT_SIGNED" ||
+      c.status === "COMPANY_SIGNED" ||
+      Boolean(c.signedPdfUrl);
+    const exportedOrSent =
+      hasDocumentArtifacts ||
+      c.status === "SENT_FOR_SIGNATURE" ||
+      signed;
+    return [
+      {
+        id: "h1",
+        label: "Реквізити та умови договору",
+        done: draftReady,
+      },
+      {
+        id: "h2",
+        label: "Зафіксувати версію документа",
+        done: c.version > 1,
+      },
+      {
+        id: "h3",
+        label: "Експорт PDF / відправка на підпис",
+        done: exportedOrSent,
+      },
+      {
+        id: "h4",
+        label: "Підпис сторін",
+        done: signed,
+      },
+      {
+        id: "h5",
+        label: "Підтвердження оплати (віха)",
+        done: paymentStripContract.done > 0,
+      },
+    ];
+  }, [data.contract, draftReady, hasDocumentArtifacts, paymentStripContract.done]);
+  const nextBestAction = !data.contract
     ? {
-        id: "fill_required" as const,
-        title: "Заповнити обов'язкові поля",
-        description: "Без них система блокує створення версії документа.",
+        id: "create_draft" as const,
+        title: "Створити чернетку договору",
+        description: "Натисніть кнопку нижче — після цього з’являться реквізити та прев’ю.",
       }
-    : emptyTemplateKeys.length > 0
+    : missingRequired.length > 0
       ? {
-          id: "fill_template" as const,
-          title: "Заповнити змінні шаблону",
-          description: `У HTML залишились порожні {{...}}: ${emptyTemplateKeys.slice(0, 6).join(", ")}${emptyTemplateKeys.length > 6 ? "…" : ""}.`,
+          id: "fill_required" as const,
+          title: "Заповнити обов'язкові поля",
+          description: "Без них система блокує створення версії документа.",
         }
-    : data.contract.status === "SENT_FOR_SIGNATURE"
-      ? {
-          id: "watch_signature",
-          title: "Контроль підпису клієнта",
-          description: "Перевірте події Дія.Підпис та оновіть статус задач.",
-        }
-      : data.contract.version <= 1
+      : emptyTemplateKeys.length > 0
         ? {
-            id: "create_version",
-            title: "Зафіксувати версію документа",
-            description: "Збережіть стан договору як офіційну ревізію.",
+            id: "fill_template" as const,
+            title: "Заповнити змінні шаблону",
+            description: `У HTML залишились порожні {{...}}: ${emptyTemplateKeys.slice(0, 6).join(", ")}${emptyTemplateKeys.length > 6 ? "…" : ""}.`,
           }
-        : {
-            id: "export_and_sign",
-            title: "Експорт і відправка на підпис",
-            description: "Згенеруйте PDF/DOCX і запустіть процес підпису.",
-          };
-  const contractHealthLabel =
-    missingRequired.length > 0
+        : data.contract.status === "SENT_FOR_SIGNATURE"
+          ? {
+              id: "watch_signature",
+              title: "Контроль підпису клієнта",
+              description: "Перевірте події Дія.Підпис та оновіть статус задач.",
+            }
+          : data.contract.version <= 1
+            ? {
+                id: "create_version",
+                title: "Зафіксувати версію документа",
+                description: "Збережіть стан договору як офіційну ревізію.",
+              }
+            : {
+                id: "export_and_sign",
+                title: "Експорт і відправка на підпис",
+                description: "Згенеруйте PDF/DOCX і запустіть процес підпису.",
+              };
+  const contractHealthLabel = !data.contract
+    ? "Чернетка ще не створена"
+    : missingRequired.length > 0
       ? "Потрібне заповнення (обов'язкові поля)"
       : emptyTemplateKeys.length > 0
         ? "Шаблон неповний (порожні змінні)"
-    : data.contract.status === "SENT_FOR_SIGNATURE"
-      ? "Очікує підпис"
+        : data.contract.status === "SENT_FOR_SIGNATURE"
+          ? "Очікує підпис"
+          : data.contract.status === "FULLY_SIGNED"
+            ? "Успішно завершено"
+            : "Готово до наступного кроку";
+  const contractHealthTone = !data.contract
+    ? "border-slate-200 bg-slate-50 text-slate-700"
+    : blockVersionActions
+      ? "border-rose-200 bg-rose-50 text-rose-800"
       : data.contract.status === "FULLY_SIGNED"
-        ? "Успішно завершено"
-        : "Готово до наступного кроку";
-  const contractHealthTone = blockVersionActions
-    ? "border-rose-200 bg-rose-50 text-rose-800"
-    : data.contract.status === "FULLY_SIGNED"
-      ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-      : "border-blue-200 bg-blue-50 text-blue-800";
+        ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+        : "border-blue-200 bg-blue-50 text-blue-800";
   const requisitesFields = [
     ["contractNumber", "Номер договору", "Напр. 24/03-15"],
     ["contractDate", "Дата договору", "дд.мм.рррр"],
@@ -638,20 +713,14 @@ function ContractTab({
       void (async () => {
         try {
           setAutoSaveBusy(true);
-          const r = await fetch(`/api/deals/${data.deal.id}/contract`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              action: "saveDraft",
-              status: cStatus,
-              ...draft,
-            }),
+          await patchDealContractByDealId(data.deal.id, {
+            action: "saveDraft",
+            status: cStatus,
+            ...draft,
           });
-          if (r.ok) {
-            setSavedSnapshot(JSON.stringify(draft));
-            setLastSavedDraft(draft);
-            setAutoSavedAt(new Date().toISOString());
-          }
+          setSavedSnapshot(JSON.stringify(draft));
+          setLastSavedDraft(draft);
+          setAutoSavedAt(new Date().toISOString());
         } finally {
           setAutoSaveBusy(false);
         }
@@ -828,16 +897,10 @@ function ContractTab({
     ) => {
       try {
         setDiiaTaskBusyId(taskId);
-        const r = await fetch(`/api/tasks/${taskId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            status,
-            ...(resultComment ? { resultComment } : {}),
-          }),
+        await patchTaskById(taskId, {
+          status,
+          ...(resultComment ? { resultComment } : {}),
         });
-        const j = (await r.json().catch(() => ({}))) as { error?: string };
-        if (!r.ok) throw new Error(j.error ?? "Не вдалося оновити задачу");
         await reloadDiiaTasks();
         dispatchDealTasksUpdated({ dealId: data.deal.id });
       } catch (e) {
@@ -866,17 +929,11 @@ function ContractTab({
       e.preventDefault();
       if (!draft || busy) return;
       void run(async () => {
-        const r = await fetch(`/api/deals/${data.deal.id}/contract`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "saveDraft",
-            status: cStatus,
-            ...draft,
-          }),
+        await patchDealContractByDealId(data.deal.id, {
+          action: "saveDraft",
+          status: cStatus,
+          ...draft,
         });
-        const j = (await r.json().catch(() => ({}))) as { error?: string };
-        if (!r.ok) throw new Error(j.error ?? "Не вдалося зберегти чернетку");
         setSavedSnapshot(JSON.stringify(draft));
         markStepDone(1, "Чернетку збережено (Ctrl+S)");
       });
@@ -891,6 +948,50 @@ function ContractTab({
         <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-800">
           {err}
         </p>
+      ) : null}
+      {estimateVersusDealHint ? (
+        <div className="flex flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950 sm:flex-row sm:items-start sm:justify-between">
+          <p className="min-w-0 flex-1 leading-relaxed">
+            <span className="font-semibold">Смета та сума угоди: </span>
+            {estimateVersusDealHint}
+          </p>
+          <SyncDealValueFromEstimateButton
+            data={data}
+            tone="amber"
+            className="shrink-0 sm:max-w-[min(100%,280px)]"
+          />
+        </div>
+      ) : null}
+      {contractHappySteps ? (
+        <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 px-3 py-2.5 shadow-sm">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-indigo-800">
+            Рекомендований порядок: від чернетки до оплати
+          </p>
+          <ol className="mt-2 grid list-none gap-1.5 p-0 text-[11px] text-indigo-950 sm:grid-cols-2 lg:grid-cols-3">
+            {contractHappySteps.map((s, i) => (
+              <li
+                key={s.id}
+                className={cn(
+                  "flex items-start gap-2 rounded-lg border px-2 py-1.5",
+                  s.done
+                    ? "border-emerald-200 bg-emerald-50/90 text-emerald-900"
+                    : "border-indigo-100/80 bg-white/90 text-indigo-900",
+                )}
+              >
+                <span className="font-mono text-[10px] text-indigo-500">
+                  {i + 1}.
+                </span>
+                <span>{s.label}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      ) : !data.contract ? (
+        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] leading-relaxed text-slate-700">
+          <span className="font-medium text-slate-800">Типовий шлях: </span>
+          чернетка → реквізити та змінні → версія документа → PDF / підпис → віхи
+          оплати у вкладці «Оплата».
+        </div>
       ) : null}
       <div className={wrap}>
         <h2 className="text-base font-semibold text-[var(--enver-text)]">Договір</h2>
@@ -1059,17 +1160,11 @@ function ContractTab({
                     onClick={() =>
                       void run(async () => {
                         if (!draft) return;
-                        const r = await fetch(`/api/deals/${data.deal.id}/contract`, {
-                          method: "PATCH",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            action: "createVersion",
-                            status: cStatus,
-                            ...draft,
-                          }),
+                        await patchDealContractByDealId(data.deal.id, {
+                          action: "createVersion",
+                          status: cStatus,
+                          ...draft,
                         });
-                        const j = (await r.json().catch(() => ({}))) as { error?: string };
-                        if (!r.ok) throw new Error(j.error ?? "Не вдалося створити версію");
                         markStepDone(2, "Версію документа створено");
                       })
                     }
@@ -1180,20 +1275,12 @@ function ContractTab({
                   className={btnGhost}
                   onClick={() =>
                     void run(async () => {
-                      const r = await fetch(`/api/deals/${data.deal.id}/contract`, {
-                        method: "PATCH",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          action: "applyTemplate",
-                          templateKey: draft.templateKey,
-                          recipientType: draft.recipientType,
-                          status: cStatus,
-                        }),
+                      await patchDealContractByDealId(data.deal.id, {
+                        action: "applyTemplate",
+                        templateKey: draft.templateKey,
+                        recipientType: draft.recipientType,
+                        status: cStatus,
                       });
-                      const j = (await r.json().catch(() => ({}))) as {
-                        error?: string;
-                      };
-                      if (!r.ok) throw new Error(j.error ?? "Не вдалося застосувати шаблон");
                     })
                   }
                 >
@@ -1459,28 +1546,16 @@ function ContractTab({
                       void run(async () => {
                         if (!draft) return;
                         const prepared = buildQuickFilledDraft(draft);
-                        const saveResp = await fetch(`/api/deals/${data.deal.id}/contract`, {
-                          method: "PATCH",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            action: "saveDraft",
-                            status: cStatus,
-                            ...prepared,
-                          }),
+                        await patchDealContractByDealId(data.deal.id, {
+                          action: "saveDraft",
+                          status: cStatus,
+                          ...prepared,
                         });
-                        const saveJson = (await saveResp.json().catch(() => ({}))) as { error?: string };
-                        if (!saveResp.ok) throw new Error(saveJson.error ?? "Не вдалося зберегти чернетку");
-                        const createResp = await fetch(`/api/deals/${data.deal.id}/contract`, {
-                          method: "PATCH",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            action: "createVersion",
-                            status: cStatus,
-                            ...prepared,
-                          }),
+                        await patchDealContractByDealId(data.deal.id, {
+                          action: "createVersion",
+                          status: cStatus,
+                          ...prepared,
                         });
-                        const createJson = (await createResp.json().catch(() => ({}))) as { error?: string };
-                        if (!createResp.ok) throw new Error(createJson.error ?? "Не вдалося створити версію");
                         setDraft(prepared);
                         setSavedSnapshot(JSON.stringify(prepared));
                         setLastSavedDraft(prepared);
@@ -1508,19 +1583,11 @@ function ContractTab({
                     onClick={() =>
                       void run(async () => {
                         if (!draft) return;
-                        const r = await fetch(`/api/deals/${data.deal.id}/contract`, {
-                          method: "PATCH",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            action: "saveDraft",
-                            status: cStatus,
-                            ...draft,
-                          }),
+                        await patchDealContractByDealId(data.deal.id, {
+                          action: "saveDraft",
+                          status: cStatus,
+                          ...draft,
                         });
-                        const j = (await r.json().catch(() => ({}))) as {
-                          error?: string;
-                        };
-                        if (!r.ok) throw new Error(j.error ?? "Не вдалося зберегти чернетку");
                         setSavedSnapshot(JSON.stringify(draft));
                         markStepDone(1, "Чернетку збережено");
                       })
@@ -1535,19 +1602,11 @@ function ContractTab({
                     onClick={() =>
                       void run(async () => {
                         if (!draft) return;
-                        const r = await fetch(`/api/deals/${data.deal.id}/contract`, {
-                          method: "PATCH",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            action: "createVersion",
-                            status: cStatus,
-                            ...draft,
-                          }),
+                        await patchDealContractByDealId(data.deal.id, {
+                          action: "createVersion",
+                          status: cStatus,
+                          ...draft,
                         });
-                        const j = (await r.json().catch(() => ({}))) as {
-                          error?: string;
-                        };
-                        if (!r.ok) throw new Error(j.error ?? "Не вдалося створити версію");
                         markStepDone(2, "Версію документа створено");
                       })
                     }
@@ -1561,18 +1620,10 @@ function ContractTab({
                     onClick={() =>
                       void run(async () => {
                         if (!draft) return;
-                        const r = await fetch(`/api/deals/${data.deal.id}/contract`, {
-                          method: "PATCH",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            action: "generatePdf",
-                            ...draft,
-                          }),
+                        await patchDealContractByDealId(data.deal.id, {
+                          action: "generatePdf",
+                          ...draft,
                         });
-                        const j = (await r.json().catch(() => ({}))) as {
-                          error?: string;
-                        };
-                        if (!r.ok) throw new Error(j.error ?? "Не вдалося згенерувати PDF");
                         markStepDone(3, "PDF згенеровано");
                       })
                     }
@@ -1586,18 +1637,10 @@ function ContractTab({
                     onClick={() =>
                       void run(async () => {
                         if (!draft) return;
-                        const r = await fetch(`/api/deals/${data.deal.id}/contract`, {
-                          method: "PATCH",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            action: "generateDocx",
-                            ...draft,
-                          }),
+                        await patchDealContractByDealId(data.deal.id, {
+                          action: "generateDocx",
+                          ...draft,
                         });
-                        const j = (await r.json().catch(() => ({}))) as {
-                          error?: string;
-                        };
-                        if (!r.ok) throw new Error(j.error ?? "Не вдалося згенерувати DOCX");
                         markStepDone(3, "DOCX згенеровано");
                       })
                     }
@@ -1617,19 +1660,10 @@ function ContractTab({
                       onClick={() =>
                         void run(async () => {
                           if (!draft) return;
-                          const r = await fetch(`/api/deals/${data.deal.id}/contract`, {
-                            method: "PATCH",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                              action: "startDiiaSign",
-                              ...draft,
-                            }),
+                          await patchDealContractByDealId(data.deal.id, {
+                            action: "startDiiaSign",
+                            ...draft,
                           });
-                          const j = (await r.json().catch(() => ({}))) as {
-                            error?: string;
-                          };
-                          if (!r.ok)
-                            throw new Error(j.error ?? "Не вдалося запустити Дія.Підпис");
                         })
                       }
                     >
@@ -1641,18 +1675,9 @@ function ContractTab({
                       className={btnGhost}
                       onClick={() =>
                         void run(async () => {
-                          const r = await fetch(`/api/deals/${data.deal.id}/contract`, {
-                            method: "PATCH",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                              action: "sendClientPreview",
-                            }),
+                          await patchDealContractByDealId(data.deal.id, {
+                            action: "sendClientPreview",
                           });
-                          const j = (await r.json().catch(() => ({}))) as {
-                            error?: string;
-                          };
-                          if (!r.ok)
-                            throw new Error(j.error ?? "Не вдалося позначити перегляд клієнтом");
                         })
                       }
                     >
@@ -1956,15 +1981,7 @@ function ContractTab({
               className={btn}
               onClick={() =>
                 void run(async () => {
-                  const r = await fetch(`/api/deals/${data.deal.id}/contract`, {
-                    method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ status: cStatus }),
-                  });
-                  const j = (await r.json().catch(() => ({}))) as {
-                    error?: string;
-                  };
-                  if (!r.ok) throw new Error(j.error ?? "Не вдалося зберегти");
+                  await patchDealContractByDealId(data.deal.id, { status: cStatus });
                 })
               }
             >
@@ -1993,7 +2010,7 @@ function PaymentTab({
   data: DealWorkspacePayload;
   roleView: "director" | "head" | "sales";
 }) {
-  const { err, busy, run } = useWorkspaceRun();
+  const { err, busy, run } = useWorkspaceRun(data.deal.id);
   const { showToast } = useDealWorkspaceToast();
   const [rows, setRows] = useState<MilestoneRow[]>(() =>
     (data.meta.payment?.milestones ?? []).map((m) => ({
@@ -2135,26 +2152,38 @@ function HandoffTab({
   data: DealWorkspacePayload;
   roleView: "director" | "head" | "sales";
 }) {
-  const { err, busy, run } = useWorkspaceRun();
+  const { err, busy, run } = useWorkspaceRun(data.deal.id);
   const [notesDraft, setNotesDraft] = useState(data.handoff.notes ?? "");
   const [rejectReason, setRejectReason] = useState("");
-  const [selectedAttachmentIds, setSelectedAttachmentIds] = useState<string[]>(
-    data.handoff.manifest.selectedAttachmentIds,
+  const [selectedAttachmentIds, setSelectedAttachmentIds] = useState<string[]>(() =>
+    initialHandoffSelectedAttachmentIds(data.attachments, data.handoff.manifest),
   );
-  const [selectedFileAssetIds, setSelectedFileAssetIds] = useState<string[]>(
-    data.handoff.manifest.selectedFileAssetIds,
-  );
+  const [fileSearch, setFileSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<"all" | AttachmentCategory>("all");
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect -- sync handoff draft when payload changes */
     setNotesDraft(data.handoff.notes ?? "");
-    setSelectedAttachmentIds(data.handoff.manifest.selectedAttachmentIds);
-    setSelectedFileAssetIds(data.handoff.manifest.selectedFileAssetIds);
+    setSelectedAttachmentIds(
+      initialHandoffSelectedAttachmentIds(data.attachments, data.handoff.manifest),
+    );
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [
     data.handoff.notes,
     data.handoff.manifest.selectedAttachmentIds,
     data.handoff.manifest.selectedFileAssetIds,
+    data.attachments,
   ]);
+  const filteredAttachments = useMemo(() => {
+    const q = fileSearch.trim().toLowerCase();
+    return data.attachments.filter((a) => {
+      if (categoryFilter !== "all" && a.category !== categoryFilter) return false;
+      if (!q) return true;
+      return (
+        a.fileName.toLowerCase().includes(q) ||
+        attachmentCategoryLabel(a.category).toLowerCase().includes(q)
+      );
+    });
+  }, [data.attachments, categoryFilter, fileSearch]);
   const { showToast } = useDealWorkspaceToast();
   const wrap =
     "rounded-2xl border border-slate-200 bg-[var(--enver-card)] p-4 text-sm shadow-sm";
@@ -2207,16 +2236,90 @@ function HandoffTab({
         Пакет передачі зібрано (метадані)
       </label>
       <div className="mt-3 rounded-lg border border-slate-100 bg-slate-50 p-3">
-        <p className="text-xs font-medium text-slate-700">
-          Файли для пакета передачі ({selectedAttachmentIds.length})
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs font-medium text-slate-700">
+            Файли для передачі на виробництво: обрано {selectedAttachmentIds.length} з{" "}
+            {data.attachments.length}
+          </p>
+        </div>
+        <p className="mt-1 text-[11px] text-slate-500">
+          Обрані файли зберігаються в пакеті передачі та при запуску виробництва копіюються у
+          виробничий потік (пакет «Передача з угоди»).
         </p>
-        <ul className="mt-2 max-h-48 space-y-1 overflow-y-auto text-xs">
-          {data.attachments.map((a) => {
+        {data.attachments.length > 0 ? (
+          <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
+            <label className="block min-w-0 flex-1 text-[11px]">
+              <span className="text-slate-500">Пошук за назвою або типом</span>
+              <input
+                value={fileSearch}
+                onChange={(e) => setFileSearch(e.target.value)}
+                placeholder="Наприклад: договір, креслення…"
+                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs"
+              />
+            </label>
+            <label className="block text-[11px] sm:w-44">
+              <span className="text-slate-500">Категорія</span>
+              <select
+                value={categoryFilter}
+                onChange={(e) =>
+                  setCategoryFilter(e.target.value as "all" | AttachmentCategory)
+                }
+                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs"
+              >
+                <option value="all">Усі категорії</option>
+                {ATTACH_CATEGORIES.map((c) => (
+                  <option key={c.value} value={c.value}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        ) : null}
+        <div className="mt-2 flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={busy || filteredAttachments.length === 0}
+            className={btnGhost}
+            onClick={() => {
+              const add = new Set(selectedAttachmentIds);
+              for (const a of filteredAttachments) add.add(a.id);
+              setSelectedAttachmentIds([...add]);
+            }}
+          >
+            Обрати видимі ({filteredAttachments.length})
+          </button>
+          <button
+            type="button"
+            disabled={busy || filteredAttachments.length === 0}
+            className={btnGhost}
+            onClick={() => {
+              const drop = new Set(filteredAttachments.map((a) => a.id));
+              setSelectedAttachmentIds((prev) => prev.filter((id) => !drop.has(id)));
+            }}
+          >
+            Зняти з видимих
+          </button>
+          <button
+            type="button"
+            disabled={busy || selectedAttachmentIds.length === 0}
+            className={btnGhost}
+            onClick={() => setSelectedAttachmentIds([])}
+          >
+            Очистити все
+          </button>
+        </div>
+        <ul className="mt-2 max-h-56 space-y-1.5 overflow-y-auto text-xs">
+          {filteredAttachments.map((a) => {
             const checked = selectedAttachmentIds.includes(a.id);
             return (
-              <li key={a.id} className="flex items-center gap-2">
+              <li
+                key={a.id}
+                className="flex items-start gap-2 rounded-md border border-transparent bg-white/60 px-1.5 py-1 hover:border-slate-200"
+              >
                 <input
                   type="checkbox"
+                  className="mt-0.5 shrink-0"
                   checked={checked}
                   onChange={(e) => {
                     setSelectedAttachmentIds((prev) =>
@@ -2224,23 +2327,32 @@ function HandoffTab({
                         ? [...new Set([...prev, a.id])]
                         : prev.filter((id) => id !== a.id),
                     );
-                    if (a.fileAssetId) {
-                      setSelectedFileAssetIds((prev) =>
-                        e.target.checked
-                          ? [...new Set([...prev, a.fileAssetId!])]
-                          : prev.filter((id) => id !== a.fileAssetId),
-                      );
-                    }
                   }}
                 />
-                <span className="truncate">
-                  {a.fileName} · {a.category} · v{a.version}
-                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-medium text-slate-800">{a.fileName}</div>
+                  <div className="text-[11px] text-slate-500">
+                    {attachmentCategoryLabel(a.category)}
+                    {a.isCurrentVersion ? "" : " · неактуальна версія"} · v{a.version}
+                  </div>
+                  {a.fileUrl ? (
+                    <a
+                      href={a.fileUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[11px] text-sky-700 underline-offset-2 hover:underline"
+                    >
+                      Відкрити посилання
+                    </a>
+                  ) : null}
+                </div>
               </li>
             );
           })}
           {data.attachments.length === 0 ? (
             <li className="text-slate-500">Немає файлів. Додайте їх на вкладці «Файли».</li>
+          ) : filteredAttachments.length === 0 ? (
+            <li className="text-slate-500">Нічого не знайдено за фільтром. Змініть пошук або категорію.</li>
           ) : null}
         </ul>
         <div className="mt-2 flex flex-wrap gap-2">
@@ -2250,14 +2362,15 @@ function HandoffTab({
             className={btnGhost}
             onClick={() =>
               void run(async () => {
+                const files = deriveHandoffManifestFiles(data.attachments, selectedAttachmentIds);
                 await patchHandoff(data.deal.id, {
                   manifestJson: {
-                    selectedAttachmentIds,
-                    selectedFileAssetIds,
-                    generatedDocumentIds: [],
+                    ...files,
+                    generatedDocumentIds: data.handoff.manifest.generatedDocumentIds,
                     notes: notesDraft.trim() || undefined,
                   },
                 });
+                showToast("Склад пакета передачі збережено", { tone: "info" });
               })
             }
           >
@@ -2384,7 +2497,7 @@ function ProductionTab({
   data: DealWorkspacePayload;
   roleView: "director" | "head" | "sales";
 }) {
-  const { err, busy, run } = useWorkspaceRun();
+  const { err, busy, run } = useWorkspaceRun(data.deal.id);
   const { showToast } = useDealWorkspaceToast();
   const wrap =
     "rounded-2xl border border-slate-200 bg-[var(--enver-card)] p-4 text-sm shadow-sm";
@@ -2401,8 +2514,9 @@ function ProductionTab({
     <div className={wrap}>
       <h2 className="text-base font-semibold text-[var(--enver-text)]">Виробництво</h2>
       <p className="mt-1 text-xs text-slate-600">
-        Передача в цех після чеклисту: договір, ≈70% оплати, контрольний замір, файли. Деталі — у
-        готовності нижче.
+        Передача в цех після чеклисту: договір, ≈70% оплати, контрольний замір, файли з вкладки
+        «Передача». При запуску обрані там файли копіюються у виробничий потік (пакет «Передача з
+        угоди»). Деталі — у готовності нижче.
       </p>
       {err ? (
         <p className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-800">
@@ -2488,9 +2602,18 @@ function ProductionTab({
             const r = await fetch(`/api/deals/${data.deal.id}/production-launch`, {
               method: "POST",
             });
-            const j = (await r.json().catch(() => ({}))) as { error?: string };
+            const j = (await r.json().catch(() => ({}))) as {
+              error?: string;
+              handoffImportedFileCount?: number | null;
+            };
             if (!r.ok) throw new Error(j.error ?? "Не вдалося створити виробниче замовлення");
-            showToast("Виробниче замовлення створено");
+            const n = j.handoffImportedFileCount;
+            showToast(
+              typeof n === "number" && n > 0
+                ? `Виробниче замовлення створено. Перенесено з передачі файлів: ${n}.`
+                : "Виробниче замовлення створено",
+              { tone: "info" },
+            );
           })
         }
       >
@@ -2530,7 +2653,7 @@ function ProductionTab({
 }
 
 function FilesTab({ data }: { data: DealWorkspacePayload }) {
-  const { err, busy, run } = useWorkspaceRun();
+  const { err, busy, run } = useWorkspaceRun(data.deal.id);
   const { showToast } = useDealWorkspaceToast();
   const [fileName, setFileName] = useState("");
   const [fileUrl, setFileUrl] = useState("");
@@ -2662,17 +2785,22 @@ function ActivityTab({ data }: { data: DealWorkspacePayload }) {
   const wrap =
     "rounded-2xl border border-slate-200 bg-[var(--enver-card)] p-4 text-sm shadow-sm";
 
+  const loadActivity = useCallback(async () => {
+    const r = await fetch(`/api/deals/${data.deal.id}/activity`);
+    const j = await readResponseJson<{
+      items?: LogItem[];
+      error?: string;
+    }>(r);
+    if (!r.ok) throw new Error(j.error ?? "Не вдалося завантажити");
+    return j.items ?? [];
+  }, [data.deal.id]);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const r = await fetch(`/api/deals/${data.deal.id}/activity`);
-        const j = await readResponseJson<{
-          items?: LogItem[];
-          error?: string;
-        }>(r);
-        if (!r.ok) throw new Error(j.error ?? "Не вдалося завантажити");
-        if (!cancelled) setItems(j.items ?? []);
+        const nextItems = await loadActivity();
+        if (!cancelled) setItems(nextItems);
       } catch (e) {
         if (!cancelled) {
           setLoadErr(e instanceof Error ? e.message : "Помилка");
@@ -2683,7 +2811,22 @@ function ActivityTab({ data }: { data: DealWorkspacePayload }) {
     return () => {
       cancelled = true;
     };
-  }, [data.deal.id]);
+  }, [loadActivity]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      void (async () => {
+        try {
+          const nextItems = await loadActivity();
+          setItems(nextItems);
+          setLoadErr(null);
+        } catch {
+          // Keep current items and avoid noisy polling errors.
+        }
+      })();
+    }, REALTIME_POLICY.dealActivityPollingMs);
+    return () => window.clearInterval(id);
+  }, [loadActivity]);
 
   return (
     <div className={wrap}>
@@ -2704,13 +2847,8 @@ function ActivityTab({ data }: { data: DealWorkspacePayload }) {
             void (async () => {
               setRefreshBusy(true);
               try {
-                const r = await fetch(`/api/deals/${data.deal.id}/activity`);
-                const j = await readResponseJson<{
-                  items?: LogItem[];
-                  error?: string;
-                }>(r);
-                if (!r.ok) throw new Error(j.error ?? "Не вдалося завантажити");
-                setItems(j.items ?? []);
+                const nextItems = await loadActivity();
+                setItems(nextItems);
                 setLoadErr(null);
                 showToast("Журнал оновлено", { tone: "info" });
               } catch (e) {
@@ -2753,7 +2891,7 @@ function ActivityTab({ data }: { data: DealWorkspacePayload }) {
 }
 
 function MessagesTab({ data }: { data: DealWorkspacePayload }) {
-  const { err, busy, run } = useWorkspaceRun();
+  const { err, busy, run } = useWorkspaceRun(data.deal.id);
   const [text, setText] = useState(data.meta.communicationsNote ?? "");
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- sync note when `data` updates
@@ -2813,7 +2951,7 @@ function QualificationTab({
   data: DealWorkspacePayload;
   roleView: "director" | "head" | "sales";
 }) {
-  const { err, busy, run } = useWorkspaceRun();
+  const { err, busy, run } = useWorkspaceRun(data.deal.id);
   const { showToast } = useDealWorkspaceToast();
   const [notes, setNotes] = useState(data.meta.qualificationNotes ?? "");
   const [done, setDone] = useState(Boolean(data.meta.qualificationComplete));
@@ -2880,7 +3018,7 @@ function MeasurementTab({
   data: DealWorkspacePayload;
   roleView: "director" | "head" | "sales";
 }) {
-  const { err, busy, run } = useWorkspaceRun();
+  const { err, busy, run } = useWorkspaceRun(data.deal.id);
   const { showToast } = useDealWorkspaceToast();
   const [notes, setNotes] = useState(data.meta.measurementNotes ?? "");
   const [done, setDone] = useState(Boolean(data.meta.measurementComplete));
@@ -2947,7 +3085,7 @@ function ProposalTab({
   data: DealWorkspacePayload;
   roleView: "director" | "head" | "sales";
 }) {
-  const { err, busy, run } = useWorkspaceRun();
+  const { err, busy, run } = useWorkspaceRun(data.deal.id);
   const [notes, setNotes] = useState(data.meta.proposalNotes ?? "");
   const [sent, setSent] = useState(Boolean(data.meta.proposalSent));
   useEffect(() => {

@@ -2,10 +2,12 @@
 
 import { format } from "date-fns";
 import { uk } from "date-fns/locale";
+import Link from "next/link";
 import type { DealWorkspacePayload } from "../../features/deal-workspace/types";
 import type { DealWorkspaceTabId } from "../../features/deal-workspace/types";
 import { useDealWorkspace } from "../../hooks/deal-workspace/useDealWorkspace";
 import { cn } from "../../lib/utils";
+import { SyncDealValueFromEstimateButton } from "./SyncDealValueFromEstimateButton";
 
 type Props = {
   data: DealWorkspacePayload;
@@ -22,6 +24,47 @@ export function DealOverviewCommandCenter({ data, onTab }: Props) {
 
   return (
     <div className="space-y-4">
+      {data.leadId ? (
+        <div className="rounded-xl border border-sky-200 bg-gradient-to-br from-sky-50/90 to-white px-3 py-3 text-xs text-sky-950 shadow-sm">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-sky-800">
+            Конверсія з ліда
+          </p>
+          <p className="mt-1.5 leading-relaxed text-sky-900">
+            Подальша смета, КП та договір ведуться в цій угоді (вкладки праворуч:
+            «Смета», «КП» у блоці продажу, «Договір»). Сторінки ліда збережені для
+            історії та файлів.
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <Link
+              href={`/leads/${data.leadId}/pricing`}
+              className="rounded-lg border border-sky-300 bg-white px-2.5 py-1 text-[11px] font-medium text-sky-900 hover:bg-sky-50"
+            >
+              Лід · розрахунок
+            </Link>
+            <Link
+              href={`/leads/${data.leadId}/kp`}
+              className="rounded-lg border border-sky-300 bg-white px-2.5 py-1 text-[11px] font-medium text-sky-900 hover:bg-sky-50"
+            >
+              Лід · КП
+            </Link>
+            <button
+              type="button"
+              className="rounded-lg border border-sky-300 bg-white px-2.5 py-1 text-[11px] font-medium text-sky-900 hover:bg-sky-50"
+              onClick={() => onTab("estimate")}
+            >
+              Смета угоди
+            </button>
+            <button
+              type="button"
+              className="rounded-lg border border-sky-300 bg-white px-2.5 py-1 text-[11px] font-medium text-sky-900 hover:bg-sky-50"
+              onClick={() => onTab("contract")}
+            >
+              Договір
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       <div className="grid gap-3 lg:grid-cols-3">
         <div className={cn(card, "lg:col-span-2")}>
           <p className="text-[10px] font-semibold uppercase text-slate-500">
@@ -151,6 +194,7 @@ export function DealOverviewCommandCenter({ data, onTab }: Props) {
           >
             Смети
           </button>
+          <SyncDealValueFromEstimateButton data={data} className="mt-2" />
         </div>
         <div className={card}>
           <p className="text-[10px] font-semibold uppercase text-slate-500">

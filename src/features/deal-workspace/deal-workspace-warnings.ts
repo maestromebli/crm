@@ -103,6 +103,48 @@ export function derivePaymentStripSummary(
   };
 }
 
+/** Повертає текст попередження, якщо сума угоди суттєво не збігається з останньою сметою (або не задана). */
+export function getEstimateVersusDealValueHint(
+  data: DealWorkspacePayload,
+): string | null {
+  const latest = data.operationalStats.latestEstimate;
+  const dealVal = data.deal.value;
+  if (
+    !latest ||
+    latest.totalPrice == null ||
+    data.deal.status !== "OPEN"
+  ) {
+    return null;
+  }
+  if (dealVal == null) {
+    return `Сума угоди не задана. Остання смета v${latest.version}: ${latest.totalPrice.toLocaleString("uk-UA")} грн — можна підставити одним кліком.`;
+  }
+  const diff = Math.abs(latest.totalPrice - dealVal);
+  const threshold = Math.max(1, Math.abs(dealVal) * 0.005);
+  if (diff <= threshold) return null;
+  const cur = (data.deal.currency ?? "UAH").trim() || "UAH";
+  return `Сума угоди (${dealVal.toLocaleString("uk-UA")} ${cur}) не збігається з останньою сметою v${latest.version} (${latest.totalPrice.toLocaleString("uk-UA")} грн). Оновіть суму в картці угоди або актуалізуйте смету.`;
+}
+
+/** Чи варто показувати кнопку «Підставити суму з смети». */
+export function canSyncDealValueFromLatestEstimate(
+  data: DealWorkspacePayload,
+): boolean {
+  const latest = data.operationalStats.latestEstimate;
+  if (
+    !latest ||
+    latest.totalPrice == null ||
+    data.deal.status !== "OPEN"
+  ) {
+    return false;
+  }
+  const dealVal = data.deal.value;
+  if (dealVal == null) return true;
+  const diff = Math.abs(latest.totalPrice - dealVal);
+  const threshold = Math.max(1, Math.abs(dealVal) * 0.005);
+  return diff > threshold;
+}
+
 export function deriveDealWarnings(data: DealWorkspacePayload): DealWarningItem[] {
   const items: DealWarningItem[] = [];
   const step = deriveNextStepSeverity(data.meta);
@@ -152,6 +194,15 @@ export function deriveDealWarnings(data: DealWorkspacePayload): DealWarningItem[
       level: "warning",
       key: "no_estimate",
       message: "Немає прорахунку (смети) по угоді.",
+    });
+  }
+
+  const valueMismatch = getEstimateVersusDealValueHint(data);
+  if (valueMismatch) {
+    items.push({
+      level: "warning",
+      key: "estimate_deal_value_mismatch",
+      message: valueMismatch,
     });
   }
 

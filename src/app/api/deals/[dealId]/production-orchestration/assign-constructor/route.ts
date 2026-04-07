@@ -80,7 +80,7 @@ export async function POST(req: Request, ctx: Ctx) {
     regenerateToken: Boolean(body.regenerateToken),
   });
 
-  if (!result.ok) {
+  if (result.ok === false) {
     const status =
       result.code === "NOT_FOUND" ? 404 : result.code === "STATE" ? 409 : 400;
     return NextResponse.json({ error: result.error }, { status });

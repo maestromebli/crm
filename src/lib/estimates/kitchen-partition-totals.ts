@@ -8,6 +8,19 @@ import {
   sumMaterialRowsFromKitchenLines,
 } from "./kitchen-cost-sheet-template";
 
+function clientMultiplierFromPartition<
+  T extends { metadataJson?: unknown },
+>(part: T[]): number {
+  for (const l of part) {
+    const m = l.metadataJson;
+    if (!m || typeof m !== "object") continue;
+    const cm = (m as { kitchenClientPriceMultiplier?: unknown })
+      .kitchenClientPriceMultiplier;
+    if (typeof cm === "number" && Number.isFinite(cm) && cm > 0) return cm;
+  }
+  return KITCHEN_CLIENT_PRICE_MULTIPLIER;
+}
+
 export function furnitureBlockKeyFromMetadata(
   metadataJson: unknown,
 ): string {
@@ -38,9 +51,8 @@ export function kitchenClientTotalPartitionedRounded(
   let sum = 0;
   for (const part of parts) {
     const { material, measurement } = sumMaterialRowsFromKitchenLines(part);
-    sum +=
-      Math.round(material * KITCHEN_CLIENT_PRICE_MULTIPLIER * 100) / 100 +
-      measurement;
+    const mult = clientMultiplierFromPartition(part);
+    sum += Math.round(material * mult * 100) / 100 + measurement;
   }
   return sum;
 }

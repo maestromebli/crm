@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { moneyFromDb } from "@/lib/finance/money";
 
 export type RiskLevel = "low" | "medium" | "high";
 
@@ -61,12 +62,7 @@ export type DealFinancialBreakdown = {
   }>;
 };
 
-function n(v: unknown): number {
-  if (v == null) return 0;
-  if (typeof v === "number") return Number.isFinite(v) ? v : 0;
-  const parsed = Number(v);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
+const n = moneyFromDb;
 
 function round2(v: number): number {
   return Math.round(v * 100) / 100;

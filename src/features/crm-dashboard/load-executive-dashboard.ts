@@ -2,6 +2,7 @@ import {
   CalendarEventStatus,
   CalendarEventType,
   DealStatus,
+  MoneyTransactionStatus,
   Prisma,
   ProductionFlowStatus,
   ProductionRiskSeverity,
@@ -37,11 +38,6 @@ const hasProductionIssue = prismaHasDelegate("productionIssue");
 
 /** String enums for optional tables (must match DB values when those tables exist). */
 const MoneyFlowType = { INCOME: "INCOME", EXPENSE: "EXPENSE" } as const;
-const MoneyTransactionStatus = {
-  PAID: "PAID",
-  PENDING: "PENDING",
-  OVERDUE: "OVERDUE",
-} as const;
 const CrmInvoiceStatus = { SENT: "SENT" } as const;
 const DealPurchaseOrderStatus = {
   DRAFT: "DRAFT",
@@ -111,12 +107,10 @@ function dealScope(
   return Object.keys(base).length ? { AND: [base, extra] } : extra;
 }
 
-function moneyTxScope(ctx: AccessContext): Record<string, unknown> {
+function moneyTxScope(ctx: AccessContext): Prisma.MoneyTransactionWhereInput {
   const dw = dealScope(ctx);
-  if (!dw) return {};
-  return {
-    OR: [{ dealId: null }, { deal: { is: dw } }],
-  };
+  if (!dw || Object.keys(dw).length === 0) return {};
+  return { deal: { is: dw } };
 }
 
 function productionScope(
@@ -179,11 +173,6 @@ function deltaVsPrev(
   const percent =
     previous !== 0 ? (absolute / Math.abs(previous)) * 100 : null;
   return { absolute, percent, label };
-}
-
-function sparkFromSeries(series: number[], take = 14): number[] {
-  if (series.length <= take) return series;
-  return series.slice(-take);
 }
 
 export async function loadExecutiveDashboard(
@@ -291,7 +280,6 @@ export async function loadExecutiveDashboard(
       openDealsForForecast,
       activeLeads,
       productionStats,
-      sparkDeals,
       funnelData,
       trendData,
       cashflow,
@@ -400,14 +388,6 @@ export async function loadExecutiveDashboard(
               deadline: Date | null;
             }[],
           }),
-      perms.dealsView
-        ? prisma.deal.findMany({
-            where: { ...dealWhere, status: DealStatus.OPEN },
-            orderBy: { updatedAt: "desc" },
-            take: 14,
-            select: { value: true },
-          })
-        : Promise.resolve([]),
       perms.leadsView
         ? loadFunnel(leadWhere)
         : Promise.resolve([] as FunnelStageRow[]),
@@ -479,9 +459,6 @@ export async function loadExecutiveDashboard(
         value: formatUah(revWork),
         valueNumeric: revWork,
         delta: null,
-        sparkline: sparkFromSeries(
-          sparkDeals.map((d) => num(d.value)),
-        ),
         format: "currency",
       });
     }
@@ -493,7 +470,6 @@ export async function loadExecutiveDashboard(
         value: formatUah(paidM),
         valueNumeric: paidM,
         delta: deltaVsPrev(paidM, paidPrev, "vs попередній місяць"),
-        sparkline: sparkFromSeries(await loadIncomeSpark(mtWhere, now)),
         format: "currency",
       });
       kpis.push({
@@ -503,7 +479,6 @@ export async function loadExecutiveDashboard(
         value: formatUah(expected),
         valueNumeric: expected,
         delta: null,
-        sparkline: [],
         format: "currency",
       });
     }
@@ -515,7 +490,6 @@ export async function loadExecutiveDashboard(
         value: formatUah(grossForecast),
         valueNumeric: grossForecast,
         delta: null,
-        sparkline: [],
         format: "currency",
       });
     }
@@ -527,7 +501,6 @@ export async function loadExecutiveDashboard(
         value: String(activeLeads),
         valueNumeric: activeLeads,
         delta: null,
-        sparkline: [],
         format: "count",
       });
     }
@@ -539,9 +512,6 @@ export async function loadExecutiveDashboard(
         value: `${productionStats.queued + productionStats.inProgress} · ${loadPct}%`,
         valueNumeric: loadPct,
         delta: null,
-        sparkline: sparkFromSeries(
-          [20, 25, 30, 28, 35, 40, 38, 42, 45, 48, 50, loadPct],
-        ),
         format: "percent",
       });
     }
@@ -611,38 +581,6 @@ function formatUah(n: number): string {
     .toString()
     .replace(/\B(?=(\d{3})+(?!\d))/g, "\u00a0");
   return `${withSpaces}\u00a0₴`;
-}
-
-async function loadIncomeSpark(
-  mtWhere: Record<string, unknown>,
-  now: Date,
-): Promise<number[]> {
-  if (!hasMoneyTransaction) {
-    return Array.from({ length: 14 }, () => 0);
-  }
-  const start = startOfDay(subDays(now, 13));
-  const txs = await (prisma as unknown as { moneyTransaction: { findMany: (a: unknown) => Promise<{ amount: unknown; paidAt: Date | null }[]> } }).moneyTransaction.findMany({
-    where: {
-      ...mtWhere,
-      type: MoneyFlowType.INCOME,
-      status: MoneyTransactionStatus.PAID,
-      paidAt: { gte: start, lte: now },
-    },
-    select: { amount: true, paidAt: true },
-  });
-  const byDay = new Map<string, number>();
-  for (const t of txs) {
-    const d = t.paidAt ?? now;
-    const key = format(d, "yyyy-MM-dd");
-    byDay.set(key, (byDay.get(key) ?? 0) + num(t.amount));
-  }
-  const series: number[] = [];
-  for (let i = 13; i >= 0; i--) {
-    const d = subDays(startOfDay(now), i);
-    const key = format(d, "yyyy-MM-dd");
-    series.push(byDay.get(key) ?? 0);
-  }
-  return series;
 }
 
 async function loadFunnel(
@@ -856,13 +794,8 @@ async function loadFinanceOverview(
             where: {
               ...mtWhere,
               type: MoneyFlowType.INCOME,
-              OR: [
-                { status: MoneyTransactionStatus.OVERDUE },
-                {
-                  status: MoneyTransactionStatus.PENDING,
-                  dueDate: { lt: now },
-                },
-              ],
+              status: MoneyTransactionStatus.PENDING,
+              dueDate: { lt: now },
             },
             _sum: { amount: true },
           })

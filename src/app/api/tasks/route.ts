@@ -14,6 +14,7 @@ import {
 import { P } from "../../../lib/authz/permissions";
 import { taskListWhereForUser } from "../../../lib/tasks/prisma-scope";
 import { assertTaskEntityAccess } from "../../../lib/tasks/entity-access";
+import { recordWorkflowEvent, WORKFLOW_EVENT_TYPES } from "@/features/event-system";
 
 const TASK_TYPES: TaskType[] = [
   "CALLBACK",
@@ -284,6 +285,39 @@ export async function POST(req: Request) {
         where: { id: entityId },
         data: { lastActivityAt: new Date() },
       });
+    }
+    await recordWorkflowEvent(
+      WORKFLOW_EVENT_TYPES.TASK_CREATED,
+      entityType === "LEAD"
+        ? { leadId: entityId, taskId: row.id }
+        : { dealId: entityId, taskId: row.id },
+      {
+        entityType,
+        entityId,
+        dealId: entityType === "DEAL" ? entityId : null,
+        userId: user.id,
+        dedupeKey: `task-created:${row.id}`,
+      },
+    );
+    if (
+      row.dueAt &&
+      row.status !== "DONE" &&
+      row.status !== "CANCELLED" &&
+      row.dueAt.getTime() < Date.now()
+    ) {
+      await recordWorkflowEvent(
+        WORKFLOW_EVENT_TYPES.TASK_OVERDUE,
+        entityType === "LEAD"
+          ? { leadId: entityId, taskId: row.id }
+          : { dealId: entityId, taskId: row.id },
+        {
+          entityType,
+          entityId,
+          dealId: entityType === "DEAL" ? entityId : null,
+          userId: user.id,
+          dedupeKey: `task-overdue:${row.id}:${new Date().toISOString().slice(0, 10)}`,
+        },
+      );
     }
 
     revalidatePath("/tasks");

@@ -64,7 +64,7 @@ export async function GET(req: Request) {
   const deals = await prisma.deal.findMany({
     where: {
       ...(ownerWhere ? { ownerId: ownerWhere } : {}),
-      productionOrders: { some: { status: { not: "CANCELED" } } },
+      productionFlow: { isNot: null },
       handoff: { is: { status: "ACCEPTED" } },
     },
     orderBy: { updatedAt: "desc" },

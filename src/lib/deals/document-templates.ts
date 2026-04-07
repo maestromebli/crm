@@ -5,6 +5,7 @@ import type {
   DealDocumentType,
   HandoffManifest,
 } from "@/lib/deal-core/workspace-types";
+import { CONTRACT_SUPPLY_ZRAZOK_HTML } from "@/lib/deals/contract-supply-zrazok-html";
 
 export type DealDocumentTemplate = {
   key: string;
@@ -59,6 +60,43 @@ export const DEAL_DOCUMENT_TEMPLATES: DealDocumentTemplate[] = [
       contractorFullName: "",
       contractorTaxId: "",
       contractorAddress: "",
+    },
+  },
+  {
+    key: "contract_supply_goods_zrazok_html",
+    title: "Договір поставки товару (зразок, HTML)",
+    documentType: "CONTRACT",
+    format: "HTML",
+    description:
+      "Текст на основі зразка договору поставки: реквізити, 70/30, додаток-специфікація. Змінні підставляються з угоди.",
+    defaultHtml: CONTRACT_SUPPLY_ZRAZOK_HTML,
+    defaultVariables: {
+      contractNumber: "",
+      contractCity: "",
+      contractDay: "",
+      contractMonth: "",
+      contractYear: "",
+      contractDateShort: "",
+      contractorFullName: "",
+      contractorTaxId: "",
+      contractorRequisitesBlock: "",
+      contractorSignatory: "",
+      customerPartyLabel: "",
+      customerFullName: "",
+      customerTaxId: "",
+      customerAddress: "",
+      customerRequisitesBlock: "",
+      customerSignatory: "",
+      contractAmount: "",
+      contractAmountWords: "",
+      objectAddress: "",
+      advancePercent: "",
+      advanceAmount: "",
+      advanceAmountWords: "",
+      remainderPercent: "",
+      remainderAmount: "",
+      remainderAmountWords: "",
+      contractValidUntil: "",
     },
   },
   {

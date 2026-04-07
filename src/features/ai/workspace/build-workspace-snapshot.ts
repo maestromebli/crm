@@ -400,7 +400,9 @@ async function buildDealSnapshot(
     `Клієнт: ${deal.client.name}`,
   ];
   if (deal.value != null)
-    confirmedFacts.push(`Орієнтовна вартість у картці: ${fmtMoney(deal.value, deal.currency)}`);
+    confirmedFacts.push(
+      `Орієнтовна вартість у картці: ${fmtMoney(Number(deal.value), deal.currency)}`,
+    );
 
   const financeMod: AiWorkspacePayload["modules"]["finance"] = options.showFinance
     ? {

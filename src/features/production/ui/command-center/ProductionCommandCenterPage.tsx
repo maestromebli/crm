@@ -9,6 +9,7 @@ import type {
   ProductionStepKey,
 } from "../../types/production";
 import {
+  WORKSHOP_KANBAN_STAGE_KEYS,
   WORKSHOP_MINI_HQ_STAGE_KEYS,
   WORKSHOP_STAGE_LABEL_UK,
   workshopStageHref,
@@ -62,6 +63,17 @@ function formatRelativeUk(iso: string, nowMs: number): string {
 /** Same string on server and first client paint — avoids hydration mismatch from Date.now(). */
 function formatSyncedAtStatic(iso: string): string {
   return iso.replace("T", " ").replace(/\.\d{3}Z?$/, "").replace(/Z$/, "");
+}
+
+/** Людський дедлайн відвантаження / здачі (оновлюється на клієнті). */
+function formatDeadlineHuman(iso: string | null, nowMs: number): { text: string; warn: boolean } {
+  if (!iso) return { text: "—", warn: false };
+  const end = new Date(iso).getTime();
+  const d = Math.ceil((end - nowMs) / (24 * 60 * 60 * 1000));
+  if (d < 0) return { text: `прострочено ${Math.abs(d)} дн.`, warn: true };
+  if (d === 0) return { text: "сьогодні", warn: true };
+  if (d <= 3) return { text: `через ${d} дн.`, warn: true };
+  return { text: `через ${d} дн.`, warn: false };
 }
 
 function openWorkshopMiniHqWindow(stageKey: WorkshopKanbanStageKey) {
@@ -170,7 +182,9 @@ export function ProductionCommandCenterPage({ data: initial }: { data: Productio
 
   const healthScore = useMemo(() => {
     const { kpis } = data;
-    const pressure = kpis.blockedFlows * 12 + kpis.highRiskFlows * 8 + kpis.overdueFlows * 10;
+    const procurementOverdue = kpis.procurementOverdue ?? 0;
+    const pressure =
+      kpis.blockedFlows * 12 + kpis.highRiskFlows * 8 + kpis.overdueFlows * 10 + procurementOverdue * 8;
     const cap = Math.max(1, kpis.activeFlows * 6);
     return Math.max(0, Math.min(100, Math.round(100 - (pressure / cap) * 100)));
   }, [data.kpis]);
@@ -209,6 +223,50 @@ export function ProductionCommandCenterPage({ data: initial }: { data: Productio
               з сервера без перезавантаження сторінки. Окремі міні-штаби для порізки, поклейки, присадки та збірки відкривають лише
               потрібну дільницю — зручно для операторів на робочих місцях.
             </p>
+            <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-white/10 pt-3 text-[11px]">
+              <span className="text-slate-500">Класичні списки угод:</span>
+              <Link
+                href="/production/in-progress"
+                className="font-medium text-sky-200/95 underline-offset-2 hover:text-white hover:underline"
+              >
+                на лінії
+              </Link>
+              <span className="text-slate-600">·</span>
+              <Link
+                href="/production/delays"
+                className="font-medium text-sky-200/95 underline-offset-2 hover:text-white hover:underline"
+              >
+                затримки
+              </Link>
+              <span className="text-slate-600">·</span>
+              <Link
+                href="/production/ready-install"
+                className="font-medium text-sky-200/95 underline-offset-2 hover:text-white hover:underline"
+              >
+                до монтажу
+              </Link>
+              <span className="text-slate-600">·</span>
+              <Link
+                href="/production/installation-schedule"
+                className="font-medium text-sky-200/95 underline-offset-2 hover:text-white hover:underline"
+              >
+                графік монтажу
+              </Link>
+              <span className="text-slate-600">·</span>
+              <Link
+                href="/crm/procurement"
+                className="font-medium text-emerald-200/95 underline-offset-2 hover:text-white hover:underline"
+              >
+                закупівлі (хаб)
+              </Link>
+              <span className="text-slate-600">·</span>
+              <Link
+                href="/warehouse"
+                className="font-medium text-emerald-200/95 underline-offset-2 hover:text-white hover:underline"
+              >
+                склад WMS
+              </Link>
+            </div>
             <div className="mt-4 flex flex-wrap gap-2">
               <Link
                 href="/crm/production/workshop"
@@ -276,29 +334,29 @@ export function ProductionCommandCenterPage({ data: initial }: { data: Productio
           return (
             <article
               key={stageKey}
-              className="relative overflow-hidden rounded-2xl border border-slate-200/90 bg-gradient-to-br from-white via-slate-50/90 to-sky-50/40 p-4 shadow-sm"
+              className="enver-panel enver-panel--interactive relative overflow-hidden bg-gradient-to-br from-[var(--enver-card)] via-[var(--enver-surface)] to-[var(--enver-accent-soft)] p-4"
             >
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <h3 className="text-sm font-semibold text-slate-900">{WORKSHOP_STAGE_LABEL_UK[stageKey]}</h3>
-                  <p className="mt-0.5 text-[11px] text-slate-500">Міні-штаб дільниці</p>
+                  <h3 className="text-sm font-semibold text-[var(--enver-text)]">{WORKSHOP_STAGE_LABEL_UK[stageKey]}</h3>
+                  <p className="mt-0.5 text-[11px] text-[var(--enver-text-muted)]">Міні-штаб дільниці</p>
                 </div>
-                <span className="rounded-full bg-slate-900 px-2.5 py-0.5 text-lg font-semibold tabular-nums text-white">{n}</span>
+                <span className="rounded-full bg-[var(--enver-text)] px-2.5 py-0.5 text-lg font-semibold tabular-nums text-[var(--enver-card)]">{n}</span>
               </div>
-              <p className="mt-3 text-[11px] leading-snug text-slate-600">
+              <p className="mt-3 text-[11px] leading-snug text-[var(--enver-text-muted)]">
                 Картки та чекліст матеріалів тільки для цієї стадії — без зайвих колонок.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <Link
                   href={workshopStageHref(stageKey)}
-                  className="inline-flex flex-1 items-center justify-center rounded-lg bg-slate-900 px-3 py-2 text-[11px] font-medium text-white hover:bg-slate-800"
+                  className="inline-flex flex-1 items-center justify-center rounded-lg bg-[var(--enver-accent)] px-3 py-2 text-[11px] font-medium text-white transition hover:bg-[var(--enver-accent-hover)]"
                 >
                   Відкрити стіл
                 </Link>
                 <button
                   type="button"
                   onClick={() => openWorkshopMiniHqWindow(stageKey)}
-                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-[11px] font-medium text-slate-700 hover:bg-slate-50"
+                  className="rounded-lg border border-[var(--enver-border)] bg-[var(--enver-card)] px-3 py-2 text-[11px] font-medium text-[var(--enver-text)] transition hover:bg-[var(--enver-hover)]"
                 >
                   У вікні
                 </button>
@@ -308,7 +366,7 @@ export function ProductionCommandCenterPage({ data: initial }: { data: Productio
         })}
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
         <KpiCard
           label="Активні потоки"
           value={data.kpis.activeFlows}
@@ -317,8 +375,18 @@ export function ProductionCommandCenterPage({ data: initial }: { data: Productio
         <KpiCard label="Заблоковані" value={data.kpis.blockedFlows} accent={data.kpis.blockedFlows > 0 ? "danger" : "ok"} />
         <KpiCard label="Середня готовність" value={`${data.kpis.averageReadiness}%`} accent="neutral" />
         <KpiCard label="Високий AI-ризик" value={data.kpis.highRiskFlows} accent={data.kpis.highRiskFlows > 0 ? "warn" : "ok"} />
-        <KpiCard label="Прострочені" value={data.kpis.overdueFlows} accent={data.kpis.overdueFlows > 0 ? "danger" : "ok"} />
+        <KpiCard label="Прострочені (дедлайн)" value={data.kpis.overdueFlows} accent={data.kpis.overdueFlows > 0 ? "danger" : "ok"} />
         <KpiCard label="Готові до розподілу" value={data.kpis.readyToDistribute} accent="highlight" />
+        <KpiCard
+          label="Закупівлі відкриті"
+          value={data.kpis.procurementPending ?? 0}
+          accent={(data.kpis.procurementPending ?? 0) > 0 ? "neutral" : "muted"}
+        />
+        <KpiCard
+          label="Простроч. постачання"
+          value={data.kpis.procurementOverdue ?? 0}
+          accent={(data.kpis.procurementOverdue ?? 0) > 0 ? "danger" : "ok"}
+        />
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -364,6 +432,23 @@ export function ProductionCommandCenterPage({ data: initial }: { data: Productio
             Повний Kanban
           </Link>
         </div>
+        {data.workshopBottleneck && data.workshopBottleneck.totalWorkshopTasks > 0 ? (
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200/90 bg-amber-50/90 px-3 py-2 text-xs text-amber-950">
+            <p>
+              <span className="font-semibold">Вузьке місце: </span>
+              {data.workshopBottleneck.stageLabel} — {data.workshopBottleneck.taskCount} з{" "}
+              {data.workshopBottleneck.totalWorkshopTasks} карток ({data.workshopBottleneck.sharePercent}%).
+            </p>
+            {WORKSHOP_KANBAN_STAGE_KEYS.includes(data.workshopBottleneck.stageKey as WorkshopKanbanStageKey) ? (
+              <Link
+                href={workshopStageHref(data.workshopBottleneck.stageKey as WorkshopKanbanStageKey)}
+                className="shrink-0 font-medium text-amber-900 underline-offset-2 hover:underline"
+              >
+                Відкрити колонку
+              </Link>
+            ) : null}
+          </div>
+        ) : null}
         <div className="flex gap-2 overflow-x-auto pb-2">
           {data.workshopKanban.map((col) => (
             <div
@@ -457,6 +542,7 @@ export function ProductionCommandCenterPage({ data: initial }: { data: Productio
                 <th className="px-3 py-2.5 font-medium">№</th>
                 <th className="px-3 py-2.5 font-medium">Клієнт</th>
                 <th className="px-3 py-2.5 font-medium">Виріб</th>
+                <th className="px-3 py-2.5 font-medium">Дедлайн</th>
                 <th className="px-3 py-2.5 font-medium">Етап</th>
                 <th className="px-3 py-2.5 font-medium">Статус</th>
                 <th className="px-3 py-2.5 font-medium">Готовність</th>
@@ -468,6 +554,8 @@ export function ProductionCommandCenterPage({ data: initial }: { data: Productio
               {filteredQueue.map((row) => {
                 const hot =
                   row.riskScore >= 70 || row.blockersCount > 0 || (row.dueDate && new Date(row.dueDate).getTime() < Date.now());
+                const nowMs = mounted ? Date.now() : new Date(data.syncedAt).getTime();
+                const dueHuman = formatDeadlineHuman(row.dueDate, nowMs);
                 return (
                   <tr
                     key={row.id}
@@ -477,6 +565,23 @@ export function ProductionCommandCenterPage({ data: initial }: { data: Productio
                     <td className="px-3 py-2.5 text-slate-700">{row.clientName}</td>
                     <td className="max-w-[200px] truncate px-3 py-2.5 text-slate-700" title={row.title}>
                       {row.title}
+                    </td>
+                    <td className="px-3 py-2.5 text-xs">
+                      {row.dueDate ? (
+                        <span
+                          className={
+                            dueHuman.warn
+                              ? "font-medium text-rose-700"
+                              : mounted
+                                ? "text-slate-700"
+                                : "text-slate-500"
+                          }
+                        >
+                          {mounted ? dueHuman.text : row.dueDate.slice(0, 10)}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
                     </td>
                     <td className="px-3 py-2.5 text-xs text-slate-600">{STEP_LABELS[row.currentStepKey]}</td>
                     <td className="px-3 py-2.5">
@@ -540,6 +645,18 @@ export function ProductionCommandCenterPage({ data: initial }: { data: Productio
                     Ризик {flow.riskScore} · Блокери {flow.blockersCount}
                     {flow.openQuestionsCount ? ` · Питання ${flow.openQuestionsCount}` : ""}
                   </p>
+                  {flow.dueDate ? (
+                    <p
+                      className={`mt-1 text-[11px] font-medium ${
+                        new Date(flow.dueDate).getTime() < (mounted ? Date.now() : new Date(data.syncedAt).getTime())
+                          ? "text-rose-700"
+                          : "text-amber-800"
+                      }`}
+                    >
+                      Дедлайн:{" "}
+                      {formatDeadlineHuman(flow.dueDate, mounted ? Date.now() : new Date(data.syncedAt).getTime()).text}
+                    </p>
+                  ) : null}
                   <div className="mt-1.5 flex gap-2">
                     <Link className="font-medium text-sky-700 hover:underline" href={`/crm/production/${flow.id}`}>
                       Відкрити штаб
@@ -614,17 +731,86 @@ export function ProductionCommandCenterPage({ data: initial }: { data: Productio
         </div>
       </section>
 
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900">Журнал подій виробництва</h2>
+            <p className="text-xs text-slate-500">Останні рішення та переходи по потоках (аудит)</p>
+          </div>
+        </div>
+        <ul className="max-h-56 space-y-2 overflow-y-auto text-xs">
+          {(data.recentEvents ?? []).length === 0 ? (
+            <li className="text-slate-500">
+              Події з&apos;являться після руху по етапах (записи ProductionEvent у базі).
+            </li>
+          ) : (
+            (data.recentEvents ?? []).map((ev) => (
+              <li
+                key={ev.id}
+                className="flex flex-wrap items-start justify-between gap-2 border-b border-slate-100 pb-2 last:border-0"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold text-slate-900">{ev.flowNumber}</p>
+                  <p className="text-slate-700">{ev.title}</p>
+                  {ev.description ? <p className="mt-0.5 text-slate-500">{ev.description}</p> : null}
+                  {ev.actorName ? <p className="mt-0.5 text-[10px] text-slate-500">{ev.actorName}</p> : null}
+                </div>
+                <div className="flex shrink-0 flex-col items-end gap-1">
+                  <span className="whitespace-nowrap font-mono text-[10px] text-slate-400">
+                    {mounted ? formatRelativeUk(ev.createdAt, Date.now()) : ev.createdAt.slice(0, 16).replace("T", " ")}
+                  </span>
+                  <Link href={`/crm/production/${ev.flowId}`} className="font-medium text-sky-700 hover:underline">
+                    Штаб
+                  </Link>
+                </div>
+              </li>
+            ))
+          )}
+        </ul>
+      </section>
+
       <section className="grid gap-4 lg:grid-cols-3">
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h3 className="text-sm font-semibold text-slate-900">Закупівля</h3>
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-slate-900">Закупівля</h3>
+            <Link href="/crm/procurement" className="text-[11px] font-medium text-sky-700 hover:underline">
+              Хаб закупівель
+            </Link>
+          </div>
           <ul className="mt-3 max-h-52 space-y-2 overflow-y-auto text-xs">
-            {data.procurement.slice(0, 10).map((item) => (
-              <li key={item.id} className="rounded-lg border border-slate-100 bg-slate-50/50 px-2 py-1.5">
-                <p className="font-semibold text-slate-900">{item.flowNumber}</p>
-                <p className="text-slate-700">{item.title}</p>
-                <p className="text-slate-500">{item.status}</p>
-              </li>
-            ))}
+            {data.procurement.slice(0, 10).map((item) => {
+              const procurementLate =
+                item.status !== "DELIVERED" &&
+                item.expectedDate &&
+                new Date(item.expectedDate).getTime() < (mounted ? Date.now() : new Date(data.syncedAt).getTime());
+              return (
+                <li
+                  key={item.id}
+                  className={`rounded-lg border px-2 py-1.5 ${
+                    procurementLate ? "border-rose-200 bg-rose-50/60" : "border-slate-100 bg-slate-50/50"
+                  }`}
+                >
+                  <p className="font-semibold text-slate-900">{item.flowNumber}</p>
+                  <p className="text-slate-700">{item.title}</p>
+                  <p className="text-slate-500">
+                    {item.status}
+                    {item.supplier ? ` · ${item.supplier}` : ""}
+                  </p>
+                  {item.expectedDate ? (
+                    <p className={`mt-0.5 text-[11px] ${procurementLate ? "font-medium text-rose-800" : "text-slate-500"}`}>
+                      Очікується: {item.expectedDate.slice(0, 10)}
+                      {procurementLate ? " · прострочено" : ""}
+                    </p>
+                  ) : null}
+                  <Link
+                    href={`/crm/production/${item.flowId}`}
+                    className="mt-1 inline-block font-medium text-sky-700 hover:underline"
+                  >
+                    Штаб замовлення
+                  </Link>
+                </li>
+              );
+            })}
             {data.procurement.length === 0 ? <li className="text-slate-500">Немає задач закупівлі.</li> : null}
           </ul>
         </div>

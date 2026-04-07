@@ -23,6 +23,8 @@ import type {
 } from "../../../../features/deal-hub/deal-hub-filters";
 import { cn } from "../../../../lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { KanbanEmptyColumn } from "@/components/shared/KanbanEmptyColumn";
+import type { DealBoardStage } from "../../../../features/deal-workspace/queries";
 import type { DealHubRow } from "./deal-hub-row";
 import { DealsKpiStrip } from "./DealsKpiStrip";
 import { DealsSavedViewsBar } from "./DealsSavedViewsBar";
@@ -190,6 +192,8 @@ type Props = {
   initialLayout?: "table" | "board";
   serverFiltered?: boolean;
   kpiCountLabel?: string;
+  /** Усі стадії воронки(ок) з БД — канбан показує порожні колонки. */
+  boardStages?: DealBoardStage[];
   /** Збережені вигляди з БД (користувацькі пресети). */
   savedViewsInitial?: DealHubSavedViewDTO[];
   /** Хибний на сторінках з жорстким серверним фільтром (won/lost/архів). */
@@ -201,6 +205,7 @@ export function DealsHubClient({
   initialLayout = "table",
   serverFiltered = false,
   kpiCountLabel = "Після фільтрів",
+  boardStages = [],
   savedViewsInitial = [],
   savedViewsEnabled = true,
 }: Props) {
@@ -282,14 +287,29 @@ export function DealsHubClient({
   }, [displayRows]);
 
   const boardGroups = useMemo(() => {
-    const m = new Map<
+    if (boardStages.length > 0) {
+      const m = new Map<string, DealHubRow[]>();
+      for (const r of displayRows) {
+        if (!m.has(r.stageId)) m.set(r.stageId, []);
+        m.get(r.stageId)!.push(r);
+      }
+      return boardStages.map((st) => ({
+        stageId: st.id,
+        stageName: st.name,
+        stageSortOrder: st.sortOrder,
+        pipelineId: st.pipelineId,
+        pipelineName: st.pipelineName,
+        rows: m.get(st.id) ?? [],
+      }));
+    }
+    const legacy = new Map<
       string,
       { label: string; sortOrder: number; list: DealHubRow[] }
     >();
     for (const r of displayRows) {
-      const cur = m.get(r.stageId);
+      const cur = legacy.get(r.stageId);
       if (!cur) {
-        m.set(r.stageId, {
+        legacy.set(r.stageId, {
           label: r.stageName,
           sortOrder: r.stageSortOrder,
           list: [r],
@@ -298,16 +318,22 @@ export function DealsHubClient({
         cur.list.push(r);
       }
     }
-    return [...m.entries()]
+    return [...legacy.entries()]
       .sort((a, b) => a[1].sortOrder - b[1].sortOrder)
       .map(([id, v]) => ({
         stageId: id,
         stageName: v.label,
         stageSortOrder: v.sortOrder,
         pipelineId: v.list[0]?.pipelineId ?? "",
+        pipelineName: v.list[0]?.pipelineName ?? "",
         rows: v.list,
       }));
-  }, [displayRows]);
+  }, [displayRows, boardStages]);
+
+  const showPipelineOnBoard = useMemo(() => {
+    const ids = new Set(boardGroups.map((g) => g.pipelineId).filter(Boolean));
+    return ids.size > 1;
+  }, [boardGroups]);
 
   const handleExport = useCallback(() => {
     const stamp = format(new Date(), "yyyy-MM-dd_HH-mm");
@@ -793,21 +819,22 @@ export function DealsHubClient({
           </div>
         </div>
       ) : (
-        <div className="space-y-2">
-          <p className="text-[11px] leading-relaxed text-[var(--enver-text-muted)]">
-            <span className="font-semibold text-[var(--enver-text)]">
-              Перетягніть картку за іконку ⋮
-            </span>{" "}
-            у межах однієї воронки. Уперед лише на{" "}
-            <span className="font-medium">наступну</span> стадію (правила Flow
-            Engine); назад можна швидше. Клік по картці лишається для відкриття
-            робочого місця.
-          </p>
+        <div className="space-y-3">
+          <div className="rounded-xl border border-dashed border-[var(--enver-border)] bg-[var(--enver-surface)]/60 px-3 py-2.5">
+            <p className="text-[11px] leading-relaxed text-[var(--enver-text-muted)]">
+              <span className="font-semibold text-[var(--enver-text)]">
+                Перетягніть картку за іконку ⋮
+              </span>{" "}
+              у межах однієї воронки. Уперед лише на{" "}
+              <span className="font-medium">наступну</span> стадію (правила Flow
+              Engine); назад можна швидше. Клік по картці — відкрити робоче місце.
+            </p>
+          </div>
           <div className="flex gap-3 overflow-x-auto pb-2 [scrollbar-width:thin]">
             {boardGroups.length === 0 ? (
-              <p className="text-sm text-[var(--enver-muted)]">
-                Немає угод у цьому вигляді.
-              </p>
+              <div className="min-h-[200px] w-full py-4">
+                <KanbanEmptyColumn message="Немає колонок воронки. Перевірте пайплайн угод у налаштуваннях." />
+              </div>
             ) : (
               boardGroups.map(
                 ({
@@ -815,6 +842,7 @@ export function DealsHubClient({
                   stageName,
                   stageSortOrder,
                   pipelineId,
+                  pipelineName,
                   rows: list,
                 }) => (
                   <div
@@ -850,18 +878,33 @@ export function DealsHubClient({
                         : "border-[var(--enver-border)]",
                     )}
                   >
-                    <p className="flex items-baseline justify-between gap-2 px-1 pb-2">
-                      <span className="text-[11px] font-bold text-[var(--enver-text)]">
-                        {stageName}
-                      </span>
+                    <div className="flex items-start justify-between gap-2 px-1 pb-2">
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-bold leading-tight text-[var(--enver-text)]">
+                          {stageName}
+                        </p>
+                        {showPipelineOnBoard && pipelineName ? (
+                          <p className="mt-0.5 truncate text-[9px] font-medium text-[var(--enver-muted)]">
+                            {pipelineName}
+                          </p>
+                        ) : null}
+                      </div>
                       <span
-                        className="rounded-full border border-[var(--enver-border)] bg-[var(--enver-hover)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--enver-text-muted)]"
+                        className="shrink-0 rounded-full border border-[var(--enver-border)] bg-[var(--enver-hover)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--enver-text-muted)]"
                         aria-label={`Кількість угод: ${list.length}`}
                       >
                         {list.length}
                       </span>
-                    </p>
-                    <ul className="space-y-2">
+                    </div>
+                    <ul className="min-h-[120px] space-y-2">
+                      {list.length === 0 ? (
+                        <li>
+                          <KanbanEmptyColumn
+                            className="min-h-[100px] border-dashed py-4"
+                            message="Немає угод у стадії"
+                          />
+                        </li>
+                      ) : null}
                       {list.map((r) => {
                         const canDrag = r.status === "OPEN";
                         const busy = movingDealId === r.id;

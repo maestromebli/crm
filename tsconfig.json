@@ -40,6 +40,9 @@
   "exclude": [
     "node_modules",
     "apps",
-    "packages"
+    "packages",
+    "backups",
+    "**/.tmp-restore-*",
+    "**/.tmp-*/**"
   ]
 }

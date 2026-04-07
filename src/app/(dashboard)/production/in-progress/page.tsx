@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { requirePermissionForPage } from "../../../../lib/authz/page-auth";
 import { P } from "../../../../lib/authz/permissions";
 import { prisma } from "../../../../lib/prisma";
@@ -41,9 +42,9 @@ export default async function ProductionInProgressPage() {
         <h1 className="text-xl font-semibold text-[var(--enver-text)]">У виробництві</h1>
         <p className="mt-1 text-sm text-slate-600">
           Запущені на лінії замовлення, які ще не пройшли фінальний етап. Детальний статус — у{" "}
-          <a className="text-sky-800 underline" href="/production/ops">
+          <Link className="text-sky-800 underline" href="/production/ops">
             операційному штабі
-          </a>
+          </Link>
           .
         </p>
       </header>

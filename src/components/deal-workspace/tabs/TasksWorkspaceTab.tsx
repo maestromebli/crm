@@ -1,6 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { dealQueryKeys } from "../../../features/deal-workspace/deal-query-keys";
+import { patchTaskById } from "../../../features/deal-workspace/use-deal-mutation-actions";
 import type { DealWorkspacePayload } from "../../../features/deal-workspace/types";
 import { cn } from "../../../lib/utils";
 import { dispatchDealTasksUpdated } from "../../../features/ai-assistant/utils/dispatchDealTasksUpdated";
@@ -19,80 +22,126 @@ const btn =
 
 export function TasksWorkspaceTab({ data }: { data: DealWorkspacePayload }) {
   const dealId = data.deal.id;
+  const queryClient = useQueryClient();
   const { showToast } = useDealWorkspaceToast();
-  const [items, setItems] = useState<TaskRow[]>([]);
-  const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
   const [title, setTitle] = useState("");
   const [taskType, setTaskType] = useState("FOLLOW_UP");
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setErr(null);
-    try {
+  const tasksQuery = useQuery({
+    queryKey: dealQueryKeys.tasks(dealId),
+    queryFn: async (): Promise<TaskRow[]> => {
       const r = await fetch(
         `/api/tasks?entityType=DEAL&entityId=${encodeURIComponent(dealId)}`,
       );
       const j = (await r.json()) as { items?: TaskRow[]; error?: string };
       if (!r.ok) throw new Error(j.error ?? "Помилка");
-      setItems(j.items ?? []);
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : "Помилка");
-    } finally {
-      setLoading(false);
-    }
-  }, [dealId]);
+      return j.items ?? [];
+    },
+    staleTime: 15_000,
+  });
+  const queryErr = tasksQuery.error instanceof Error ? tasksQuery.error.message : null;
 
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  const create = async () => {
-    if (!title.trim()) return;
-    setBusy(true);
-    setErr(null);
-    try {
+  const createMutation = useMutation<
+    TaskRow,
+    Error,
+    { title: string; taskType: string },
+    { previous?: TaskRow[]; tempId: string }
+  >({
+    mutationFn: async ({ title: nextTitle, taskType: nextType }) => {
       const r = await fetch("/api/tasks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: title.trim(),
+          title: nextTitle,
           entityType: "DEAL",
           entityId: dealId,
-          taskType,
+          taskType: nextType,
         }),
       });
-      const j = (await r.json()) as { error?: string };
-      if (!r.ok) throw new Error(j.error ?? "Помилка");
-      setTitle("");
-      await load();
+      const j = (await r.json()) as { error?: string; task?: TaskRow };
+      if (!r.ok || !j.task) throw new Error(j.error ?? "Помилка");
+      return j.task;
+    },
+    onMutate: async ({ title: nextTitle, taskType: nextType }) => {
+      setErr(null);
+      const tempId = `tmp-${Date.now()}`;
+      await queryClient.cancelQueries({ queryKey: dealQueryKeys.tasks(dealId) });
+      const previous = queryClient.getQueryData<TaskRow[]>(dealQueryKeys.tasks(dealId));
+      const optimistic: TaskRow = {
+        id: tempId,
+        title: nextTitle,
+        taskType: nextType,
+        status: "OPEN",
+        dueAt: null,
+      };
+      queryClient.setQueryData<TaskRow[]>(dealQueryKeys.tasks(dealId), (current) => [
+        optimistic,
+        ...(current ?? []),
+      ]);
+      return { previous, tempId };
+    },
+    onError: (e, _vars, ctx) => {
+      if (ctx?.previous) {
+        queryClient.setQueryData(dealQueryKeys.tasks(dealId), ctx.previous);
+      }
+      setErr(e.message);
+    },
+    onSuccess: (created, _vars, ctx) => {
+      queryClient.setQueryData<TaskRow[]>(dealQueryKeys.tasks(dealId), (current) =>
+        (current ?? []).map((row) => (row.id === ctx.tempId ? created : row)),
+      );
+      dispatchDealTasksUpdated({ dealId });
       showToast("Задачу додано");
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : "Помилка");
-    } finally {
-      setBusy(false);
-    }
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: dealQueryKeys.tasks(dealId) });
+    },
+  });
+
+  const completeMutation = useMutation<
+    void,
+    Error,
+    { id: string },
+    { previous?: TaskRow[] }
+  >({
+    mutationFn: async ({ id }) => {
+      await patchTaskById(id, { status: "DONE" });
+    },
+    onMutate: async ({ id }) => {
+      setErr(null);
+      await queryClient.cancelQueries({ queryKey: dealQueryKeys.tasks(dealId) });
+      const previous = queryClient.getQueryData<TaskRow[]>(dealQueryKeys.tasks(dealId));
+      queryClient.setQueryData<TaskRow[]>(dealQueryKeys.tasks(dealId), (current) =>
+        (current ?? []).map((row) =>
+          row.id === id ? { ...row, status: "DONE" } : row,
+        ),
+      );
+      return { previous };
+    },
+    onError: (e, _vars, ctx) => {
+      if (ctx?.previous) {
+        queryClient.setQueryData(dealQueryKeys.tasks(dealId), ctx.previous);
+      }
+      setErr(e.message);
+    },
+    onSuccess: () => {
+      dispatchDealTasksUpdated({ dealId });
+      showToast("Задачу позначено виконаною");
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: dealQueryKeys.tasks(dealId) });
+    },
+  });
+
+  const create = async () => {
+    if (!title.trim()) return;
+    await createMutation.mutateAsync({ title: title.trim(), taskType });
+    setTitle("");
   };
 
   const complete = async (id: string) => {
-    setBusy(true);
-    try {
-      const r = await fetch(`/api/tasks/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "DONE" }),
-      });
-      const j = (await r.json()) as { error?: string };
-      if (!r.ok) throw new Error(j.error ?? "Помилка");
-      await load();
-      dispatchDealTasksUpdated({ dealId });
-      showToast("Задачу позначено виконаною");
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : "Помилка");
-    } finally {
-      setBusy(false);
-    }
+    await completeMutation.mutateAsync({ id });
   };
 
   const wrap =
@@ -104,9 +153,9 @@ export function TasksWorkspaceTab({ data }: { data: DealWorkspacePayload }) {
         <h2 className="text-base font-semibold text-[var(--enver-text)]">
           Швидка задача
         </h2>
-        {err ? (
+        {err ?? queryErr ? (
           <p className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-800">
-            {err}
+            {err ?? queryErr}
           </p>
         ) : null}
         <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
@@ -137,7 +186,9 @@ export function TasksWorkspaceTab({ data }: { data: DealWorkspacePayload }) {
           </label>
           <button
             type="button"
-            disabled={busy || !title.trim()}
+            disabled={
+              createMutation.isPending || completeMutation.isPending || !title.trim()
+            }
             className={cn(btn, "shrink-0")}
             onClick={() => void create()}
           >
@@ -150,13 +201,13 @@ export function TasksWorkspaceTab({ data }: { data: DealWorkspacePayload }) {
         <h2 className="text-base font-semibold text-[var(--enver-text)]">
           Задачі по угоді
         </h2>
-        {loading ? (
+        {tasksQuery.isPending ? (
           <p className="mt-2 text-xs text-slate-500">Завантаження…</p>
-        ) : items.length === 0 ? (
+        ) : (tasksQuery.data ?? []).length === 0 ? (
           <p className="mt-2 text-xs text-slate-500">Поки немає задач.</p>
         ) : (
           <ul className="mt-3 space-y-2">
-            {items.map((t) => (
+            {(tasksQuery.data ?? []).map((t) => (
               <li
                 key={t.id}
                 className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50/80 px-2 py-1.5 text-xs"
@@ -173,7 +224,7 @@ export function TasksWorkspaceTab({ data }: { data: DealWorkspacePayload }) {
                 {t.status !== "DONE" && t.status !== "CANCELLED" ? (
                   <button
                     type="button"
-                    disabled={busy}
+                    disabled={createMutation.isPending || completeMutation.isPending}
                     className="rounded border border-slate-300 bg-[var(--enver-card)] px-2 py-0.5 text-[11px] font-medium"
                     onClick={() => void complete(t.id)}
                   >

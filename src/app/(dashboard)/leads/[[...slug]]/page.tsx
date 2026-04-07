@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { LeadDetailView } from "../../../../components/leads/LeadDetailView";
 import { LeadsPage as LeadsListView } from "../../../../components/leads/LeadsPage";
@@ -15,7 +15,6 @@ import {
 } from "../../../../lib/authz/permissions";
 import { getSessionAccess } from "../../../../lib/authz/session-access";
 import { parseLeadsSlug } from "../../../../lib/leads-route";
-import { redirect } from "next/navigation";
 import {
   buildModulePath,
   pageTitleFromPath,
@@ -115,91 +114,86 @@ export default async function LeadsPage({ params }: PageProps) {
       realRole: access.realRole,
       impersonatorId: access.impersonatorId,
     };
-    const canUpdateLead = hasEffectivePermission(
-      access.permissionKeys,
-      P.LEADS_UPDATE,
-      permCtx,
-    );
-    const canConvertToDeal =
-      canUpdateLead &&
-      hasEffectivePermission(
-        access.permissionKeys,
-        P.DEALS_CREATE,
-        permCtx,
-      );
-    const canUploadLeadFiles = hasEffectivePermission(
-      access.permissionKeys,
-      P.FILES_UPLOAD,
-      permCtx,
-    );
-    const canSearchContacts = hasEffectivePermission(
-      access.permissionKeys,
-      P.CONTACTS_VIEW,
-      permCtx,
-    );
-    const canViewTasks = hasEffectivePermission(
-      access.permissionKeys,
-      P.TASKS_VIEW,
-      permCtx,
-    );
-    const canCreateTasks = hasEffectivePermission(
-      access.permissionKeys,
-      P.TASKS_CREATE,
-      permCtx,
-    );
-    const canUpdateTasks = hasEffectivePermission(
-      access.permissionKeys,
-      P.TASKS_UPDATE,
-      permCtx,
-    );
-    const canAssignLead = hasEffectivePermission(
-      access.permissionKeys,
-      P.LEADS_ASSIGN,
-      permCtx,
-    );
-    const canViewEstimates = hasEffectivePermission(
-      access.permissionKeys,
-      P.ESTIMATES_VIEW,
-      permCtx,
-    );
-    const canCreateEstimate =
-      canUpdateLead &&
-      hasEffectivePermission(
-        access.permissionKeys,
-        P.ESTIMATES_CREATE,
-        permCtx,
-      );
-    const canUpdateEstimate =
-      canUpdateLead &&
-      hasEffectivePermission(
-        access.permissionKeys,
-        P.ESTIMATES_UPDATE,
-        permCtx,
-      );
-    const canViewCost = hasEffectivePermission(
-      access.permissionKeys,
-      P.COST_VIEW,
-      permCtx,
-    );
+    const caps = buildLeadDetailCapabilityFlags(access.permissionKeys, permCtx);
     return (
       <LeadDetailView
         lead={lead}
         tab={parsed.tab}
-        canUpdateLead={canUpdateLead}
-        canConvertToDeal={canConvertToDeal}
-        canUploadLeadFiles={canUploadLeadFiles}
-        canSearchContacts={canSearchContacts}
-        canViewTasks={canViewTasks}
-        canCreateTasks={canCreateTasks}
-        canUpdateTasks={canUpdateTasks}
-        canAssignLead={canAssignLead}
-        canViewEstimates={canViewEstimates}
-        canCreateEstimate={canCreateEstimate}
-        canUpdateEstimate={canUpdateEstimate}
-        canViewCost={canViewCost}
+        canUpdateLead={caps.canUpdateLead}
+        canConvertToDeal={caps.canConvertToDeal}
+        canUploadLeadFiles={caps.canUploadLeadFiles}
+        canSearchContacts={caps.canSearchContacts}
+        canViewTasks={caps.canViewTasks}
+        canCreateTasks={caps.canCreateTasks}
+        canUpdateTasks={caps.canUpdateTasks}
+        canAssignLead={caps.canAssignLead}
+        canViewEstimates={caps.canViewEstimates}
+        canCreateEstimate={caps.canCreateEstimate}
+        canUpdateEstimate={caps.canUpdateEstimate}
+        canViewCost={caps.canViewCost}
       />
     );
   }
 
   notFound();
+}
+
+type LeadPermCtx = {
+  realRole: string;
+  impersonatorId?: string | null;
+};
+
+function buildLeadDetailCapabilityFlags(
+  permissionKeys: string[],
+  permCtx: LeadPermCtx,
+) {
+  const canUpdateLead = hasEffectivePermission(
+    permissionKeys,
+    P.LEADS_UPDATE,
+    permCtx,
+  );
+  return {
+    canUpdateLead,
+    canConvertToDeal:
+      canUpdateLead &&
+      hasEffectivePermission(permissionKeys, P.DEALS_CREATE, permCtx),
+    canUploadLeadFiles: hasEffectivePermission(
+      permissionKeys,
+      P.FILES_UPLOAD,
+      permCtx,
+    ),
+    canSearchContacts: hasEffectivePermission(
+      permissionKeys,
+      P.CONTACTS_VIEW,
+      permCtx,
+    ),
+    canViewTasks: hasEffectivePermission(permissionKeys, P.TASKS_VIEW, permCtx),
+    canCreateTasks: hasEffectivePermission(
+      permissionKeys,
+      P.TASKS_CREATE,
+      permCtx,
+    ),
+    canUpdateTasks: hasEffectivePermission(
+      permissionKeys,
+      P.TASKS_UPDATE,
+      permCtx,
+    ),
+    canAssignLead: hasEffectivePermission(
+      permissionKeys,
+      P.LEADS_ASSIGN,
+      permCtx,
+    ),
+    canViewEstimates: hasEffectivePermission(
+      permissionKeys,
+      P.ESTIMATES_VIEW,
+      permCtx,
+    ),
+    canCreateEstimate:
+      canUpdateLead &&
+      hasEffectivePermission(permissionKeys, P.ESTIMATES_CREATE, permCtx),
+    canUpdateEstimate:
+      canUpdateLead &&
+      hasEffectivePermission(permissionKeys, P.ESTIMATES_UPDATE, permCtx),
+    canViewCost: hasEffectivePermission(permissionKeys, P.COST_VIEW, permCtx),
+  };
 }

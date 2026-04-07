@@ -27,8 +27,8 @@ export function LeadHubThreeColumnShell({
       )}
     >
       <aside
-        className="hidden w-[280px] shrink-0 flex-col border-[var(--enver-border)] bg-[var(--enver-surface)] lg:flex lg:border-r"
-        aria-label="Список лідів"
+        className="hidden w-[300px] shrink-0 flex-col border-[var(--enver-border)] bg-[var(--enver-surface)] lg:flex lg:border-r"
+        aria-label="Етапи та контроль ліда"
       >
         {left}
       </aside>
@@ -41,7 +41,7 @@ export function LeadHubThreeColumnShell({
 
       <aside
         className="hidden w-[320px] shrink-0 flex-col border-[var(--enver-border)] bg-[var(--enver-surface)] lg:flex lg:border-l"
-        aria-label="AI та наступний крок"
+        aria-label="Смарт-панель та швидкі дії"
       >
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4">
           {right}

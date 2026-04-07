@@ -49,6 +49,8 @@ export type DealWorkspaceMeta = {
   }>;
   handoffPackageReady?: boolean;
   productionOrderCreated?: boolean;
+  /** Legacy alias у workspaceMeta (деякі автоматизації ще читають цей прапорець). */
+  productionLaunched?: boolean;
   /** Зв’язок з лідом після конверсії (комунікація не дублюється). */
   conversion?: {
     fromLeadId?: string;

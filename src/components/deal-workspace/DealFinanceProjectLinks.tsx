@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect, useState } from "react";
+import { dealQueryKeys } from "../../features/deal-workspace/deal-query-keys";
 import type { DealWorkspacePayload } from "../../features/deal-workspace/types";
+import { useDealMutationActions } from "../../features/deal-workspace/use-deal-mutation-actions";
 import { cn } from "../../lib/utils";
 
 type Props = {
@@ -13,17 +15,23 @@ type Props = {
 type LinkableRow = { id: string; code: string; title: string; status: string };
 
 export function DealFinanceProjectLinks({ data }: Props) {
-  const router = useRouter();
+  const queryClient = useQueryClient();
+  const dealActions = useDealMutationActions(data.deal.id);
   const dealId = data.deal.id;
-  const rows = data.linkedFinanceProjects ?? [];
+  const rowsFromServer = data.linkedFinanceProjects ?? [];
   const canManage = data.canManageFinanceProjectLink ?? false;
 
+  const [rows, setRows] = useState(rowsFromServer);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [linkable, setLinkable] = useState<LinkableRow[]>([]);
   const [pickId, setPickId] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    setRows(rowsFromServer);
+  }, [rowsFromServer]);
 
   const loadLinkable = useCallback(async () => {
     setLoading(true);
@@ -59,17 +67,17 @@ export function DealFinanceProjectLinks({ data }: Props) {
     setBusyId(pickId);
     setErr(null);
     try {
-      const r = await fetch(`/api/projects/${pickId}`, {
-        method: "PATCH",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dealId }),
-      });
-      const j = (await r.json().catch(() => ({}))) as { error?: string };
-      if (!r.ok) throw new Error(j.error ?? "Не вдалося прив’язати");
+      await dealActions.attachFinanceProject(pickId);
+      const picked = linkable.find((p) => p.id === pickId);
+      if (picked) {
+        setRows((current) => [picked, ...current.filter((r) => r.id !== picked.id)]);
+      }
+      setLinkable((current) => current.filter((p) => p.id !== pickId));
       setOpen(false);
       setPickId("");
-      router.refresh();
+      void queryClient.invalidateQueries({
+        queryKey: dealQueryKeys.workspace(dealId),
+      });
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Помилка");
     } finally {
@@ -82,15 +90,11 @@ export function DealFinanceProjectLinks({ data }: Props) {
     setBusyId(projectId);
     setErr(null);
     try {
-      const r = await fetch(`/api/projects/${projectId}`, {
-        method: "PATCH",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dealId: null }),
+      await dealActions.unlinkFinanceProject(projectId);
+      setRows((current) => current.filter((p) => p.id !== projectId));
+      void queryClient.invalidateQueries({
+        queryKey: dealQueryKeys.workspace(dealId),
       });
-      const j = (await r.json().catch(() => ({}))) as { error?: string };
-      if (!r.ok) throw new Error(j.error ?? "Не вдалося відв’язати");
-      router.refresh();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Помилка");
     } finally {

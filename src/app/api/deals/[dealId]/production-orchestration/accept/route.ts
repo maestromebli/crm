@@ -56,8 +56,9 @@ export async function POST(req: Request, ctx: Ctx) {
     estimateId: body.estimateId,
   });
 
-  if (!result.ok) {
-    const status = result.code === "NOT_FOUND" ? 404 : result.code === "CONFLICT" ? 409 : 400;
+  if (result.ok === false) {
+    const status =
+      result.code === "NOT_FOUND" ? 404 : result.code === "CONFLICT" ? 409 : 400;
     return NextResponse.json({ error: result.error }, { status });
   }
 

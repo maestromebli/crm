@@ -6,7 +6,7 @@ export function ownerDealWhere(
   return ownerWhere ? { ownerId: ownerWhere } : {};
 }
 
-/** Підготовка: передача прийнята, ще немає виробничого замовлення або воно в черзі. */
+/** Підготовка: передача прийнята, ще немає потоку або він у статусі NEW. */
 export async function queryProductionDesignDeals(
   prisma: PrismaClient,
   ownerWhere: Prisma.StringFilter | undefined,
@@ -16,12 +16,8 @@ export async function queryProductionDesignDeals(
       ...ownerDealWhere(ownerWhere),
       handoff: { is: { status: "ACCEPTED" } },
       OR: [
-        { productionOrders: { none: {} } },
-        {
-          productionOrders: {
-            some: { status: "QUEUED" },
-          },
-        },
+        { productionFlow: null },
+        { productionFlow: { status: "NEW" } },
       ],
     },
     orderBy: { updatedAt: "desc" },
@@ -32,26 +28,34 @@ export async function queryProductionDesignDeals(
       updatedAt: true,
       client: { select: { name: true } },
       owner: { select: { name: true, email: true } },
-      productionOrders: { take: 1, select: { status: true } },
+      productionFlow: { select: { status: true } },
       constructorRoom: { select: { status: true, dueAt: true } },
     },
   });
 }
 
-/** У роботі: виробниче замовлення активне. */
+/** У роботі: активний виробничий потік (цех / закупівлі). */
 export async function queryProductionLineActiveDeals(
   prisma: PrismaClient,
   ownerWhere: Prisma.StringFilter | undefined,
 ) {
-  const orders = await prisma.productionOrder.findMany({
+  const flows = await prisma.productionFlow.findMany({
     where: {
-      status: { in: ["IN_PROGRESS", "PAUSED"] },
+      status: {
+        in: [
+          "ACTIVE",
+          "ON_HOLD",
+          "BLOCKED",
+          "READY_FOR_PROCUREMENT_AND_WORKSHOP",
+          "IN_WORKSHOP",
+        ],
+      },
       deal: { is: ownerDealWhere(ownerWhere) },
     },
     orderBy: { updatedAt: "desc" },
     take: 200,
     select: {
-      id: true,
+      currentStepKey: true,
       deal: {
         select: {
           id: true,
@@ -61,41 +65,30 @@ export async function queryProductionLineActiveDeals(
           owner: { select: { name: true, email: true } },
         },
       },
-      stages: {
-        where: { status: "IN_PROGRESS" },
-        take: 1,
-        select: { name: true },
-      },
     },
   });
-  return orders.map((o) => ({
+  return flows.map((o) => ({
     id: o.deal.id,
     title: o.deal.title,
     updatedAt: o.deal.updatedAt,
     client: o.deal.client,
     owner: o.deal.owner,
     productionFloorState: {
-      stage: o.stages[0]?.name ?? "CUTTING",
+      stage: o.currentStepKey,
       progress: 0,
     },
   }));
 }
 
-/** Готові до монтажу: етап INSTALLATION у черзі або в роботі після PACKAGING/DELIVERY. */
+/** Готові до монтажу. */
 export async function queryProductionReadyInstallDeals(
   prisma: PrismaClient,
   ownerWhere: Prisma.StringFilter | undefined,
 ) {
-  const orders = await prisma.productionOrder.findMany({
+  const flows = await prisma.productionFlow.findMany({
     where: {
-      status: "IN_PROGRESS",
+      status: "READY_FOR_INSTALLATION",
       deal: { is: ownerDealWhere(ownerWhere) },
-      stages: {
-        some: {
-          name: "INSTALLATION",
-          status: { in: ["PENDING", "IN_PROGRESS"] },
-        },
-      },
     },
     orderBy: { updatedAt: "desc" },
     take: 200,
@@ -112,7 +105,7 @@ export async function queryProductionReadyInstallDeals(
       },
     },
   });
-  return orders.map((r) => r.deal);
+  return flows.map((r) => r.deal);
 }
 
 /** Графік монтажів. */
@@ -134,28 +127,23 @@ export async function queryProductionInstallScheduleDeals(
       installationDate: true,
       client: { select: { name: true } },
       owner: { select: { name: true, email: true } },
-      productionOrders: {
-        take: 1,
+      productionFlow: {
         select: {
-          stages: {
-            where: { status: "IN_PROGRESS" },
-            take: 1,
-            select: { name: true },
-          },
+          currentStepKey: true,
         },
       },
     },
   });
 }
 
-/** Завершені виробничі замовлення. */
+/** Завершені потоки. */
 export async function queryProductionCompletedDeals(
   prisma: PrismaClient,
   ownerWhere: Prisma.StringFilter | undefined,
 ) {
-  const orders = await prisma.productionOrder.findMany({
+  const flows = await prisma.productionFlow.findMany({
     where: {
-      status: "COMPLETED",
+      status: "DONE",
       deal: { is: ownerDealWhere(ownerWhere) },
     },
     orderBy: { updatedAt: "desc" },
@@ -172,7 +160,7 @@ export async function queryProductionCompletedDeals(
       },
     },
   });
-  return orders.map((o) => o.deal);
+  return flows.map((o) => o.deal);
 }
 
 const SLA_HANDOFF_HOURS = 24;
@@ -206,45 +194,39 @@ export async function queryProductionHandoffDelays(
   });
 }
 
-/** Довго на етапі (початок етапу старіший за SLA). */
+/** Довго без руху на активному потоці. */
 export async function queryProductionStageStuckDeals(
   prisma: PrismaClient,
   ownerWhere: Prisma.StringFilter | undefined,
 ) {
   const stageCut = new Date(Date.now() - SLA_STAGE_HOURS * 3600000);
-  const stages = await prisma.productionStage.findMany({
+  const flows = await prisma.productionFlow.findMany({
     where: {
-      status: "IN_PROGRESS",
-      startedAt: { lt: stageCut },
-      order: {
-        deal: { is: ownerDealWhere(ownerWhere) },
-      },
+      status: { in: ["ACTIVE", "IN_WORKSHOP", "READY_FOR_PROCUREMENT_AND_WORKSHOP"] },
+      updatedAt: { lt: stageCut },
+      deal: { is: ownerDealWhere(ownerWhere) },
     },
-    orderBy: { startedAt: "asc" },
+    orderBy: { updatedAt: "asc" },
     take: 100,
     select: {
-      name: true,
-      startedAt: true,
-      order: {
+      currentStepKey: true,
+      updatedAt: true,
+      deal: {
         select: {
-          deal: {
-            select: {
-              id: true,
-              title: true,
-              updatedAt: true,
-              client: { select: { name: true } },
-              owner: { select: { name: true, email: true } },
-            },
-          },
+          id: true,
+          title: true,
+          updatedAt: true,
+          client: { select: { name: true } },
+          owner: { select: { name: true, email: true } },
         },
       },
     },
   });
-  return stages.map((s) => ({
-    ...s.order.deal,
+  return flows.map((s) => ({
+    ...s.deal,
     productionFloorState: {
-      stage: s.name,
-      stageStartedAt: s.startedAt,
+      stage: s.currentStepKey,
+      stageStartedAt: s.updatedAt,
       progress: 0,
     },
   }));

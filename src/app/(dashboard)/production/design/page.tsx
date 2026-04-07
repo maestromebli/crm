@@ -33,7 +33,7 @@ export default async function ProductionDesignPage() {
             ? ` · до ${new Date(r.constructorRoom.dueAt).toLocaleDateString("uk-UA")}`
             : ""
         }`
-      : `Виробництво: ${r.productionOrders?.[0]?.status ?? "немає"}`,
+      : `Виробництво: ${r.productionFlow?.status ?? "немає"}`,
   }));
 
   return (

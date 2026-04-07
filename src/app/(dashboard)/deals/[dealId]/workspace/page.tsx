@@ -13,11 +13,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { dealId } = await params;
   const access = await getSessionAccess();
   const data = access
-    ? await getDealWorkspacePayload(dealId, access.ctx, {
-        permissionKeys: access.permissionKeys,
-        realRole: access.realRole,
-        impersonatorId: access.impersonatorId,
-      })
+    ? await getDealWorkspacePayload(dealId, access.ctx)
     : null;
   if (!data) return { title: "Угода · ENVER CRM" };
   return {
@@ -37,11 +33,7 @@ export default async function DealWorkspacePage({ params }: Props) {
   const { dealId } = await params;
   const access = await getSessionAccess();
   if (!access) redirect("/login");
-  const data = await getDealWorkspacePayload(dealId, access.ctx, {
-    permissionKeys: access.permissionKeys,
-    realRole: access.realRole,
-    impersonatorId: access.impersonatorId,
-  });
+  const data = await getDealWorkspacePayload(dealId, access.ctx);
   if (!data) notFound();
 
   return (

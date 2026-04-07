@@ -12,6 +12,7 @@ import { P } from "../../../../../lib/authz/permissions";
 import { mergeWorkspaceMeta } from "../../../../../lib/deal-api/workspace-meta-merge";
 import type { DealWorkspaceMeta } from "@/lib/deal-core/workspace-types";
 import { syncNextStepReminderTask } from "../../../../../lib/deals/next-step-reminder-task";
+import { recordWorkflowEvent, WORKFLOW_EVENT_TYPES } from "@/features/event-system";
 
 type Ctx = { params: Promise<{ dealId: string }> };
 
@@ -85,6 +86,35 @@ export async function PATCH(req: Request, ctx: Ctx) {
       workspaceMetaJson: nextMeta,
       actorUserId: sessionUserId,
     });
+    const nextStepKind =
+      typeof nextMeta === "object" && nextMeta && !Array.isArray(nextMeta)
+        ? (nextMeta as Partial<DealWorkspaceMeta>).nextStepKind
+        : undefined;
+    const nextActionAt =
+      typeof nextMeta === "object" && nextMeta && !Array.isArray(nextMeta)
+        ? (nextMeta as Partial<DealWorkspaceMeta>).nextActionAt
+        : undefined;
+    const followUpDate =
+      typeof nextActionAt === "string" ? new Date(nextActionAt) : null;
+    const shouldEmitFollowUp =
+      nextStepKind === "follow_up" &&
+      (!followUpDate ||
+        Number.isNaN(followUpDate.getTime()) ||
+        followUpDate.getTime() <= Date.now());
+    if (shouldEmitFollowUp) {
+      const dayKey = new Date().toISOString().slice(0, 10);
+      await recordWorkflowEvent(
+        WORKFLOW_EVENT_TYPES.FOLLOW_UP_REQUIRED,
+        { dealId },
+        {
+          entityType: "DEAL",
+          entityId: dealId,
+          dealId,
+          userId: sessionUserId,
+          dedupeKey: `follow-up:${dealId}:${dayKey}`,
+        },
+      );
+    }
 
     revalidatePath(`/deals/${dealId}/workspace`);
     revalidatePath("/tasks");

@@ -1,6 +1,10 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import type { ProductionCommandCenterView } from "../../types/production";
+import type {
+  ProductionCommandCenterEvent,
+  ProductionCommandCenterView,
+  WorkshopBottleneck,
+} from "../../types/production";
 import { getDemoCommandCenterView } from "../demo/production-demo";
 import { normalizeMaterialsChecklist } from "../../workshop-materials";
 import { WORKSHOP_KANBAN_COLUMNS, WORKSHOP_STATION_LABEL_BY_KEY } from "../../workshop-stages";
@@ -20,43 +24,11 @@ function isProductionSchemaMissingError(e: unknown): boolean {
 const STATION_LABELS = WORKSHOP_STATION_LABEL_BY_KEY;
 
 export async function getProductionCommandCenterView(): Promise<ProductionCommandCenterView> {
-  const productionFlowDelegate = (
-    prisma as unknown as {
-      productionFlow?: {
-        findMany: (args: unknown) => Promise<
-          Array<{
-            id: string;
-            number: string;
-            title: string;
-            clientName: string;
-            currentStepKey: string;
-            status: string;
-            readinessPercent: number;
-            riskScore: number;
-            dueDate: Date | null;
-            blockersCount: number;
-            openQuestionsCount: number;
-            risks: Array<{ severity: string; title: string; description: string }>;
-            aiInsights: Array<{ recommendedAction: string | null }>;
-            stationLoads: Array<{
-              stationKey: string;
-              stationLabel: string;
-              loadPercent: number;
-            }>;
-            updatedAt: Date;
-          }>
-        >;
-      };
-    }
-  ).productionFlow;
-
-  // Graceful fallback when the running server still has stale Prisma client delegates.
-  if (!productionFlowDelegate) {
+  if (!prisma.productionFlow) {
     return getDemoCommandCenterView();
   }
-
   try {
-    return await loadCommandCenterFromDatabase(productionFlowDelegate);
+    return await loadCommandCenterFromDatabase(prisma.productionFlow);
   } catch (e) {
     if (isProductionSchemaMissingError(e)) {
       return getDemoCommandCenterView();
@@ -256,6 +228,46 @@ async function loadCommandCenterFromDatabase(
       };
     });
 
+  const procurementPending = procurement.filter((p) => p.status !== "DELIVERED").length;
+  const procurementOverdue = procurement.filter((p) => {
+    if (p.status === "DELIVERED") return false;
+    const t = p.expectedDate ? new Date(p.expectedDate).getTime() : NaN;
+    return !Number.isNaN(t) && t < now;
+  }).length;
+
+  const totalWorkshopTasks = workshopKanban.reduce((s, c) => s + c.tasks.length, 0);
+  let workshopBottleneck: WorkshopBottleneck | null = null;
+  if (totalWorkshopTasks > 0 && workshopKanban.length > 0) {
+    const maxCol = workshopKanban.reduce((a, b) => (a.tasks.length >= b.tasks.length ? a : b));
+    workshopBottleneck = {
+      stageKey: maxCol.stageKey,
+      stageLabel: maxCol.stageLabel,
+      taskCount: maxCol.tasks.length,
+      totalWorkshopTasks,
+      sharePercent: Math.round((maxCol.tasks.length / totalWorkshopTasks) * 100),
+    };
+  }
+
+  let recentEvents: ProductionCommandCenterEvent[] = [];
+  try {
+    const ev = await prisma.productionEvent.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 14,
+      include: { flow: { select: { number: true } } },
+    });
+    recentEvents = ev.map((e) => ({
+      id: e.id,
+      flowId: e.flowId,
+      flowNumber: e.flow.number,
+      actorName: e.actorName,
+      title: e.title,
+      description: e.description,
+      createdAt: e.createdAt.toISOString(),
+    }));
+  } catch (e) {
+    if (!isProductionSchemaMissingError(e)) throw e;
+  }
+
   return {
     kpis: {
       activeFlows: activeFlows.length,
@@ -264,7 +276,11 @@ async function loadCommandCenterFromDatabase(
       highRiskFlows: highRiskFlows.length,
       overdueFlows: overdueFlows.length,
       readyToDistribute,
+      procurementPending,
+      procurementOverdue,
     },
+    workshopBottleneck,
+    recentEvents,
     queue,
     stationLoads: Array.from(stationMap.values()),
     criticalBlockers,

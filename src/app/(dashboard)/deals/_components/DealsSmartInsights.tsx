@@ -14,6 +14,7 @@ export function DealsSmartInsights({ rows }: Props) {
   const insights = useMemo(() => {
     const out: string[] = [];
     const open = rows.filter((r) => r.status === "OPEN");
+    // eslint-disable-next-line react-hooks/purity -- snapshot часу для overdue vs nextActionAt
     const now = Date.now();
 
     const noNext = open.filter((r) => {

@@ -1,22 +1,21 @@
 import { randomBytes } from "node:crypto";
-import type { Prisma, PrismaClient } from "@prisma/client";
-import {
-  ActivityEntityType,
-  ActivityType,
-  ConstructorAssignmentType,
-  HandoffStatus,
-  ProductionOrchestrationStatus,
-  ProductionSubflowState,
-} from "@prisma/client";
+import type { PrismaClient } from "@prisma/client";
+import { HandoffStatus } from "@prisma/client";
 import { appendActivityLog } from "@/lib/deal-api/audit";
+import {
+  acceptFlowByChief,
+  assignConstructor,
+  createProductionFlowFromDealHandoff,
+  addFlowQuestion,
+} from "@/features/production/server/services/production-flow.service";
 
 export async function generateUniqueProductionNumber(
   prisma: PrismaClient,
 ): Promise<string> {
   for (let i = 0; i < 8; i++) {
     const n = `ENVER-${new Date().getFullYear()}-${randomBytes(3).toString("hex").toUpperCase()}`;
-    const exists = await prisma.productionOrchestration.findUnique({
-      where: { productionNumber: n },
+    const exists = await prisma.productionFlow.findFirst({
+      where: { number: n },
       select: { id: true },
     });
     if (!exists) return n;
@@ -27,7 +26,6 @@ export async function generateUniqueProductionNumber(
 export type AcceptOrchestrationInput = {
   dealId: string;
   actorUserId: string;
-  /** Актуальна смета угоди (остання затверджена / активна — визначає UI). */
   estimateId?: string | null;
 };
 
@@ -38,14 +36,18 @@ export async function acceptProductionOrchestration(
   | { ok: true; orchestrationId: string }
   | { ok: false; error: string; code: "STATE" | "CONFLICT" | "NOT_FOUND" }
 > {
-  const { dealId, actorUserId, estimateId } = input;
+  const { dealId, actorUserId } = input;
 
-  const existing = await prisma.productionOrchestration.findUnique({
+  const existing = await prisma.productionFlow.findUnique({
     where: { dealId },
     select: { id: true },
   });
   if (existing) {
-    return { ok: false, error: "Оркестрацію для цієї угоди вже створено", code: "CONFLICT" };
+    return {
+      ok: false,
+      error: "Потік виробництва для цієї угоди вже створено",
+      code: "CONFLICT",
+    };
   }
 
   const deal = await prisma.deal.findUnique({
@@ -67,42 +69,35 @@ export async function acceptProductionOrchestration(
     };
   }
 
-  const productionNumber = await generateUniqueProductionNumber(prisma);
+  const actor = await prisma.user.findUnique({
+    where: { id: actorUserId },
+    select: { name: true, email: true },
+  });
+  const actorName = actor?.name?.trim() || actor?.email || "CRM";
 
-  const orch = await prisma.productionOrchestration.create({
-    data: {
-      dealId,
-      estimateId: estimateId ?? null,
-      productionNumber,
-      status: ProductionOrchestrationStatus.ACCEPTED,
-      acceptedById: actorUserId,
-      acceptedAt: new Date(),
-    },
+  const { flow } = await createProductionFlowFromDealHandoff({
+    dealId,
+    actorName,
+    defaultChiefUserId: actorUserId,
+  });
+
+  await acceptFlowByChief(flow.id, {
+    actorName,
+    chiefUserId: actorUserId,
   });
 
   await appendActivityLog({
-    entityType: ActivityEntityType.PRODUCTION_ORCHESTRATION,
-    entityId: orch.id,
-    type: ActivityType.PRODUCTION_ORCHESTRATION_ACCEPTED,
-    actorUserId,
-    data: {
-      dealId,
-      productionNumber: orch.productionNumber,
-    },
-  });
-
-  await appendActivityLog({
-    entityType: ActivityEntityType.DEAL,
+    entityType: "DEAL",
     entityId: dealId,
-    type: ActivityType.PRODUCTION_ORCHESTRATION_ACCEPTED,
+    type: "HANDOFF_ACCEPTED",
     actorUserId,
     data: {
-      productionOrchestrationId: orch.id,
-      productionNumber: orch.productionNumber,
+      productionFlowId: flow.id,
+      estimateId: input.estimateId ?? null,
     },
   });
 
-  return { ok: true, orchestrationId: orch.id };
+  return { ok: true, orchestrationId: flow.id };
 }
 
 export async function requestHandoffClarification(
@@ -120,24 +115,50 @@ export async function requestHandoffClarification(
   });
   if (!deal) return { ok: false, error: "Угоду не знайдено" };
 
-  const row = await prisma.productionHandoffClarification.create({
-    data: {
-      dealId: input.dealId,
-      issuesJson: input.issues as Prisma.InputJsonValue,
-      messageToManager: input.messageToManager ?? null,
-      createdById: input.actorUserId,
-    },
+  const flow = await prisma.productionFlow.findUnique({
+    where: { dealId: input.dealId },
+    select: { id: true },
   });
+
+  const text = [
+    input.messageToManager?.trim(),
+    input.issues?.length
+      ? `Питання: ${JSON.stringify(input.issues).slice(0, 4000)}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+
+  if (flow) {
+    const actor = await prisma.user.findUnique({
+      where: { id: input.actorUserId },
+      select: { name: true, email: true },
+    });
+    const actorName = actor?.name?.trim() || actor?.email || "CRM";
+    const q = await addFlowQuestion(flow.id, {
+      actorName,
+      text: text || "Запит уточнення по handoff",
+      source: "HANDOFF",
+      isCritical: true,
+    });
+    await appendActivityLog({
+      entityType: "DEAL",
+      entityId: input.dealId,
+      type: "DEAL_UPDATED",
+      actorUserId: input.actorUserId,
+      data: { clarificationQuestionId: q.id },
+    });
+    return { ok: true, id: q.id };
+  }
 
   await appendActivityLog({
-    entityType: ActivityEntityType.DEAL,
+    entityType: "DEAL",
     entityId: input.dealId,
-    type: ActivityType.PRODUCTION_ORCHESTRATION_CLARIFICATION_REQUESTED,
+    type: "DEAL_UPDATED",
     actorUserId: input.actorUserId,
-    data: { clarificationId: row.id },
+    data: { handoffClarification: text || "clarification" },
   });
-
-  return { ok: true, id: row.id };
+  return { ok: true, id: `log-${input.dealId}` };
 }
 
 export async function rejectHandoffToManager(
@@ -163,9 +184,9 @@ export async function rejectHandoffToManager(
   });
 
   await appendActivityLog({
-    entityType: ActivityEntityType.DEAL,
+    entityType: "DEAL",
     entityId: input.dealId,
-    type: ActivityType.PRODUCTION_ORCHESTRATION_REJECTED,
+    type: "HANDOFF_REJECTED",
     actorUserId: input.actorUserId,
     data: { reason: input.reason },
   });
@@ -185,32 +206,20 @@ export async function assignProductionConstructor(
     constructorExternalEmail?: string | null;
     dueDate?: Date | null;
     productionNotes?: string | null;
-    /** Для зовнішнього: згенерувати новий токен посилання. */
     regenerateToken?: boolean;
   },
 ): Promise<
   | { ok: true; orchestrationId: string; externalWorkspaceToken: string | null }
   | { ok: false; error: string; code: "NOT_FOUND" | "STATE" | "VALIDATION" }
 > {
-  const orch = await prisma.productionOrchestration.findUnique({
+  const flow = await prisma.productionFlow.findUnique({
     where: { dealId: input.dealId },
   });
-  if (!orch) {
+  if (!flow) {
     return {
       ok: false,
-      error: "Спочатку прийміть угоду у виробничу оркестрацію",
+      error: "Спочатку прийміть угоду у виробничий потік",
       code: "NOT_FOUND",
-    };
-  }
-
-  if (
-    orch.status !== ProductionOrchestrationStatus.ACCEPTED &&
-    orch.status !== ProductionOrchestrationStatus.CONSTRUCTOR_ASSIGNED
-  ) {
-    return {
-      ok: false,
-      error: "Призначення зараз недоступне для цього статусу оркестрації",
-      code: "STATE",
     };
   }
 
@@ -230,64 +239,69 @@ export async function assignProductionConstructor(
     };
   }
 
-  let externalWorkspaceToken: string | null = orch.externalWorkspaceToken;
-  if (input.type === "OUTSOURCED") {
-    if (input.regenerateToken || !externalWorkspaceToken) {
-      externalWorkspaceToken = randomBytes(32).toString("hex");
-    }
-  } else {
-    externalWorkspaceToken = null;
+  const actor = await prisma.user.findUnique({
+    where: { id: input.actorUserId },
+    select: { name: true, email: true },
+  });
+  const actorName = actor?.name?.trim() || actor?.email || "CRM";
+
+  const constructorUser =
+    input.type === "INTERNAL" && input.constructorUserId
+      ? await prisma.user.findUnique({
+          where: { id: input.constructorUserId },
+          select: { name: true, email: true },
+        })
+      : null;
+
+  const mode: "INTERNAL" | "OUTSOURCE" =
+    input.type === "INTERNAL" ? "INTERNAL" : "OUTSOURCE";
+  const constructorName =
+    input.type === "INTERNAL"
+      ? (constructorUser?.name?.trim() || constructorUser?.email || "Конструктор")
+      : (input.constructorExternalName ?? "Зовнішній конструктор");
+
+  const dueDate =
+    input.dueDate ??
+    flow.dueDate ??
+    new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+
+  if (input.productionNotes?.trim()) {
+    await prisma.productionFlow.update({
+      where: { id: flow.id },
+      data: { productSummary: input.productionNotes.trim() },
+    });
   }
 
-  const updated = await prisma.productionOrchestration.update({
-    where: { id: orch.id },
-    data: {
-      constructorType:
-        input.type === "INTERNAL"
-          ? ConstructorAssignmentType.INTERNAL
-          : ConstructorAssignmentType.OUTSOURCED,
-      constructorUserId: input.type === "INTERNAL" ? input.constructorUserId! : null,
-      constructorExternalName:
-        input.type === "OUTSOURCED" ? input.constructorExternalName ?? null : null,
-      constructorExternalPhone:
-        input.type === "OUTSOURCED" ? input.constructorExternalPhone ?? null : null,
-      constructorExternalEmail:
-        input.type === "OUTSOURCED" ? input.constructorExternalEmail ?? null : null,
-      externalWorkspaceToken,
-      dueDate: input.dueDate ?? undefined,
-      productionNotes:
-        input.productionNotes !== undefined ? input.productionNotes : undefined,
-      status: ProductionOrchestrationStatus.CONSTRUCTOR_ASSIGNED,
-      designStatus: ProductionSubflowState.ACTIVE,
-    },
+  await assignConstructor(flow.id, {
+    actorName,
+    constructorMode: mode,
+    constructorName,
+    constructorCompany:
+      input.type === "OUTSOURCED" ? input.constructorExternalName : null,
+    constructorWorkspaceUrl: flow.constructorWorkspaceUrl ?? undefined,
+    dueDate: dueDate.toISOString(),
+  });
+
+  const after = await prisma.productionFlow.findUnique({
+    where: { id: flow.id },
+    select: { constructorWorkspaceUrl: true },
   });
 
   await appendActivityLog({
-    entityType: ActivityEntityType.PRODUCTION_ORCHESTRATION,
-    entityId: orch.id,
-    type: ActivityType.PRODUCTION_CONSTRUCTOR_ASSIGNED,
-    actorUserId: input.actorUserId,
-    data: {
-      constructorType: input.type,
-      constructorUserId: input.constructorUserId ?? null,
-      hasExternalToken: Boolean(externalWorkspaceToken),
-    },
-  });
-
-  await appendActivityLog({
-    entityType: ActivityEntityType.DEAL,
+    entityType: "DEAL",
     entityId: input.dealId,
-    type: ActivityType.PRODUCTION_CONSTRUCTOR_ASSIGNED,
+    type: "DEAL_UPDATED",
     actorUserId: input.actorUserId,
     data: {
-      productionOrchestrationId: orch.id,
-      constructorType: input.type,
+      productionFlowId: flow.id,
+      constructorAssigned: true,
+      mode: input.type,
     },
   });
 
   return {
     ok: true,
-    orchestrationId: updated.id,
-    externalWorkspaceToken,
+    orchestrationId: flow.id,
+    externalWorkspaceToken: after?.constructorWorkspaceUrl ?? null,
   };
 }

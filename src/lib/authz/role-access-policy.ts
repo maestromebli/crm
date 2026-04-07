@@ -78,6 +78,10 @@ export const ALL_PERMISSION_KEYS: readonly PermissionKey[] = [
   "HANDOFF_SUBMIT",
   "HANDOFF_ACCEPT",
   "PRODUCTION_LAUNCH",
+  "PRODUCTION_ORDERS_VIEW",
+  "PRODUCTION_ORDERS_MANAGE",
+  "PRODUCTION_ORCHESTRATION_VIEW",
+  "PRODUCTION_ORCHESTRATION_MANAGE",
   "PAYMENT_CONFIRM",
   "AI_USE",
   "AI_ANALYTICS",
@@ -155,6 +159,23 @@ export const MEASURER_PERMISSION_KEYS: readonly PermissionKey[] = [
   "AI_USE",
 ];
 
+export const PRODUCTION_WORKER_PERMISSION_KEYS: readonly PermissionKey[] = [
+  "DASHBOARD_VIEW",
+  "DEALS_VIEW",
+  "DEAL_WORKSPACE_VIEW",
+  "FILES_VIEW",
+  "FILES_UPLOAD",
+  "TASKS_VIEW",
+  "TASKS_UPDATE",
+  "PRODUCTION_LAUNCH",
+  "PRODUCTION_ORDERS_VIEW",
+  "PRODUCTION_ORDERS_MANAGE",
+  "PRODUCTION_ORCHESTRATION_VIEW",
+  "PRODUCTION_ORCHESTRATION_MANAGE",
+  "NOTIFICATIONS_VIEW",
+  "AI_USE",
+];
+
 const headExcludedSet = new Set(HEAD_MANAGER_EXCLUDED_KEYS);
 const adminExcludedSet = new Set(OPERATIONAL_ADMIN_EXCLUDED_KEYS);
 
@@ -168,6 +189,8 @@ export function getDefaultPermissionKeysForRole(role: Role): DefaultPermissionMo
     case "HEAD_MANAGER":
     case "MANAGER":
       return ALL_PERMISSION_KEYS.filter((k) => !headExcludedSet.has(k));
+    case "TEAM_LEAD":
+      return ALL_PERMISSION_KEYS.filter((k) => !headExcludedSet.has(k));
     case "ADMIN":
       return ALL_PERMISSION_KEYS.filter((k) => !adminExcludedSet.has(k));
     case "SALES_MANAGER":
@@ -175,6 +198,8 @@ export function getDefaultPermissionKeysForRole(role: Role): DefaultPermissionMo
       return [...SALES_MANAGER_PERMISSION_KEYS];
     case "MEASURER":
       return [...MEASURER_PERMISSION_KEYS];
+    case "PRODUCTION_WORKER":
+      return [...PRODUCTION_WORKER_PERMISSION_KEYS];
     case "ACCOUNTANT":
       return [
         ...ALL_PERMISSION_KEYS.filter(

@@ -34,9 +34,20 @@ const manifest = {
   notes: [],
 };
 
+/** Потокове SHA256 — `readFileSync` падає на файлах > 2 GiB (ERR_FS_FILE_TOO_LARGE). */
 function sha256File(filePath) {
-  const buf = fs.readFileSync(filePath);
-  return `sha256:${createHash("sha256").update(buf).digest("hex")}`;
+  const hash = createHash("sha256");
+  const fd = fs.openSync(filePath, "r");
+  try {
+    const chunk = Buffer.allocUnsafe(1024 * 1024);
+    let n;
+    while ((n = fs.readSync(fd, chunk, 0, chunk.length, null)) > 0) {
+      hash.update(n === chunk.length ? chunk : chunk.subarray(0, n));
+    }
+  } finally {
+    fs.closeSync(fd);
+  }
+  return `sha256:${hash.digest("hex")}`;
 }
 
 function resolvePgDump() {

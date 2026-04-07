@@ -7,10 +7,12 @@ import {
 import { P } from "../../../../../../lib/authz/permissions";
 import { createFinanceInvoice } from "../../../../../../lib/finance/invoice-payment-service";
 import type { CrmInvoiceType } from "@prisma/client";
+import { CORE_EVENT_TYPES, publishEntityEvent } from "@/lib/events/crm-events";
+import { recordWorkflowEvent, WORKFLOW_EVENT_TYPES } from "@/features/event-system";
 
 type Ctx = { params: Promise<{ dealId: string }> };
 
-const TYPES = new Set<string>(["PREPAYMENT_70", "FINAL_30", "CUSTOM"]);
+const TYPES = new Set<string>(["INCOMING", "OUTGOING"]);
 
 export async function GET(_req: Request, ctx: Ctx) {
   if (!process.env.DATABASE_URL?.trim()) {
@@ -40,6 +42,14 @@ export async function GET(_req: Request, ctx: Ctx) {
       amount: true,
       pdfUrl: true,
       createdAt: true,
+      documentNumber: true,
+      issueDate: true,
+      counterpartyName: true,
+      counterpartyEdrpou: true,
+      vatRatePercent: true,
+      amountWithoutVat: true,
+      vatAmount: true,
+      dueDate: true,
     },
   });
 
@@ -47,6 +57,9 @@ export async function GET(_req: Request, ctx: Ctx) {
     invoices: rows.map((r) => ({
       ...r,
       amount: r.amount.toString(),
+      vatRatePercent: r.vatRatePercent?.toString() ?? null,
+      amountWithoutVat: r.amountWithoutVat?.toString() ?? null,
+      vatAmount: r.vatAmount?.toString() ?? null,
     })),
   });
 }
@@ -96,7 +109,31 @@ export async function POST(req: Request, ctx: Ctx) {
       dealId,
       type: typeRaw as CrmInvoiceType,
       amount: amountNum,
+      createdById: user.id,
     });
+    await publishEntityEvent({
+      type: CORE_EVENT_TYPES.INVOICE_CREATED,
+      entityType: "DEAL",
+      entityId: dealId,
+      userId: user.id,
+      payload: {
+        invoiceId: row.id,
+        invoiceType: typeRaw,
+        amount: amountNum,
+      },
+      dedupeKey: `invoice:${row.id}`,
+    });
+    await recordWorkflowEvent(
+      WORKFLOW_EVENT_TYPES.INVOICE_CREATED,
+      { dealId, invoiceId: row.id },
+      {
+        entityType: "DEAL",
+        entityId: dealId,
+        dealId,
+        userId: user.id,
+        dedupeKey: `invoice-created:${row.id}`,
+      },
+    );
     return NextResponse.json({ id: row.id }, { status: 201 });
   } catch (e) {
     console.error("[POST finance/invoices]", e);

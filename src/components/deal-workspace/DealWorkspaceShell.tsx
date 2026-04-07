@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { DealWorkspacePayload } from "../../features/deal-workspace/types";
 import type { DealWorkspaceTabId } from "../../features/deal-workspace/types";
 import type { EffectiveRole } from "../../lib/authz/roles";
@@ -40,6 +40,7 @@ import { buildDealPageEntitySnapshot } from "../../features/ai-assistant/utils/b
 import { DealAiOperationsPanel } from "../../features/ai";
 import { AiV2InsightCard } from "../../features/ai-v2";
 import { CRMLayout } from "../layout/CRMLayout";
+import { parseResponseJson } from "../../lib/api/parse-response-json";
 
 type Props = {
   data: DealWorkspacePayload;
@@ -61,25 +62,45 @@ export function DealWorkspaceShell({ data, viewerRole }: Props) {
   const setDealEntity = useAssistantPageEntitySetter();
   const [headerEditSignal, setHeaderEditSignal] = useState(0);
   const tasksRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const workspaceQuery = useQuery({
+    queryKey: dealQueryKeys.workspace(data.deal.id),
+    queryFn: async (): Promise<DealWorkspacePayload> => {
+      const r = await fetch(`/api/deals/${data.deal.id}/workspace`, {
+        cache: "no-store",
+      });
+      const j = await parseResponseJson<{
+        data?: DealWorkspacePayload;
+        error?: string;
+      }>(r);
+      if (!r.ok || !j.data) {
+        throw new Error(j.error ?? "Не вдалося завантажити угоду");
+      }
+      return j.data;
+    },
+    initialData: data,
+  });
+  const workspaceData = workspaceQuery.data ?? data;
 
   useEffect(() => {
-    setDealEntity(buildDealPageEntitySnapshot(data));
+    setDealEntity(buildDealPageEntitySnapshot(workspaceData));
     return () => setDealEntity(null);
-  }, [data, setDealEntity]);
+  }, [workspaceData, setDealEntity]);
 
   useEffect(() => {
     queryClient.setQueryData(dealQueryKeys.workspace(data.deal.id), data);
   }, [data, queryClient]);
 
   useEffect(() => {
-    const dealId = data.deal.id;
+    const dealId = workspaceData.deal.id;
     const onDealTasksUpdated = (ev: Event) => {
       const ce = ev as CustomEvent<EnverDealTasksUpdatedDetail>;
       if (ce.detail?.dealId === dealId) {
         if (tasksRefreshTimerRef.current) return;
         tasksRefreshTimerRef.current = setTimeout(() => {
           tasksRefreshTimerRef.current = null;
-          router.refresh();
+          void queryClient.invalidateQueries({
+            queryKey: dealQueryKeys.workspace(dealId),
+          });
         }, 180);
       }
     };
@@ -97,7 +118,7 @@ export function DealWorkspaceShell({ data, viewerRole }: Props) {
         onDealTasksUpdated as EventListener,
       );
     };
-  }, [data.deal.id, router]);
+  }, [workspaceData.deal.id, queryClient]);
   const estimateVisibility = estimateVisibilityForRole(viewerRole);
   const tabParam = searchParams.get("tab") ?? undefined;
   const activeTab: DealWorkspaceTabId = isDealWorkspaceTabId(tabParam)
@@ -117,11 +138,11 @@ export function DealWorkspaceShell({ data, viewerRole }: Props) {
       else q.set("tab", t);
       const s = q.toString();
       router.replace(
-        `/deals/${data.deal.id}/workspace${s ? `?${s}` : ""}`,
+        `/deals/${workspaceData.deal.id}/workspace${s ? `?${s}` : ""}`,
         { scroll: false },
       );
     },
-    [router, searchParams, data.deal.id],
+    [router, searchParams, workspaceData.deal.id],
   );
 
   const dismissFromLeadBridge = useCallback(() => {
@@ -129,16 +150,16 @@ export function DealWorkspaceShell({ data, viewerRole }: Props) {
     q.delete("fromLead");
     const s = q.toString();
     router.replace(
-      `/deals/${data.deal.id}/workspace${s ? `?${s}` : ""}`,
+      `/deals/${workspaceData.deal.id}/workspace${s ? `?${s}` : ""}`,
       { scroll: false },
     );
-  }, [router, searchParams, data.deal.id]);
+  }, [router, searchParams, workspaceData.deal.id]);
 
   const showLeadBridge = searchParams.get("fromLead") === "1";
 
-  const nextBest = useMemo(() => deriveNextBestAction(data), [data]);
-  const aiSummary = useMemo(() => deriveAiSummary(data), [data]);
-  const nextLabel = useMemo(() => deriveNextActionLabel(data), [data]);
+  const nextBest = useMemo(() => deriveNextBestAction(workspaceData), [workspaceData]);
+  const aiSummary = useMemo(() => deriveAiSummary(workspaceData), [workspaceData]);
+  const nextLabel = useMemo(() => deriveNextActionLabel(workspaceData), [workspaceData]);
 
   const bumpHeaderEdit = useCallback(() => {
     setHeaderEditSignal((s) => s + 1);
@@ -155,31 +176,31 @@ export function DealWorkspaceShell({ data, viewerRole }: Props) {
         */}
         <div className="shrink-0 space-y-2 border-b border-slate-200 pb-2 pt-0.5">
           <DealWorkspaceHeader
-            data={data}
+            data={workspaceData}
             nextActionLabel={nextLabel}
             systemNextHint={nextBest}
             openEditSignal={headerEditSignal}
           />
           <DealWorkspacePrimaryActions
-            data={data}
+            data={workspaceData}
             onTab={setTab}
             onRequestEditHeader={bumpHeaderEdit}
           />
-          <DealWorkspaceCommandStrip data={data} onTab={setTab} />
-          <DealFinanceProjectLinks data={data} />
-          <DealProcurementLink dealId={data.deal.id} />
-          <DealReadinessStrip data={data} />
+          <DealWorkspaceCommandStrip data={workspaceData} onTab={setTab} />
+          <DealFinanceProjectLinks data={workspaceData} />
+          <DealProcurementLink dealId={workspaceData.deal.id} />
+          <DealReadinessStrip data={workspaceData} />
         </div>
 
-        <DealWorkspaceExecutionBlocks data={data} onTab={setTab} />
+        <DealWorkspaceExecutionBlocks data={workspaceData} onTab={setTab} />
 
         <DealAssistantCards
-          data={data}
+          data={workspaceData}
           onTab={setTab}
           onRequestEditHeader={bumpHeaderEdit}
         />
-        <AiV2InsightCard context="deal" dealId={data.deal.id} />
-        <DealAiOperationsPanel dealId={data.deal.id} />
+        <AiV2InsightCard context="deal" dealId={workspaceData.deal.id} />
+        <DealAiOperationsPanel dealId={workspaceData.deal.id} />
 
         {showLeadBridge ? (
           <div
@@ -195,9 +216,9 @@ export function DealWorkspaceShell({ data, viewerRole }: Props) {
                 ліда вже в цій угоді. Далі — ті самі принципи (наступний крок,
                 комунікація, документи), з повним циклом угоди.
               </p>
-              {data.leadId ? (
+              {workspaceData.leadId ? (
                 <Link
-                  href={`/leads/${data.leadId}`}
+                  href={`/leads/${workspaceData.leadId}`}
                   className="mt-1.5 inline-block text-[11px] font-medium text-emerald-900 underline decoration-emerald-300 underline-offset-2 hover:decoration-emerald-600"
                 >
                   Відкрити картку ліда (історія та комунікація)
@@ -213,7 +234,7 @@ export function DealWorkspaceShell({ data, viewerRole }: Props) {
             </button>
           </div>
         ) : null}
-        <DealStageProgress data={data} />
+        <DealStageProgress data={workspaceData} />
 
         <CRMLayout
           main={
@@ -264,7 +285,7 @@ export function DealWorkspaceShell({ data, viewerRole }: Props) {
 
             <DealWorkspaceTabPanels
               tab={activeTab}
-              data={data}
+              data={workspaceData}
               onTab={setTab}
               estimateVisibility={estimateVisibility}
             />
@@ -272,7 +293,7 @@ export function DealWorkspaceShell({ data, viewerRole }: Props) {
           }
           smartPanel={
             <DealRightRail
-              data={data}
+              data={workspaceData}
               nextBestAction={nextBest}
               aiSummary={aiSummary}
             />
@@ -281,7 +302,7 @@ export function DealWorkspaceShell({ data, viewerRole }: Props) {
       </div>
 
       <DealActionBar
-        data={data}
+        data={workspaceData}
         activeTab={activeTab}
         onTab={setTab}
         onRequestEditHeader={bumpHeaderEdit}

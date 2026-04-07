@@ -1,0 +1,67 @@
+{
+  "version": "1.0.0",
+  "generatedAt": "2026-04-07",
+  "policy": {
+    "nonDestructive": true,
+    "wrapperFirstUi": true,
+    "calculationUxFrozen": true
+  },
+  "protectedEstimateContracts": {
+    "routes": [
+      "GET /api/deals/:dealId/estimates",
+      "POST /api/deals/:dealId/estimates",
+      "GET /api/deals/:dealId/estimates/:estimateId",
+      "PATCH /api/deals/:dealId/estimates/:estimateId",
+      "GET /api/deals/:dealId/estimates/compare?from=:id&to=:id",
+      "GET /api/leads/:leadId/estimates",
+      "POST /api/leads/:leadId/estimates",
+      "GET /api/leads/:leadId/estimates/:estimateId",
+      "PATCH /api/leads/:leadId/estimates/:estimateId",
+      "GET /api/leads/:leadId/estimates/compare?from=:id&to=:id"
+    ],
+    "uiEntrypoints": [
+      "src/modules/estimate-workspace/DealEstimateWorkspace.tsx",
+      "src/modules/estimate-workspace/useDealEstimateWorkspace.ts",
+      "src/components/deal-workspace/tabs/EstimateWorkspaceTab.tsx",
+      "src/features/estimate/components/EstimateWorkspacePage.tsx"
+    ],
+    "apiSerializers": [
+      "src/lib/estimates/serialize.ts",
+      "src/lib/estimates/deal-estimate-dto.ts",
+      "src/lib/estimates/compare-estimate-versions.ts"
+    ]
+  },
+  "eventContract": {
+    "storage": {
+      "model": "DomainEvent",
+      "fields": [
+        "id",
+        "type",
+        "payload",
+        "entityType",
+        "entityId",
+        "userId",
+        "dealId",
+        "createdAt",
+        "processedAt"
+      ]
+    },
+    "mandatoryFamilies": [
+      "lead_created",
+      "status_changed",
+      "file_uploaded",
+      "estimate_created",
+      "quote_sent",
+      "payment_received"
+    ],
+    "timelineReaders": [
+      "src/app/api/leads/[leadId]/activity/route.ts",
+      "src/app/api/deals/[dealId]/activity/route.ts"
+    ]
+  },
+  "rbacAnchors": [
+    "src/lib/authz/permissions.ts",
+    "src/lib/authz/data-scope.ts",
+    "src/lib/authz/role-access-policy.ts"
+  ]
+}

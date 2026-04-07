@@ -8,6 +8,7 @@ import { runAiOperation } from "../../../../features/ai/server/run-operation";
 import { requireSessionUser } from "../../../../lib/authz/api-guard";
 import { hasEffectivePermission, P } from "../../../../lib/authz/permissions";
 import { requireDatabaseUrl } from "../../../../lib/api/route-guards";
+import { resolveAiExecutionPolicy } from "../../../../features/ai/policies/ai-action-guard";
 
 export const runtime = "nodejs";
 
@@ -93,6 +94,13 @@ export async function POST(request: Request) {
   if (!canRunOperation(user, operation)) {
     return NextResponse.json({ error: "Недостатньо прав" }, { status: 403 });
   }
+  const policy = resolveAiExecutionPolicy({ user, operation });
+  if (!policy.allowed) {
+    return NextResponse.json(
+      { error: "Недостатньо прав для AI", policy },
+      { status: 403 },
+    );
+  }
 
   const needsLead =
     operation === "lead_summary" ||
@@ -135,5 +143,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }
 
-  return NextResponse.json(result);
+  return NextResponse.json({
+    ...result,
+    policy: {
+      advisoryOnly: policy.advisoryOnly,
+      reason: policy.reason,
+    },
+  });
 }

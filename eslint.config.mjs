@@ -11,6 +11,8 @@ const eslintConfig = [
       "coverage/**",
       "apps/**",
       "packages/**",
+      "backups/**",
+      "**/.tmp-*/**",
       "next-env.d.ts",
     ],
   },

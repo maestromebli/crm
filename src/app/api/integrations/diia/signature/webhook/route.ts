@@ -251,7 +251,7 @@ export async function POST(req: Request) {
     });
     if (
       dealForPlan?.value != null &&
-      dealForPlan.value > 0 &&
+      Number(dealForPlan.value) > 0 &&
       !(await prisma.dealPaymentPlan.findUnique({
         where: { dealId: contract.dealId },
         select: { id: true },
@@ -259,7 +259,7 @@ export async function POST(req: Request) {
     ) {
       await seedDealPaymentPlan7030(prisma, {
         dealId: contract.dealId,
-        total: dealForPlan.value,
+        total: Number(dealForPlan.value),
         currency: dealForPlan.currency?.trim() || "UAH",
       });
     }

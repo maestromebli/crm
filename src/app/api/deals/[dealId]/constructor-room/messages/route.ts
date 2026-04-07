@@ -65,7 +65,7 @@ export async function POST(req: Request, ctx: Ctx) {
       );
     }
 
-    const msg = await prisma.constructorRoomMessage.create({
+    const msg = await prisma.dealConstructorRoomMessage.create({
       data: {
         roomId: room.id,
         body: text,

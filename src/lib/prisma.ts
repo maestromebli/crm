@@ -128,7 +128,7 @@ function dealProductionRelationConsistent(client: PrismaClient): boolean {
   if (!fields?.length) {
     return true;
   }
-  return fields.some((f) => f.name === "productionOrders");
+  return fields.some((f) => f.name === "productionFlow");
 }
 
 function prismaClientMatchesCurrentCodegen(client: PrismaClient): boolean {
@@ -146,10 +146,8 @@ function prismaClientMatchesCurrentCodegen(client: PrismaClient): boolean {
  * хоча codegen у node_modules уже новий — тоді треба пересоздати клієнт (і в production).
  */
 function prismaSingletonHasRequiredDelegates(client: PrismaClient): boolean {
-  const c = client as unknown as { dealHandoff?: unknown; project?: unknown };
-  return (
-    typeof c.dealHandoff !== "undefined" && typeof c.project !== "undefined"
-  );
+  const c = client as unknown as { dealHandoff?: unknown };
+  return typeof c.dealHandoff !== "undefined";
 }
 
 async function resetPrismaSingletonHard(): Promise<void> {

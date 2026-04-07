@@ -156,7 +156,7 @@ export function estimateLinesToQuoteItems(
       options?.estimateName,
       options?.estimateTemplateKey,
     );
-    const title = sheetTitle ? `${sheetTitle} · ${groupTitle}` : groupTitle;
+    const title = sheetTitle ?? groupTitle;
     let lineTotal = 0;
     for (const li of block) {
       lineTotal += Number.isFinite(li.amountSale) ? li.amountSale : 0;

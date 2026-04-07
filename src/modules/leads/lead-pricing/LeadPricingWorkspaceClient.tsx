@@ -20,6 +20,7 @@ import type {
   LeadEstimateSummary,
   LeadProposalSummary,
 } from "../../../features/leads/queries";
+import { patchLeadEstimateById } from "../../../features/leads/lead-estimate-api";
 import { parseResponseJson } from "../../../lib/api/parse-response-json";
 import { parseEstimateLineBreakdown } from "../../../lib/estimates/estimate-line-breakdown";
 import {
@@ -200,13 +201,14 @@ function mapApiLine(
   };
 }
 
-function metadataJsonForSave(
+/**
+ * Метадані меблевого рядка для PATCH. Завжди зберігаємо furnitureBlockKind / групи /
+ * кухонні поля — інакше після перезавантаження блок «додатковий тип» зливається з основним.
+ */
+function buildKitchenSheetMetadataForSave(
   li: EstimateLineDraft,
   fallbackTemplateKey: FurnitureTemplateKey,
-): object | null | undefined {
-  if (li.metadataJson?.components?.length) {
-    return li.metadataJson as unknown as object;
-  }
+): KitchenSheetMetadata {
   const m: KitchenSheetMetadata = {
     kitchenSheet: true,
     templateKey:
@@ -234,6 +236,21 @@ function metadataJsonForSave(
       : {}),
   };
   return withFurnitureBlockKind(m, li.furnitureBlockKind ?? null);
+}
+
+function metadataJsonForSave(
+  li: EstimateLineDraft,
+  fallbackTemplateKey: FurnitureTemplateKey,
+): object | null | undefined {
+  if (li.metadataJson?.components?.length) {
+    const sheet = buildKitchenSheetMetadataForSave(li, fallbackTemplateKey);
+    const br = li.metadataJson as unknown as {
+      v: unknown;
+      components: unknown;
+    };
+    return { ...sheet, v: br.v, components: br.components } as object;
+  }
+  return buildKitchenSheetMetadataForSave(li, fallbackTemplateKey);
 }
 
 /** Окремі розрахункові таблиці за типом меблевого блоку (кухня, шафа, …). */
@@ -288,6 +305,10 @@ export type LeadPricingWorkspaceClientProps = {
   showCostFields: boolean;
   /** Прокрутка до блоку смети або КП після завантаження (вкладки «Розрахунок» / «КП»). */
   scrollToSection?: "estimate" | "kp";
+  /** Зображення з файлів ліда — автопідстановка URL у КП. */
+  leadImageUrlsForKp?: string[];
+  /** Id угоди після конверсії (посилання з заблокованого розділу). */
+  leadDealId?: string | null;
 };
 
 export function LeadPricingWorkspaceClient({
@@ -301,6 +322,8 @@ export function LeadPricingWorkspaceClient({
   canUpdate,
   showCostFields,
   scrollToSection,
+  leadImageUrlsForKp,
+  leadDealId,
 }: LeadPricingWorkspaceClientProps) {
   const router = useRouter();
   const [estimates, setEstimates] = useState(initialEstimates);
@@ -564,7 +587,10 @@ export function LeadPricingWorkspaceClient({
       const r = await fetch(`/api/leads/${leadId}/estimates`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ estimateName: leadTitle }),
+        body: JSON.stringify({
+          estimateName: leadTitle,
+          templateKey: KITCHEN_NO_COUNTER_TEMPLATE_KEY,
+        }),
       });
       const j = await parseResponseJson<{
         estimate?: { id: string };
@@ -779,14 +805,9 @@ export function LeadPricingWorkspaceClient({
     if (!canUpdate) return;
     const meta = FURNITURE_TEMPLATES.find((t) => t.key === kind);
     if (!meta) return;
-    const blockId = `blk_${uid()}`;
-    const label = nextBlockLabel(meta.label, lines);
-    const icon = iconForBlockKind(kind);
+    const label = nextBlockLabel(meta.label, kind, lines);
     const newRows = seedRowsForFurnitureBlock(kind, {
-      blockGroupId: blockId,
       blockLabel: label,
-      blockIcon: icon,
-      sheetTemplateKey: activeTemplateKey,
       newId: uid,
     });
     setLines((prev) => [...prev, ...newRows.map((r) => recalcLineAmount(r))]);
@@ -940,29 +961,23 @@ export function LeadPricingWorkspaceClient({
         amountCost: li.amountCost ?? null,
         metadataJson: metadataJsonForSave(li, activeTemplateKey),
       }));
-      const r = await fetch(`/api/leads/${leadId}/estimates/${selectedId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          versioning: forkOnSave ? "fork" : "inline",
-          changeSummary: forkOnSave
-            ? "Оновлення з робочого місця (нова версія)"
-            : null,
-          name: estimate?.name ?? null,
-          notes: notes || null,
-          discountAmount,
-          deliveryCost,
-          installationCost,
-          status,
-          lineItems,
-        }),
-      });
-      const j = await parseResponseJson<{
+      const j = await patchLeadEstimateById<{
         estimate?: Record<string, unknown>;
         estimateIdChanged?: boolean;
         error?: string;
-      }>(r);
-      if (!r.ok) throw new Error(j.error ?? "Не збережено");
+      }>(leadId, selectedId, {
+        versioning: forkOnSave ? "fork" : "inline",
+        changeSummary: forkOnSave
+          ? "Оновлення з робочого місця (нова версія)"
+          : null,
+        name: estimate?.name ?? null,
+        notes: notes || null,
+        discountAmount,
+        deliveryCost,
+        installationCost,
+        status,
+        lineItems,
+      });
       if (j.estimateIdChanged && j.estimate && typeof j.estimate === "object") {
         const ne = j.estimate as { id?: string };
         if (ne.id) {
@@ -1003,13 +1018,9 @@ export function LeadPricingWorkspaceClient({
     setSaveBusy(true);
     setErr(null);
     try {
-      const r = await fetch(`/api/leads/${leadId}/estimates/${selectedId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ setCurrent: true }),
+      await patchLeadEstimateById<{ error?: string }>(leadId, selectedId, {
+        setCurrent: true,
       });
-      const j = await parseResponseJson<{ error?: string }>(r);
-      if (!r.ok) throw new Error(j.error ?? "Помилка");
       await refreshList();
       router.refresh();
     } catch (e) {
@@ -1243,7 +1254,21 @@ export function LeadPricingWorkspaceClient({
   if (leadConverted) {
     return (
       <div className="rounded-xl border border-slate-200 bg-[var(--enver-card)] px-4 py-3 text-sm text-slate-700 shadow-sm">
-        Лід конвертовано в угоду — редагуйте смету в картці угоди.
+        <p className="font-medium text-[var(--enver-text)]">
+          Лід конвертовано в угоду
+        </p>
+        <p className="mt-1 text-xs leading-relaxed text-slate-600">
+          Актуальну смету, КП і договір ведіть у робочому місці угоди — там же
+          підпис і передача у виробництво.
+        </p>
+        {leadDealId ? (
+          <Link
+            href={`/deals/${leadDealId}/workspace`}
+            className="mt-2 inline-flex text-sm font-medium text-sky-700 underline hover:text-sky-900"
+          >
+            Відкрити угоду
+          </Link>
+        ) : null}
       </div>
     );
   }
@@ -1335,6 +1360,7 @@ export function LeadPricingWorkspaceClient({
           summaryHint={proposalSummaryHint}
           defaultSummary={proposalDefaultSummary}
           kpVisualizationRows={kpVisualizationRows}
+          leadImageUrls={leadImageUrlsForKp}
         />
       ) : null}
 
@@ -1864,6 +1890,16 @@ export function LeadPricingWorkspaceClient({
                       : undefined
                   }
                   onCatalogLinePick={applyKitchenCatalogHit}
+                  onKitchenPricingChange={
+                    canUpdate
+                      ? (clientMultiplier, markupPercent) =>
+                          updatePartitionKitchenPricing(
+                            blockKind,
+                            clientMultiplier,
+                            markupPercent,
+                          )
+                      : undefined
+                  }
                 />
               );
             })}

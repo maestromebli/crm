@@ -2,6 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import type { DealWorkspacePayload } from "../../features/deal-workspace/types";
+import { canSyncDealValueFromLatestEstimate } from "../../features/deal-workspace/deal-workspace-warnings";
+import { SyncDealValueFromEstimateButton } from "../../components/deal-workspace/SyncDealValueFromEstimateButton";
 import type { EstimateLineType } from "@prisma/client";
 import { cn } from "../../lib/utils";
 import {
@@ -115,15 +118,20 @@ function sectionSubtotal(lines: LineModel[], sectionId: string | null) {
     .reduce((a, l) => a + l.amountSale, 0);
 }
 
+export type DealEstimateWorkspaceProps = {
+  dealId: string;
+  dealTitle: string;
+  estimateVisibility: EstimateVisibility;
+  /** Для синхронізації суми угоди з сметою (кнопка над таблицею). */
+  workspacePayload?: DealWorkspacePayload;
+};
+
 export function DealEstimateWorkspace({
   dealId,
   dealTitle,
   estimateVisibility,
-}: {
-  dealId: string;
-  dealTitle: string;
-  estimateVisibility: EstimateVisibility;
-}) {
+  workspacePayload,
+}: DealEstimateWorkspaceProps) {
   const router = useRouter();
   const ws = useDealEstimateWorkspace(dealId);
   const [compareOpen, setCompareOpen] = useState(false);
@@ -227,8 +235,27 @@ export function DealEstimateWorkspace({
     );
   }
 
+  const showDealValueSync =
+    workspacePayload &&
+    ws.list.length > 0 &&
+    canSyncDealValueFromLatestEstimate(workspacePayload);
+
   return (
     <div className={cn("flex min-h-[calc(100vh-180px)] flex-col", bg)}>
+      {showDealValueSync ? (
+        <div className="mx-4 mt-2 shrink-0 rounded-xl border border-amber-200 bg-amber-50/95 px-3 py-2.5 shadow-sm">
+          <p className="text-[11px] leading-relaxed text-amber-950">
+            <span className="font-semibold">Сума в шапці угоди</span> не збігається з
+            останньою сметою (або не задана). Підставте для договору, КП та
+            звітів.
+          </p>
+          <SyncDealValueFromEstimateButton
+            data={workspacePayload}
+            tone="amber"
+            className="mt-2"
+          />
+        </div>
+      ) : null}
       {/* Sticky top bar */}
       <header className="sticky top-0 z-30 border-b border-[#E5E7EB] bg-[#FAFAFA]/95 px-4 py-3 backdrop-blur">
         <div className="flex flex-wrap items-center justify-between gap-3">

@@ -3,16 +3,17 @@
 import Link from "next/link";
 import { format } from "date-fns";
 import { uk } from "date-fns/locale";
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import type { DealWorkspaceMeta } from "../../features/deal-workspace/types";
 import type { DealWorkspacePayload } from "../../features/deal-workspace/types";
 import { deriveNextStepSeverity } from "../../features/deal-workspace/insights";
+import { useDealMutationActions } from "../../features/deal-workspace/use-deal-mutation-actions";
 import {
   derivePaymentMoneySummaryForPayload,
   derivePaymentStripSummaryForPayload,
 } from "../../features/deal-workspace/payment-aggregate";
 import { cn } from "../../lib/utils";
+import { SyncDealValueFromEstimateButton } from "./SyncDealValueFromEstimateButton";
 
 type Props = {
   data: DealWorkspacePayload;
@@ -54,7 +55,7 @@ export function DealWorkspaceHeader({
   systemNextHint,
   openEditSignal = 0,
 }: Props) {
-  const router = useRouter();
+  const dealActions = useDealMutationActions(data.deal.id);
   const { deal, client, primaryContact, owner, stage, meta } = data;
   const health = meta.health ?? "ok";
   const healthClass =
@@ -157,13 +158,7 @@ export function DealWorkspaceHeader({
       }
       dealBody.expectedCloseDate = closeDate.trim() ? closeDate : null;
 
-      const r1 = await fetch(`/api/deals/${deal.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(dealBody),
-      });
-      const j1 = (await r1.json().catch(() => ({}))) as { error?: string };
-      if (!r1.ok) throw new Error(j1.error ?? "Не вдалося зберегти угоду");
+      await dealActions.patchDeal(dealBody);
 
       const metaPatch: Record<string, unknown> = {
         subStatusLabel: subStatusLabel.trim() ? subStatusLabel.trim() : null,
@@ -182,16 +177,9 @@ export function DealWorkspaceHeader({
         })(),
       };
 
-      const r2 = await fetch(`/api/deals/${deal.id}/workspace-meta`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(metaPatch),
-      });
-      const j2 = (await r2.json().catch(() => ({}))) as { error?: string };
-      if (!r2.ok) throw new Error(j2.error ?? "Не вдалося зберегти метадані");
+      await dealActions.patchWorkspaceMeta(metaPatch);
 
       setOpen(false);
-      router.refresh();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Помилка");
     } finally {
@@ -200,13 +188,12 @@ export function DealWorkspaceHeader({
   }, [
     closeDate,
     currency,
-    deal.id,
+    dealActions,
     description,
     healthSel,
     nextActionAt,
     nextStepLabel,
     nextStepKind,
-    router,
     status,
     subStatusLabel,
     title,
@@ -293,9 +280,14 @@ export function DealWorkspaceHeader({
               {owner.name ?? owner.email}
             </p>
           </div>
-          <div className="text-right text-xs">
+          <div className="flex flex-col items-end text-right text-xs">
             <p className="text-slate-500">Сума</p>
             <p className="font-semibold text-[var(--enver-text)]">{valueStr}</p>
+            <SyncDealValueFromEstimateButton
+              data={data}
+              label="short"
+              className="mt-1.5 items-end"
+            />
           </div>
         </div>
       </div>

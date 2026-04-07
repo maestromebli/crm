@@ -1,4 +1,5 @@
 import type { EstimateLineType, Prisma } from "@prisma/client";
+import { newEstimateStableLineId } from "./new-stable-line-id";
 import { recalculateEstimateTotals } from "./recalculate";
 
 /** Рядок смети для нової версії (immutable fork). */
@@ -102,9 +103,7 @@ export async function forkLeadEstimateWithNewLines(
           amountCost: l.amountCost,
           margin: l.margin,
           sortOrder: l.sortOrder ?? idx,
-          ...(l.stableLineId?.trim()
-            ? { stableLineId: l.stableLineId.trim() }
-            : {}),
+          stableLineId: l.stableLineId?.trim() || newEstimateStableLineId(),
           ...(l.code != null ? { code: l.code } : {}),
           ...(l.supplierRef != null ? { supplierRef: l.supplierRef } : {}),
           ...(l.notes != null ? { notes: l.notes } : {}),

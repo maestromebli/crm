@@ -12,6 +12,8 @@ import { P } from "../../../../../lib/authz/permissions";
 import { prisma } from "../../../../../lib/prisma";
 import { saveLeadUploadPrivate } from "../../../../../lib/uploads/lead-disk-upload";
 import { scheduleFileAiProcessing } from "../../../../../features/ai/file-intelligence/process-file-extraction";
+import { CORE_EVENT_TYPES, publishEntityEvent } from "../../../../../lib/events/crm-events";
+import { recordWorkflowEvent, WORKFLOW_EVENT_TYPES } from "../../../../../features/event-system";
 
 type Ctx = { params: Promise<{ leadId: string }> };
 
@@ -139,6 +141,27 @@ export async function POST(req: Request, ctx: Ctx) {
         fileName: saved.originalName,
       },
     });
+    await publishEntityEvent({
+      type: CORE_EVENT_TYPES.FILE_UPLOADED,
+      entityType: "LEAD",
+      entityId: leadId,
+      userId: user.id,
+      payload: {
+        attachmentId: att.id,
+        category,
+        fileName: saved.originalName,
+      },
+    });
+    await recordWorkflowEvent(
+      WORKFLOW_EVENT_TYPES.FILE_UPLOADED,
+      { leadId, attachmentId: att.id },
+      {
+        entityType: "LEAD",
+        entityId: leadId,
+        userId: user.id,
+        dedupeKey: `file-uploaded:${att.id}`,
+      },
+    );
 
     revalidatePath("/leads");
     revalidatePath(`/leads/${leadId}`);

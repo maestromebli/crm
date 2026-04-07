@@ -7,6 +7,8 @@ import {
   canAccessCalendarEvent,
   resolveAccessContext,
 } from "../../../../../lib/authz/data-scope";
+import { recordWorkflowEvent, WORKFLOW_EVENT_TYPES } from "@/features/event-system";
+import type { CalendarEventStatus } from "@prisma/client";
 
 type Ctx = { params: Promise<{ eventId: string }> };
 
@@ -25,30 +27,59 @@ export async function PATCH(req: Request, ctx: Ctx) {
   if (denied) return denied;
 
   const { eventId } = await ctx.params;
-  let body: { startAt?: string; endAt?: string };
+  let body: { startAt?: string; endAt?: string; status?: string };
   try {
     body = (await req.json()) as typeof body;
   } catch {
     return NextResponse.json({ error: "Некоректний JSON" }, { status: 400 });
   }
 
-  const startAt =
-    typeof body.startAt === "string" ? new Date(body.startAt) : null;
-  const endAt = typeof body.endAt === "string" ? new Date(body.endAt) : null;
-  if (
-    !startAt ||
-    !endAt ||
-    Number.isNaN(startAt.getTime()) ||
-    Number.isNaN(endAt.getTime())
-  ) {
+  const hasStartAt = typeof body.startAt === "string";
+  const hasEndAt = typeof body.endAt === "string";
+  const hasStatus = typeof body.status === "string";
+
+  const startAt = hasStartAt ? new Date(body.startAt as string) : null;
+  const endAt = hasEndAt ? new Date(body.endAt as string) : null;
+
+  if ((hasStartAt && !hasEndAt) || (!hasStartAt && hasEndAt)) {
     return NextResponse.json(
-      { error: "Потрібні коректні startAt та endAt (ISO)" },
+      { error: "Потрібні обидва поля startAt та endAt" },
       { status: 400 },
     );
   }
-  if (endAt <= startAt) {
+  if (hasStartAt && hasEndAt) {
+    if (
+      !startAt ||
+      !endAt ||
+      Number.isNaN(startAt.getTime()) ||
+      Number.isNaN(endAt.getTime())
+    ) {
+      return NextResponse.json(
+        { error: "Потрібні коректні startAt та endAt (ISO)" },
+        { status: 400 },
+      );
+    }
+    if (endAt <= startAt) {
+      return NextResponse.json(
+        { error: "Кінець події має бути пізніше за початок" },
+        { status: 400 },
+      );
+    }
+  }
+
+  const allowedStatuses = new Set<CalendarEventStatus>([
+    "PLANNED",
+    "CONFIRMED",
+    "COMPLETED",
+    "CANCELED",
+  ]);
+  const nextStatusRaw = hasStatus ? (body.status as string).trim().toUpperCase() : null;
+  if (nextStatusRaw && !allowedStatuses.has(nextStatusRaw as CalendarEventStatus)) {
+    return NextResponse.json({ error: "Некоректний status" }, { status: 400 });
+  }
+  if (!hasStartAt && !hasEndAt && !nextStatusRaw) {
     return NextResponse.json(
-      { error: "Кінець події має бути пізніше за початок" },
+      { error: "Немає полів для оновлення" },
       { status: 400 },
     );
   }
@@ -58,6 +89,9 @@ export async function PATCH(req: Request, ctx: Ctx) {
       where: { id: eventId },
       select: {
         id: true,
+        type: true,
+        status: true,
+        leadId: true,
         createdById: true,
         assignedToId: true,
         lead: { select: { ownerId: true } },
@@ -76,10 +110,40 @@ export async function PATCH(req: Request, ctx: Ctx) {
       return NextResponse.json({ error: "Немає прав на зміну" }, { status: 403 });
     }
 
+    const data: {
+      startAt?: Date;
+      endAt?: Date;
+      status?: CalendarEventStatus;
+    } = {};
+    if (hasStartAt && hasEndAt && startAt && endAt) {
+      data.startAt = startAt;
+      data.endAt = endAt;
+    }
+    if (nextStatusRaw) {
+      data.status = nextStatusRaw as CalendarEventStatus;
+    }
+
     await prisma.calendarEvent.update({
       where: { id: eventId },
-      data: { startAt, endAt },
+      data,
     });
+    if (
+      existing.type === "MEASUREMENT" &&
+      existing.leadId &&
+      existing.status !== "COMPLETED" &&
+      data.status === "COMPLETED"
+    ) {
+      await recordWorkflowEvent(
+        WORKFLOW_EVENT_TYPES.MEASUREMENT_DONE,
+        { leadId: existing.leadId, eventId },
+        {
+          entityType: "LEAD",
+          entityId: existing.leadId,
+          userId: user.id,
+          dedupeKey: `measurement-done:${eventId}`,
+        },
+      );
+    }
 
     revalidatePath("/calendar");
     return NextResponse.json({ ok: true });

@@ -139,7 +139,7 @@ export function ErpBridgeProvider({ children }: { children: ReactNode }) {
       setState((prev) => ({
         ...prev,
         purchaseRequests: [
-          { id: makeId("prq"), status: "NEW", approvedBy: null, ...request },
+          { id: makeId("prq"), status: "NEW" as const, approvedBy: null, ...request },
           ...prev.purchaseRequests,
         ].slice(0, 200),
       }));
@@ -149,7 +149,7 @@ export function ErpBridgeProvider({ children }: { children: ReactNode }) {
       setState((prev) => ({
         ...prev,
         financeDocuments: [
-          { id: makeId("fdc"), status: "DRAFT", approvedBy: null, ...doc },
+          { id: makeId("fdc"), status: "DRAFT" as const, approvedBy: null, ...doc },
           ...prev.financeDocuments,
         ].slice(0, 200),
       }));

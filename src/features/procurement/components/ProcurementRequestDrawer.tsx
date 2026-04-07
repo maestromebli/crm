@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
 
@@ -16,8 +17,26 @@ type Line = {
   comment: string;
 };
 
-export function ProcurementRequestDrawer() {
-  const [open, setOpen] = useState(false);
+export type ProcurementRequestDrawerProps = {
+  /** Відкрити панель (наприклад `?newRequest=1` у URL). */
+  defaultOpen?: boolean;
+  /** Попередньо обрати угоду (`?dealId=` з робочого місця угоди). */
+  initialDealId?: string;
+};
+
+export function ProcurementRequestDrawer({
+  defaultOpen = false,
+  initialDealId,
+}: ProcurementRequestDrawerProps) {
+  const router = useRouter();
+  const [open, setOpen] = useState(defaultOpen);
+  const [dealId, setDealId] = useState(initialDealId?.trim() ?? "");
+  const [deals, setDeals] = useState<Array<{ id: string; title: string }>>([]);
+  const [neededByDate, setNeededByDate] = useState("");
+  const [priority, setPriority] = useState("MEDIUM");
+  const [headerComment, setHeaderComment] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [lines, setLines] = useState<Line[]>([
     {
       category: "ДСП",
@@ -32,10 +51,81 @@ export function ProcurementRequestDrawer() {
     },
   ]);
 
+  useEffect(() => {
+    if (defaultOpen) setOpen(true);
+  }, [defaultOpen]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const r = await fetch("/api/crm/procurement/deals");
+        const j = (await r.json()) as { deals?: Array<{ id: string; title: string }> };
+        if (!cancelled && r.ok && j.deals) setDeals(j.deals);
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const id = initialDealId?.trim();
+    if (!id) return;
+    if (deals.length === 0) {
+      setDealId(id);
+      return;
+    }
+    if (deals.some((d) => d.id === id)) setDealId(id);
+  }, [initialDealId, deals]);
+
   const total = useMemo(
     () => lines.reduce((acc, l) => acc + l.qty * l.plannedUnitCost, 0),
     [lines],
   );
+
+  async function submit() {
+    setError(null);
+    if (!dealId.trim()) {
+      setError("Оберіть угоду (проєкт).");
+      return;
+    }
+    const payloadLines = lines
+      .filter((l) => l.name.trim().length > 0)
+      .map((l) => ({
+        name: l.name.trim(),
+        qty: l.qty,
+        plannedUnitCost: l.plannedUnitCost,
+      }));
+    if (payloadLines.length === 0) {
+      setError("Додайте хоча б одну позицію з назвою.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const r = await fetch("/api/crm/procurement/requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          dealId: dealId.trim(),
+          lines: payloadLines,
+          neededByDate: neededByDate || null,
+          priority,
+          comment: headerComment || null,
+        }),
+      });
+      const j = (await r.json()) as { error?: string };
+      if (!r.ok) throw new Error(j.error ?? "Не вдалося зберегти");
+      setOpen(false);
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Помилка");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <>
@@ -44,7 +134,7 @@ export function ProcurementRequestDrawer() {
       </Button>
       {open ? (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/30">
-          <div className="h-full w-full max-w-3xl overflow-y-auto bg-white p-4">
+          <div className="h-full w-full max-w-3xl overflow-y-auto bg-[var(--enver-card)] p-4">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-sm font-semibold">Нова заявка на закупку</h3>
               <Button variant="outline" size="sm" onClick={() => setOpen(false)}>
@@ -52,12 +142,65 @@ export function ProcurementRequestDrawer() {
               </Button>
             </div>
 
-            <div className="grid gap-2 md:grid-cols-3">
-              <Input placeholder="Проєкт" className="h-9 text-xs" />
-              <Input placeholder="Обʼєкт (опц.)" className="h-9 text-xs" />
-              <Input type="date" className="h-9 text-xs" />
+            {error ? (
+              <div className="mb-2 rounded border border-rose-200 bg-rose-50 px-2 py-1.5 text-xs text-rose-900">
+                {error}
+              </div>
+            ) : null}
+
+            <label className="block text-[11px] font-medium text-slate-600">Угода (проєкт)</label>
+            <select
+              className="mt-1 w-full rounded-md border border-slate-200 bg-white px-2 py-2 text-xs"
+              value={dealId}
+              onChange={(e) => setDealId(e.target.value)}
+            >
+              <option value="">— Оберіть угоду —</option>
+              {deals.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.title}
+                </option>
+              ))}
+            </select>
+            {deals.length === 0 ? (
+              <p className="mt-1 text-[11px] text-amber-800">
+                Список угод порожній або БД недоступна. Перевірте підключення та наявність угод у CRM.
+              </p>
+            ) : null}
+
+            <div className="mt-3 grid gap-2 md:grid-cols-3">
+              <div>
+                <label className="text-[11px] text-slate-600">Потрібно до</label>
+                <Input
+                  type="date"
+                  className="mt-1 h-9 text-xs"
+                  value={neededByDate}
+                  onChange={(e) => setNeededByDate(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="text-[11px] text-slate-600">Пріоритет</label>
+                <select
+                  className="mt-1 w-full rounded-md border border-slate-200 px-2 py-2 text-xs"
+                  value={priority}
+                  onChange={(e) => setPriority(e.target.value)}
+                >
+                  <option value="LOW">Низький</option>
+                  <option value="MEDIUM">Середній</option>
+                  <option value="HIGH">Високий</option>
+                  <option value="CRITICAL">Критичний</option>
+                </select>
+              </div>
+              <div className="md:col-span-1" />
             </div>
-            <Input placeholder="Коментар" className="mt-2 h-9 text-xs" />
+            <div className="mt-2">
+              <label className="text-[11px] text-slate-600">Коментар до заявки</label>
+              <Input
+                placeholder="Контекст для закупівель"
+                className="mt-1 h-9 text-xs"
+                value={headerComment}
+                onChange={(e) => setHeaderComment(e.target.value)}
+              />
+            </div>
 
             <div className="mt-4 space-y-2">
               {lines.map((line, idx) => (
@@ -72,33 +215,56 @@ export function ProcurementRequestDrawer() {
                     }}
                     placeholder="Категорія"
                   />
-                  <Input className="md:col-span-2 h-8 text-xs" value={line.name} onChange={(e) => {
-                    const next = [...lines];
-                    next[idx].name = e.target.value;
-                    setLines(next);
-                  }} placeholder="Позиція" />
-                  <Input className="md:col-span-1 h-8 text-xs" value={line.unit} onChange={(e) => {
-                    const next = [...lines];
-                    next[idx].unit = e.target.value;
-                    setLines(next);
-                  }} placeholder="Од." />
-                  <Input className="md:col-span-1 h-8 text-xs" type="number" value={line.qty} onChange={(e) => {
-                    const next = [...lines];
-                    next[idx].qty = Number(e.target.value);
-                    setLines(next);
-                  }} placeholder="Qty" />
-                  <Input className="md:col-span-2 h-8 text-xs" type="number" value={line.plannedUnitCost} onChange={(e) => {
-                    const next = [...lines];
-                    next[idx].plannedUnitCost = Number(e.target.value);
-                    setLines(next);
-                  }} placeholder="План / од." />
+                  <Input
+                    className="md:col-span-2 h-8 text-xs"
+                    value={line.name}
+                    onChange={(e) => {
+                      const next = [...lines];
+                      next[idx].name = e.target.value;
+                      setLines(next);
+                    }}
+                    placeholder="Позиція"
+                  />
+                  <Input
+                    className="md:col-span-1 h-8 text-xs"
+                    value={line.unit}
+                    onChange={(e) => {
+                      const next = [...lines];
+                      next[idx].unit = e.target.value;
+                      setLines(next);
+                    }}
+                    placeholder="Од."
+                  />
+                  <Input
+                    className="md:col-span-1 h-8 text-xs"
+                    type="number"
+                    value={line.qty}
+                    onChange={(e) => {
+                      const next = [...lines];
+                      next[idx].qty = Number(e.target.value);
+                      setLines(next);
+                    }}
+                    placeholder="К-сть"
+                  />
+                  <Input
+                    className="md:col-span-2 h-8 text-xs"
+                    type="number"
+                    value={line.plannedUnitCost}
+                    onChange={(e) => {
+                      const next = [...lines];
+                      next[idx].plannedUnitCost = Number(e.target.value);
+                      setLines(next);
+                    }}
+                    placeholder="План / од."
+                  />
                   <div className="md:col-span-2 flex items-center rounded border border-slate-200 px-2 text-xs">
-                    {(line.qty * line.plannedUnitCost).toLocaleString("uk-UA")} UAH
+                    {(line.qty * line.plannedUnitCost).toLocaleString("uk-UA")} грн
                   </div>
                   <Button
                     variant="outline"
                     size="sm"
                     className="md:col-span-2"
+                    type="button"
                     onClick={() => setLines(lines.filter((_, i) => i !== idx))}
                   >
                     Видалити
@@ -107,10 +273,11 @@ export function ProcurementRequestDrawer() {
               ))}
             </div>
 
-            <div className="mt-3 flex items-center justify-between">
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
               <Button
                 variant="outline"
                 size="sm"
+                type="button"
                 onClick={() =>
                   setLines([
                     ...lines,
@@ -130,7 +297,16 @@ export function ProcurementRequestDrawer() {
               >
                 Додати рядок
               </Button>
-              <div className="text-sm font-semibold">Разом план: {total.toLocaleString("uk-UA")} UAH</div>
+              <div className="text-sm font-semibold">Разом план: {total.toLocaleString("uk-UA")} грн</div>
+            </div>
+
+            <div className="mt-4 flex justify-end gap-2 border-t border-slate-200 pt-3">
+              <Button variant="outline" size="sm" type="button" onClick={() => setOpen(false)}>
+                Скасувати
+              </Button>
+              <Button size="sm" type="button" disabled={saving} onClick={() => void submit()}>
+                {saving ? "Збереження…" : "Зберегти заявку"}
+              </Button>
             </div>
           </div>
         </div>
@@ -138,4 +314,3 @@ export function ProcurementRequestDrawer() {
     </>
   );
 }
-

@@ -110,7 +110,7 @@ export async function POST(request: Request) {
   }
 
   const gen = await generateConversationInsight({ transcript });
-  if (!gen.ok) {
+  if (gen.ok === false) {
     return NextResponse.json({ error: gen.error }, { status: 503 });
   }
 

@@ -2,8 +2,11 @@
 
 import { format } from "date-fns";
 import { uk } from "date-fns/locale";
-import { useRouter } from "next/navigation";
-import { useCallback, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { dealQueryKeys } from "../../features/deal-workspace/deal-query-keys";
+import { useDealMutationActions } from "../../features/deal-workspace/use-deal-mutation-actions";
+import { patchDealPaymentMilestoneByDealId } from "../../features/deal-workspace/use-deal-mutation-actions";
 import type { DealWorkspacePayload } from "../../features/deal-workspace/types";
 import type { DealWorkspaceTabId } from "../../features/deal-workspace/types";
 import {
@@ -21,23 +24,15 @@ type Props = {
 const card =
   "rounded-2xl border border-slate-200 bg-[var(--enver-card)] px-4 py-3 text-xs shadow-sm shadow-slate-900/5";
 
-async function patchWorkspaceMeta(
-  dealId: string,
-  patch: Record<string, unknown>,
-): Promise<void> {
-  const r = await fetch(`/api/deals/${dealId}/workspace-meta`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(patch),
-  });
-  const j = (await r.json().catch(() => ({}))) as { error?: string };
-  if (!r.ok) throw new Error(j.error ?? "Помилка збереження");
-}
-
 export function DealWorkspaceExecutionBlocks({ data, onTab }: Props) {
-  const router = useRouter();
+  const queryClient = useQueryClient();
+  const dealActions = useDealMutationActions(data.deal.id);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [techState, setTechState] = useState(data.meta.technicalChecklist ?? {});
+  const [milestonesState, setMilestonesState] = useState(() =>
+    getEffectivePaymentMilestones(data),
+  );
 
   const snap = data.commercialSnapshot;
   const snapTotal = useMemo(() => {
@@ -47,9 +42,9 @@ export function DealWorkspaceExecutionBlocks({ data, onTab }: Props) {
   }, [snap]);
 
   const pay = derivePaymentMoneySummaryForPayload(data);
-  const milestones = getEffectivePaymentMilestones(data);
+  const milestones = milestonesState;
 
-  const tech = data.meta.technicalChecklist ?? {};
+  const tech = techState;
   const techKeys = [
     {
       k: "finalDimensionsConfirmed" as const,
@@ -68,50 +63,59 @@ export function DealWorkspaceExecutionBlocks({ data, onTab }: Props) {
     },
   ];
 
+  useEffect(() => {
+    setTechState(data.meta.technicalChecklist ?? {});
+    setMilestonesState(getEffectivePaymentMilestones(data));
+  }, [data]);
+
   const toggleTech = useCallback(
     async (key: (typeof techKeys)[number]["k"]) => {
       setBusy(true);
       setErr(null);
+      const prevTech = techState;
+      const nextTech = {
+        ...techState,
+        [key]: !Boolean(techState[key]),
+      };
+      setTechState(nextTech);
       try {
-        await patchWorkspaceMeta(data.deal.id, {
-          technicalChecklist: {
-            ...data.meta.technicalChecklist,
-            [key]: !tech[key],
-          },
+        await dealActions.patchWorkspaceMeta({
+          technicalChecklist: nextTech,
         });
-        router.refresh();
+        void queryClient.invalidateQueries({
+          queryKey: dealQueryKeys.workspace(data.deal.id),
+        });
       } catch (e) {
+        setTechState(prevTech);
         setErr(e instanceof Error ? e.message : "Помилка");
       } finally {
         setBusy(false);
       }
     },
-    [data.deal.id, data.meta.technicalChecklist, tech, router],
+    [data.deal.id, dealActions, queryClient, techState],
   );
 
   const toggleMilestone = useCallback(
     async (id: string, done: boolean) => {
       setBusy(true);
       setErr(null);
+      const prevMilestones = milestonesState;
+      setMilestonesState((current) =>
+        current.map((m) => (m.id === id ? { ...m, done: !done } : m)),
+      );
       try {
-        const r = await fetch(
-          `/api/deals/${data.deal.id}/payment-milestones`,
-          {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ milestoneId: id, confirmed: !done }),
-          },
-        );
-        const j = (await r.json().catch(() => ({}))) as { error?: string };
-        if (!r.ok) throw new Error(j.error ?? "Помилка");
-        router.refresh();
+        await patchDealPaymentMilestoneByDealId(data.deal.id, id, !done);
+        void queryClient.invalidateQueries({
+          queryKey: dealQueryKeys.workspace(data.deal.id),
+        });
       } catch (e) {
+        setMilestonesState(prevMilestones);
         setErr(e instanceof Error ? e.message : "Помилка");
       } finally {
         setBusy(false);
       }
     },
-    [data.deal.id, router],
+    [data.deal.id, milestonesState, queryClient],
   );
 
   const cm = data.controlMeasurement;

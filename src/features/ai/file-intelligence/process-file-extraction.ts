@@ -1,8 +1,5 @@
 import { readFile } from "node:fs/promises";
-import type {
-  AiDetectedFileCategory,
-  AiFileProcessingStatus,
-} from "@prisma/client";
+import type { AiDetectedFileCategory, AiFileProcessingStatus } from "@prisma/client";
 import { prisma } from "../../../lib/prisma";
 import { logAiEvent } from "../../../lib/ai/log-ai-event";
 import { resolveAttachmentAbsolutePath } from "../../../lib/uploads/lead-disk-upload";

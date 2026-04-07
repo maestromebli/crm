@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { useLeadMutationActions } from "../../features/leads/use-lead-mutation-actions";
 import type { LeadDetailRow } from "../../features/leads/queries";
 import { LeadAiManagerPanel } from "./LeadAiManagerPanel";
 
@@ -18,8 +19,8 @@ export function LeadDetailOverviewClient({
   canConvertToDeal,
 }: Props) {
   const router = useRouter();
+  const leadActions = useLeadMutationActions(lead.id);
   const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [converting, setConverting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -39,7 +40,7 @@ export function LeadDetailOverviewClient({
   const [note, setNote] = useState(lead.note ?? "");
   const [dealTitleDraft, setDealTitleDraft] = useState(lead.title);
   const [quickStageId, setQuickStageId] = useState(lead.stageId);
-  const [quickStageSaving, setQuickStageSaving] = useState(false);
+  const patchBusy = leadActions.isPending;
 
   useEffect(() => {
     setQuickStageId(lead.stageId);
@@ -59,55 +60,33 @@ export function LeadDetailOverviewClient({
   }, [lead]);
 
   const save = async () => {
-    setSaving(true);
     setErr(null);
     try {
-      const r = await fetch(`/api/leads/${lead.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title,
-          source,
-          priority,
-          stageId,
-          contactName: contactName.trim() || null,
-          phone: phone.trim() || null,
-          email: email.trim() || null,
-          note: note.trim() || null,
-        }),
+      await leadActions.patch({
+        title,
+        source,
+        priority,
+        stageId,
+        contactName: contactName.trim() || null,
+        phone: phone.trim() || null,
+        email: email.trim() || null,
+        note: note.trim() || null,
       });
-      const data = (await r.json()) as { error?: string };
-      if (!r.ok) {
-        setErr(data.error ?? "Помилка збереження");
-        return;
-      }
       setEditing(false);
-      router.refresh();
-    } finally {
-      setSaving(false);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Помилка збереження");
     }
   };
 
   const saveQuickStage = async (nextId: string) => {
     if (nextId === lead.stageId) return;
-    setQuickStageSaving(true);
     setErr(null);
     try {
-      const r = await fetch(`/api/leads/${lead.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ stageId: nextId }),
-      });
-      const data = (await r.json()) as { error?: string };
-      if (!r.ok) {
-        setErr(data.error ?? "Не вдалося змінити стадію");
-        setQuickStageId(lead.stageId);
-        return;
-      }
+      await leadActions.updateStage(nextId);
       setQuickStageId(nextId);
-      router.refresh();
-    } finally {
-      setQuickStageSaving(false);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Не вдалося змінити стадію");
+      setQuickStageId(lead.stageId);
     }
   };
 
@@ -220,7 +199,7 @@ export function LeadDetailOverviewClient({
               <div className="flex gap-2">
                 <button
                   type="button"
-                  disabled={saving}
+                  disabled={patchBusy}
                   onClick={() => {
                     resetForm();
                     setEditing(false);
@@ -231,11 +210,11 @@ export function LeadDetailOverviewClient({
                 </button>
                 <button
                   type="button"
-                  disabled={saving}
+                  disabled={patchBusy}
                   onClick={save}
                   className="rounded-lg bg-slate-900 px-2 py-1 text-[11px] font-medium text-white hover:bg-slate-800 disabled:opacity-50"
                 >
-                  {saving ? "Збереження…" : "Зберегти"}
+                  {patchBusy ? "Збереження…" : "Зберегти"}
                 </button>
               </div>
             ) : (
@@ -374,7 +353,7 @@ export function LeadDetailOverviewClient({
                   <div className="mt-1 flex max-w-md flex-col gap-1">
                     <select
                       value={quickStageId}
-                      disabled={quickStageSaving}
+                      disabled={patchBusy}
                       onChange={(e) => {
                         const v = e.target.value;
                         setQuickStageId(v);

@@ -93,11 +93,7 @@ export async function runAiOperation(params: {
     if (!dealId || !CUID.test(dealId)) {
       return fail("Некоректний dealId", 400);
     }
-    const data = await getDealWorkspacePayload(dealId, ctx, {
-      permissionKeys: user.permissionKeys,
-      realRole: user.realRole,
-      impersonatorId: user.impersonatorId,
-    });
+    const data = await getDealWorkspacePayload(dealId, ctx);
     if (!data) {
       return fail("Угоду не знайдено", 404);
     }

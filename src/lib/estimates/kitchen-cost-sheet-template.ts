@@ -37,6 +37,10 @@ export type KitchenSheetMetadata = {
   rowStyle?: "tan" | "orange";
   /** Користувацька назва всієї таблиці (перекриває шаблон за типом блоку) */
   tableTitle?: string;
+  /** Коефіцієнт до клієнтської ціни по матеріалах (типово 2.1). */
+  kitchenClientPriceMultiplier?: number;
+  /** Націнка на матеріали, % від собівартості матеріалів (типово 110). */
+  kitchenMaterialMarkupPercent?: number;
 };
 
 type TemplateRow = {
@@ -69,20 +73,22 @@ const TEMPLATE_META: Record<FurnitureTemplateKey, TemplateMeta> = {
       { id: "facades", label: "Фасади та профілі", icon: "🚪" },
       { id: "hardware", label: "Фурнітура", icon: "⚙️" },
       { id: "services", label: "Сервіс", icon: "🛠️" },
+      { id: "extra", label: "Додаткові позиції", icon: "➕" },
     ],
     rows: [
       { groupId: "boards", productName: "ДСП Kronospan K 086 PW Гікорі Рокфорд натуральний", qty: 4, coefficient: 1.3, unit: "лист", unitPrice: 3050, type: "PRODUCT", role: "material" },
       { groupId: "boards", productName: "ДСП лам. Swiss Krono U570 VL Білий Фарфор", qty: 7, coefficient: 1.3, unit: "лист", unitPrice: 3000, type: "PRODUCT", role: "material" },
-      { groupId: "boards", productName: "ЛХДФ 3мм лист", qty: 4, coefficient: 1, unit: "лист", unitPrice: 1150, type: "PRODUCT", role: "material" },
-      { groupId: "boards", productName: "МДФ", qty: 11, coefficient: 1, unit: "лист", unitPrice: 3200, type: "PRODUCT", role: "material" },
-      { groupId: "facades", productName: "Ручка Гола", qty: 6, coefficient: 1, unit: "шт", unitPrice: 600, type: "PRODUCT", role: "material" },
-      { groupId: "facades", productName: "Ручка Гола верх", qty: 4, coefficient: 1, unit: "шт", unitPrice: 400, type: "PRODUCT", role: "material" },
+      { groupId: "boards", productName: "ЛХДФ 3 мм (лист)", qty: 4, coefficient: 1, unit: "лист", unitPrice: 1150, type: "PRODUCT", role: "material" },
+      { groupId: "boards", productName: "МДФ (лист)", qty: 11, coefficient: 1, unit: "лист", unitPrice: 3200, type: "PRODUCT", role: "material" },
+      { groupId: "facades", productName: "Ручка «Гола» (нижні)", qty: 6, coefficient: 1, unit: "шт", unitPrice: 600, type: "PRODUCT", role: "material" },
+      { groupId: "facades", productName: "Ручка «Гола» (верхні)", qty: 4, coefficient: 1, unit: "шт", unitPrice: 400, type: "PRODUCT", role: "material" },
       { groupId: "hardware", productName: "Тандеми повні", qty: 7, coefficient: 1, unit: "компл", unitPrice: 1500, type: "PRODUCT", role: "material", rowStyle: "tan" },
-      { groupId: "hardware", productName: "Сушка", qty: 1, coefficient: 1, unit: "компл", unitPrice: 2000, type: "PRODUCT", role: "material", rowStyle: "tan" },
-      { groupId: "hardware", productName: "Петли Блюм з доводчиком", qty: 18, coefficient: 1, unit: "шт", unitPrice: 120, type: "PRODUCT", role: "material" },
-      { groupId: "services", productName: "Расходники (клей, метизи…)", qty: 1, coefficient: 1, unit: "компл", unitPrice: 5000, type: "PRODUCT", role: "material" },
-      { groupId: "services", productName: "Товарно-транспортные расходы", qty: 1, coefficient: 1, unit: "компл", unitPrice: 5000, type: "PRODUCT", role: "material" },
-      { groupId: "services", productName: "Замер", qty: 1, coefficient: 1, unit: "компл", unitPrice: 1500, type: "SERVICE", role: "measurement", rowStyle: "orange" },
+      { groupId: "hardware", productName: "Сушка для посуду", qty: 1, coefficient: 1, unit: "компл", unitPrice: 2000, type: "PRODUCT", role: "material", rowStyle: "tan" },
+      { groupId: "hardware", productName: "Петлі Blum з доводчиком", qty: 18, coefficient: 1, unit: "шт", unitPrice: 120, type: "PRODUCT", role: "material" },
+      { groupId: "services", productName: "Розхідники (клей, кріплення…)", qty: 1, coefficient: 1, unit: "компл", unitPrice: 5000, type: "PRODUCT", role: "material" },
+      { groupId: "services", productName: "Транспортні витрати", qty: 1, coefficient: 1, unit: "компл", unitPrice: 5000, type: "PRODUCT", role: "material" },
+      { groupId: "services", productName: "Замір", qty: 1, coefficient: 1, unit: "компл", unitPrice: 1500, type: "SERVICE", role: "measurement", rowStyle: "orange" },
+      { groupId: "extra", productName: "Кастомна позиція — назва та ціна", qty: 1, coefficient: 1, unit: "шт", unitPrice: 0, type: "PRODUCT", role: "material" },
     ],
   },
   kitchen_island: {
@@ -216,6 +222,18 @@ export function buildFurnitureSheetLinesForDb(
 
 export function buildKitchenSheetLinesForDb(): KitchenLineForDb[] {
   return buildFurnitureSheetLinesForDb(KITCHEN_NO_COUNTER_TEMPLATE_KEY);
+}
+
+/**
+ * Ключ детальної таблиці для кнопки «Додати блок» (kitchen → повна специфікація без стільниці).
+ */
+export function sheetTemplateKeyFromBlockKind(
+  blockKind: FurnitureBlockKind,
+): FurnitureTemplateKey {
+  if (blockKind === "kitchen") return KITCHEN_NO_COUNTER_TEMPLATE_KEY;
+  const sheetKeys = new Set<string>(FURNITURE_TEMPLATE_KEYS);
+  if (sheetKeys.has(blockKind)) return blockKind as FurnitureTemplateKey;
+  return KITCHEN_NO_COUNTER_TEMPLATE_KEY;
 }
 
 export function sumMaterialRowsFromKitchenLines(

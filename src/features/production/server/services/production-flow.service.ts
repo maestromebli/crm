@@ -1,11 +1,18 @@
-import { Prisma } from "@prisma/client";
+import { Prisma, type ProductionFlow } from "@prisma/client";
 import { randomBytes } from "node:crypto";
 import { prisma } from "@/lib/prisma";
+import { parseHandoffManifest } from "@/lib/deals/document-templates";
 import { computeReadinessPercent, computeRiskScore } from "./production-metrics.service";
 import { PRODUCTION_STEP_SEQUENCE } from "./production-step.service";
 import { refreshFlowAiInsights } from "./production-ai.service";
 
 type Actor = { actorName: string };
+
+export type CreateProductionFlowFromDealHandoffResult = {
+  flow: ProductionFlow;
+  /** Скільки файлів з пакета передачі скопійовано в потік; null якщо імпорт не виконувався */
+  handoffImportedFileCount: number | null;
+};
 
 function buildConstructorWorkspaceUrl(token?: string | null): string {
   if (token && token.trim()) return `/constructor/${token.trim()}`;
@@ -100,11 +107,104 @@ export async function recomputeFlowMetrics(flowId: string) {
   });
 }
 
+const HANDOFF_IMPORT_PACKAGE_NAME = "Передача з угоди";
+
+/**
+ * Копіює обрані у пакеті передачі файли угоди в перший пакет виробничого потоку.
+ * Не змінює кроки пайплайну (на відміну від registerFilePackage).
+ * Ідемпотентно: якщо пакет з такою назвою вже є — нічого не робить.
+ */
+export async function importDealHandoffFilesToProductionFlowIfMissing(input: {
+  flowId: string;
+  dealId: string;
+  actorName: string;
+}): Promise<{ fileCount: number } | null> {
+  const dup = await prisma.productionFilePackage.findFirst({
+    where: { flowId: input.flowId, packageName: HANDOFF_IMPORT_PACKAGE_NAME },
+    select: { id: true },
+  });
+  if (dup) return null;
+
+  const handoff = await prisma.dealHandoff.findUnique({
+    where: { dealId: input.dealId },
+    select: { manifestJson: true },
+  });
+  const manifest = parseHandoffManifest(handoff?.manifestJson);
+  const ids = [...new Set(manifest.selectedAttachmentIds)];
+  const assetIds = [...new Set(manifest.selectedFileAssetIds)];
+
+  const where: Prisma.AttachmentWhereInput = {
+    entityType: "DEAL",
+    entityId: input.dealId,
+    deletedAt: null,
+  };
+  if (ids.length > 0 && assetIds.length > 0) {
+    where.OR = [
+      { id: { in: ids } },
+      { fileAssetId: { in: assetIds }, isCurrentVersion: true },
+    ];
+  } else if (ids.length > 0) {
+    where.id = { in: ids };
+  } else if (assetIds.length > 0) {
+    where.fileAssetId = { in: assetIds };
+    where.isCurrentVersion = true;
+  } else {
+    return null;
+  }
+
+  const rows = await prisma.attachment.findMany({
+    where,
+    select: {
+      id: true,
+      fileName: true,
+      fileUrl: true,
+      mimeType: true,
+      category: true,
+    },
+  });
+  const unique = [...new Map(rows.map((r) => [r.id, r])).values()];
+  if (unique.length === 0) return null;
+
+  const versionLabel = new Date().toISOString().slice(0, 10);
+
+  await prisma.productionFilePackage.create({
+    data: {
+      flowId: input.flowId,
+      packageName: HANDOFF_IMPORT_PACKAGE_NAME,
+      versionLabel,
+      packageTypeTags: ["HANDOFF", "DEAL_IMPORT"],
+      note: "Автоматичний імпорт файлів, обраних у пакеті передачі угоди.",
+      uploadedByName: input.actorName,
+      files: {
+        create: unique.map((a) => ({
+          fileName: a.fileName,
+          fileType: a.mimeType ?? null,
+          fileUrl: a.fileUrl,
+          metadataJson: {
+            source: "DEAL_HANDOFF",
+            dealAttachmentId: a.id,
+            category: a.category,
+          } as Prisma.InputJsonValue,
+        })),
+      },
+    },
+  });
+
+  await createEvent({
+    flowId: input.flowId,
+    type: "HANDOFF_FILES_IMPORTED",
+    title: "Файли з угоди додано до потоку",
+    description: `${unique.length} файл(ів) з пакета передачі.`,
+    actorName: input.actorName,
+  });
+  return { fileCount: unique.length };
+}
+
 export async function createProductionFlowFromDealHandoff(input: {
   dealId: string;
   actorName: string;
   defaultChiefUserId?: string | null;
-}) {
+}): Promise<CreateProductionFlowFromDealHandoffResult> {
   const deal = await prisma.deal.findUnique({
     where: { id: input.dealId },
     select: {
@@ -118,7 +218,19 @@ export async function createProductionFlowFromDealHandoff(input: {
   if (!deal) throw new Error("Угоду не знайдено");
 
   const existing = await prisma.productionFlow.findUnique({ where: { dealId: input.dealId } });
-  if (existing) return existing;
+  if (existing) {
+    const imported = await importDealHandoffFilesToProductionFlowIfMissing({
+      flowId: existing.id,
+      dealId: input.dealId,
+      actorName: input.actorName,
+    });
+    await recomputeFlowMetrics(existing.id);
+    if (imported) await refreshFlowAiInsights(existing.id);
+    return {
+      flow: existing,
+      handoffImportedFileCount: imported?.fileCount ?? null,
+    };
+  }
 
   const count = await prisma.productionFlow.count();
   const number = `PR-${String(count + 1).padStart(3, "0")}`;
@@ -151,8 +263,17 @@ export async function createProductionFlowFromDealHandoff(input: {
     description: `Потік ${number} готовий до прийняття в роботу.`,
     actorName: input.actorName,
   });
+  const imported = await importDealHandoffFilesToProductionFlowIfMissing({
+    flowId: flow.id,
+    dealId: input.dealId,
+    actorName: input.actorName,
+  });
   await recomputeFlowMetrics(flow.id);
-  return flow;
+  if (imported) await refreshFlowAiInsights(flow.id);
+  return {
+    flow,
+    handoffImportedFileCount: imported?.fileCount ?? null,
+  };
 }
 
 async function moveToStep(flowId: string, step: (typeof PRODUCTION_STEP_SEQUENCE)[number]) {

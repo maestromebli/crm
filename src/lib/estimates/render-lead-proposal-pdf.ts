@@ -1,4 +1,5 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import type { QuotePrintModel } from "../leads/lead-proposal-document";
 
 export type LeadProposalPdfInput = {
   leadTitle: string;
@@ -115,4 +116,28 @@ export async function renderLeadProposalPdf(
   });
 
   return doc.save();
+}
+
+/**
+ * PDF з повної моделі друку КП (груповані позиції з `buildQuotePrintModelFromEntities`).
+ */
+export async function renderLeadProposalPdfFromModel(
+  model: QuotePrintModel,
+): Promise<Uint8Array> {
+  const lines = model.rows.map((r) => ({
+    name: r.title,
+    qty: r.quantity,
+    unit: "шт",
+    amount: r.lineTotal,
+  }));
+  return renderLeadProposalPdf({
+    leadTitle: model.objectLine || model.docTitle,
+    proposalTitle: model.docTitle,
+    proposalVersion: model.proposalVersion,
+    estimateVersion: model.estimateVersion,
+    total: model.totals.total,
+    currency: model.currencyLabel || "грн",
+    lines,
+    summary: model.summary,
+  });
 }

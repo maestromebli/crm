@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
+import { useLeadMutationActions } from "../../features/leads/use-lead-mutation-actions";
 import type { LeadDetailRow } from "../../features/leads/queries";
 import { parseJsonResponse } from "../../lib/http/parse-json-response";
 import { cn } from "../../lib/utils";
@@ -40,6 +41,7 @@ export function LeadAiManagerPanel({
   compact,
 }: Props) {
   const router = useRouter();
+  const leadActions = useLeadMutationActions(lead.id);
   const [loading, setLoading] = useState(false);
   const [applyLoading, setApplyLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -79,13 +81,7 @@ export function LeadAiManagerPanel({
     setApplyLoading(true);
     setErr(null);
     try {
-      const r = await fetch(`/api/leads/${lead.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ stageId: insight.recommendedStageId }),
-      });
-      const j = await parseJsonResponse<{ error?: string }>(r);
-      if (!r.ok) throw new Error(j.error ?? "Не вдалося змінити стадію");
+      await leadActions.updateStage(insight.recommendedStageId);
       setInsight((prev) =>
         prev
           ? {
@@ -97,13 +93,12 @@ export function LeadAiManagerPanel({
             }
           : prev,
       );
-      router.refresh();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Помилка");
     } finally {
       setApplyLoading(false);
     }
-  }, [canUpdateLead, insight, lead.id, lead.stageId, router]);
+  }, [canUpdateLead, insight, lead.stageId, leadActions]);
 
   const wrap = cn(
     "rounded-2xl border border-violet-200/80 bg-gradient-to-b from-violet-50/90 to-white p-4 shadow-sm",

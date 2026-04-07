@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { KanbanBoardSkeleton } from "@/components/shared/KanbanBoardSkeleton";
+import { KanbanEmptyColumn } from "@/components/shared/KanbanEmptyColumn";
 import type { ProductionCommandCenterView } from "../../types/production";
 import { MINI_HQ_STANDARDS, workshopMaterialsPanelTitle } from "../../workshop-mini-hq-standards";
 import {
@@ -20,6 +22,7 @@ import {
   workshopStageHref,
   type WorkshopKanbanStageKey,
 } from "../../workshop-stages";
+import { tryReadResponseJson } from "@/lib/http/read-response-json";
 
 type KanbanColumn = ProductionCommandCenterView["workshopKanban"][number];
 type WorkshopTask = KanbanColumn["tasks"][number];
@@ -27,23 +30,42 @@ type WorkshopStageKey = KanbanColumn["stageKey"];
 
 type AssigneeOption = { id: string; name: string | null; email: string | null; role: string };
 
+const PRIORITY_RANK: Record<WorkshopTask["priority"], number> = {
+  URGENT: 0,
+  HIGH: 1,
+  NORMAL: 2,
+  LOW: 3,
+};
+
+/** Прострочені та найближчі дедлайни зверху, далі — пріоритет. */
+function sortWorkshopTasks(tasks: WorkshopTask[], nowMs: number): WorkshopTask[] {
+  return [...tasks].sort((a, b) => {
+    const ta = a.dueDate ? new Date(a.dueDate).getTime() : Number.POSITIVE_INFINITY;
+    const tb = b.dueDate ? new Date(b.dueDate).getTime() : Number.POSITIVE_INFINITY;
+    const aOver = a.dueDate != null && ta < nowMs;
+    const bOver = b.dueDate != null && tb < nowMs;
+    if (aOver !== bOver) return aOver ? -1 : 1;
+    if (ta !== tb) return ta - tb;
+    return PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority];
+  });
+}
+
+function dueLine(iso: string | null, nowMs: number): { text: string; overdue: boolean; soon: boolean } {
+  if (!iso) return { text: "", overdue: false, soon: false };
+  const end = new Date(iso).getTime();
+  const d = Math.ceil((end - nowMs) / (24 * 60 * 60 * 1000));
+  if (d < 0) return { text: `прострочено ${Math.abs(d)} дн.`, overdue: true, soon: false };
+  if (d === 0) return { text: "дедлайн сьогодні", overdue: false, soon: true };
+  if (d <= 3) return { text: `здача через ${d} дн.`, overdue: false, soon: true };
+  return { text: `до ${iso.slice(0, 10)}`, overdue: false, soon: false };
+}
+
 function displayName(u: AssigneeOption): string {
   return u.name?.trim() || u.email?.trim() || u.id;
 }
 
 function newMaterialId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `m-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-}
-
-/** Avoids SyntaxError when the server returns 204 / empty body / HTML error shell. */
-async function readJsonBody<T>(response: Response): Promise<T | null> {
-  const text = await response.text();
-  if (!text.trim()) return null;
-  try {
-    return JSON.parse(text) as T;
-  } catch {
-    return null;
-  }
 }
 
 export type WorkshopKanbanClientProps = {
@@ -64,12 +86,16 @@ export function WorkshopKanbanClient({ initialStageKey = null }: WorkshopKanbanC
   const [loading, setLoading] = useState(true);
   const [savingTaskId, setSavingTaskId] = useState<string | null>(null);
   const [newLineByTask, setNewLineByTask] = useState<Record<string, string>>({});
+  const [tick, setTick] = useState(0);
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
+  const [pollMs, setPollMs] = useState(0);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = Boolean(opts?.silent);
+    if (!silent) setLoading(true);
     try {
       const response = await fetch("/api/crm/production/workshop", { cache: "no-store" });
-      const payload = await readJsonBody<{
+      const payload = await tryReadResponseJson<{
         workshopKanban?: KanbanColumn[];
         canManageWorkshop?: boolean;
         canMarkWorkshopMaterialsProgress?: boolean;
@@ -84,12 +110,14 @@ export function WorkshopKanbanClient({ initialStageKey = null }: WorkshopKanbanC
       setColumns(payload.workshopKanban ?? []);
       setCanManage(Boolean(payload.canManageWorkshop));
       setCanMarkMaterialsProgress(Boolean(payload.canMarkWorkshopMaterialsProgress));
+      setLastSyncedAt(new Date().toISOString());
+      setTick((n) => n + 1);
     } catch {
       setColumns([]);
       setCanManage(false);
       setCanMarkMaterialsProgress(false);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
@@ -98,10 +126,31 @@ export function WorkshopKanbanClient({ initialStageKey = null }: WorkshopKanbanC
   }, [load]);
 
   useEffect(() => {
+    if (pollMs <= 0) return;
+    const id = window.setInterval(() => {
+      void load({ silent: true });
+    }, pollMs);
+    return () => window.clearInterval(id);
+  }, [pollMs, load]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => setTick((n) => n + 1), 60_000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState === "visible") void load({ silent: true });
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [load]);
+
+  useEffect(() => {
     void (async () => {
       try {
         const r = await fetch("/api/crm/production/workshop/assignees", { cache: "no-store" });
-        const j = await readJsonBody<{ users?: AssigneeOption[] }>(r);
+        const j = await tryReadResponseJson<{ users?: AssigneeOption[] }>(r);
         if (r.ok && j) setAssignees(j.users ?? []);
       } catch {
         /* ignore */
@@ -193,6 +242,14 @@ export function WorkshopKanbanClient({ initialStageKey = null }: WorkshopKanbanC
     ? columns.filter((column) => column.stageKey === focusedStage)
     : columns;
 
+  const displayColumns = useMemo(() => {
+    const t = Date.now();
+    return visibleColumns.map((col) => ({
+      ...col,
+      tasks: sortWorkshopTasks(col.tasks, t),
+    }));
+  }, [visibleColumns, tick]);
+
   function openDetachedStageWindow(stageKey: WorkshopStageKey) {
     if (typeof window === "undefined") return;
     const url = `${window.location.origin}${workshopStageHref(stageKey as WorkshopKanbanStageKey)}`;
@@ -200,28 +257,58 @@ export function WorkshopKanbanClient({ initialStageKey = null }: WorkshopKanbanC
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-900">
+    <div className="space-y-5">
+      <div className="enver-panel enver-panel--interactive flex flex-wrap items-start justify-between gap-4 p-4 md:p-5">
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--enver-muted)]">
+            Виробництво · цех
+          </p>
+          <h1 className="mt-1 text-xl font-semibold tracking-tight text-[var(--enver-text)] md:text-2xl">
             {focusedStage
-              ? `Kanban цеху · ${WORKSHOP_STAGE_LABEL_UK[focusedStage as WorkshopKanbanStageKey]}`
+              ? `Kanban · ${WORKSHOP_STAGE_LABEL_UK[focusedStage as WorkshopKanbanStageKey]}`
               : "Kanban цеху"}
           </h1>
-          <p className="mt-1 max-w-2xl text-sm text-slate-600">
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[var(--enver-text-muted)]">
             {focusedStage
               ? "Окреме вікно стадії: переміщуйте картки в рамках потоку та ведіть чекліст матеріалів без зайвих відволікань."
               : "Збірник на задачу та чекліст матеріалів синхронізуються для штабу та бригад. Перетягуйте картки між колонками."}
           </p>
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className="flex flex-col items-end gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2 text-[11px] text-[var(--enver-text-muted)]">
+            <label className="flex items-center gap-1.5">
+              <span className="text-[var(--enver-muted)]">Автооновлення</span>
+              <select
+                value={pollMs}
+                onChange={(e) => setPollMs(Number(e.target.value))}
+                className="rounded-lg border border-[var(--enver-border)] bg-[var(--enver-input-bg)] px-2 py-1 text-[11px] text-[var(--enver-text)] outline-none transition focus:border-[var(--enver-accent)] focus:ring-2 focus:ring-[var(--enver-accent-ring)]"
+              >
+                <option value={0}>Вимкнено</option>
+                <option value={30_000}>30 с</option>
+                <option value={60_000}>60 с</option>
+              </select>
+            </label>
+            <button
+              type="button"
+              onClick={() => void load({ silent: columns.length > 0 })}
+              className="rounded-lg border border-[var(--enver-border)] bg-[var(--enver-card)] px-2.5 py-1 font-medium text-[var(--enver-text)] shadow-[var(--enver-shadow)] transition hover:border-[var(--enver-border-strong)] hover:bg-[var(--enver-hover)]"
+            >
+              Оновити
+            </button>
+            {lastSyncedAt ? (
+              <span className="font-mono text-[10px] text-[var(--enver-muted)]" title={lastSyncedAt}>
+                {lastSyncedAt.replace("T", " ").slice(0, 19)}
+              </span>
+            ) : null}
+          </div>
+          <div className="flex flex-wrap items-center justify-end gap-2">
           {WORKSHOP_MINI_HQ_STAGE_KEYS.map((stageKey) => (
             <Tooltip key={stageKey}>
               <TooltipTrigger asChild>
                 <motion.button
                   type="button"
                   onClick={() => openDetachedStageWindow(stageKey)}
-                  className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[11px] font-medium text-slate-700 shadow-sm transition-colors hover:border-sky-300 hover:bg-sky-50/80"
+                  className="rounded-lg border border-[var(--enver-border)] bg-[var(--enver-card)] px-2.5 py-1.5 text-[11px] font-medium text-[var(--enver-text)] shadow-[var(--enver-shadow)] transition hover:border-[var(--enver-accent)]/40 hover:bg-[var(--enver-accent-soft)]"
                   whileHover={reduceMotion ? undefined : { y: -1 }}
                   whileTap={reduceMotion ? undefined : { scale: 0.98 }}
                 >
@@ -236,25 +323,26 @@ export function WorkshopKanbanClient({ initialStageKey = null }: WorkshopKanbanC
           {focusedStage ? (
             <Link
               href="/crm/production/workshop"
-              className="text-[11px] font-medium text-slate-600 underline-offset-2 hover:underline"
+              className="text-[11px] font-medium text-[var(--enver-text-muted)] underline-offset-2 hover:text-[var(--enver-accent)] hover:underline"
             >
               Показати всі стадії
             </Link>
           ) : null}
           <Link
             href="/crm/production"
-            className="text-sm font-medium text-sky-700 underline-offset-2 hover:underline"
+            className="text-sm font-medium text-[var(--enver-accent)] underline-offset-2 hover:text-[var(--enver-accent-hover)] hover:underline"
           >
             Штаб виробництва
           </Link>
+          </div>
         </div>
       </div>
 
       {focusedStage ? (
-        <section className="rounded-2xl border border-sky-200/80 bg-gradient-to-br from-sky-50/90 to-white p-4 shadow-sm">
-          <h2 className="text-sm font-semibold text-slate-900">{MINI_HQ_STANDARDS[focusedStage].headline}</h2>
-          <p className="mt-1 text-xs leading-relaxed text-slate-600">{MINI_HQ_STANDARDS[focusedStage].intro}</p>
-          <ul className="mt-2 list-disc space-y-1 pl-4 text-[11px] leading-snug text-slate-700">
+        <section className="rounded-2xl border border-[var(--enver-border)] bg-gradient-to-br from-[var(--enver-accent-soft)] to-[var(--enver-card)] p-4 shadow-[var(--enver-shadow)]">
+          <h2 className="text-sm font-semibold text-[var(--enver-text)]">{MINI_HQ_STANDARDS[focusedStage].headline}</h2>
+          <p className="mt-1 text-xs leading-relaxed text-[var(--enver-text-muted)]">{MINI_HQ_STANDARDS[focusedStage].intro}</p>
+          <ul className="mt-2 list-disc space-y-1 pl-4 text-[11px] leading-snug text-[var(--enver-text-muted)]">
             {MINI_HQ_STANDARDS[focusedStage].bullets.map((b, i) => (
               <li key={`${focusedStage}-${i}`}>{b}</li>
             ))}
@@ -263,14 +351,14 @@ export function WorkshopKanbanClient({ initialStageKey = null }: WorkshopKanbanC
       ) : null}
 
       {loading && columns.length === 0 ? (
-        <p className="text-sm text-slate-500">Завантаження…</p>
+        <KanbanBoardSkeleton columns={focusedStage ? 1 : 6} />
       ) : null}
 
       <div className={`grid gap-3 ${focusedStage ? "xl:grid-cols-1" : "xl:grid-cols-6"}`}>
-        {visibleColumns.map((column, colIndex) => (
+        {displayColumns.map((column, colIndex) => (
           <motion.div
             key={column.stageKey}
-            className="flex min-h-[320px] flex-col rounded-2xl border border-slate-200 bg-slate-50/80 p-3 shadow-sm transition-shadow duration-200 hover:shadow-md"
+            className="enver-panel enver-panel--interactive flex min-h-[320px] flex-col p-3"
             initial={reduceMotion ? false : { opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{
@@ -287,13 +375,16 @@ export function WorkshopKanbanClient({ initialStageKey = null }: WorkshopKanbanC
               }
             }}
           >
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-700">{column.stageLabel}</p>
-              <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-medium text-slate-600">
+            <div className="mb-2 flex items-center justify-between gap-2 border-b border-[var(--enver-border)] pb-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--enver-text)]">{column.stageLabel}</p>
+              <span className="rounded-full bg-[var(--enver-hover)] px-2 py-0.5 text-[10px] font-medium tabular-nums text-[var(--enver-text-muted)]">
                 {column.tasks.length}
               </span>
             </div>
             <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
+              {column.tasks.length === 0 ? (
+                <KanbanEmptyColumn message="Перетягніть картку сюди або дочекайтесь нових задач" />
+              ) : null}
               {column.tasks.map((task) => {
                 const displayedMaterials = filterMaterialsForWorkshopStage(
                   column.stageKey,
@@ -301,28 +392,44 @@ export function WorkshopKanbanClient({ initialStageKey = null }: WorkshopKanbanC
                 );
                 const ratio = doneRatioForColumn(task, column);
                 const busy = savingTaskId === task.id;
+                const due = dueLine(task.dueDate, Date.now());
+                const cardTone =
+                  due.overdue
+                    ? "border-rose-300/90 bg-[var(--enver-danger-soft)] hover:border-rose-400"
+                    : due.soon
+                      ? "border-amber-200/90 bg-[var(--enver-warning-soft)] hover:border-amber-300"
+                      : "border-[var(--enver-border)] bg-[var(--enver-card)] hover:border-[var(--enver-accent)]/40";
                 return (
                   <motion.article
                     key={task.id}
                     draggable
                     onDragStart={() => setDragTaskId(task.id)}
-                    className="cursor-move rounded-xl border border-slate-200 bg-white p-2.5 text-xs shadow-sm transition-[box-shadow,border-color] duration-200 hover:border-sky-200 hover:shadow-md"
+                    className={`cursor-move rounded-xl border p-2.5 text-xs shadow-[var(--enver-shadow)] transition-[box-shadow,border-color] duration-200 hover:shadow-md ${cardTone}`}
                     whileDrag={{ scale: 1.02, boxShadow: "0 12px 28px rgba(15, 23, 42, 0.12)" }}
                     whileHover={reduceMotion ? undefined : { y: -1 }}
                   >
                     <div className="flex items-start justify-between gap-1">
                       <div>
-                        <p className="font-semibold text-slate-900">{task.flowNumber}</p>
-                        <p className="mt-0.5 text-slate-600">{task.title}</p>
+                        <p className="font-semibold text-[var(--enver-text)]">{task.flowNumber}</p>
+                        <p className="mt-0.5 text-[var(--enver-text-muted)]">{task.title}</p>
+                        {task.dueDate ? (
+                          <p
+                            className={`mt-1 text-[10px] font-medium ${
+                              due.overdue ? "text-rose-800" : due.soon ? "text-amber-900" : "text-slate-500"
+                            }`}
+                          >
+                            {due.text}
+                          </p>
+                        ) : null}
                       </div>
-                      <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600">
+                      <span className="shrink-0 rounded bg-[var(--enver-hover)] px-1.5 py-0.5 text-[10px] text-[var(--enver-text-muted)]">
                         {task.priority}
                       </span>
                     </div>
 
                     {column.stageKey === "ASSEMBLY" ? (
-                      <div className="mt-2 border-t border-slate-100 pt-2">
-                        <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                      <div className="mt-2 border-t border-[var(--enver-border)] pt-2">
+                        <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--enver-muted)]">
                           Збірник (начальник цеху)
                         </p>
                         {canManage ? (
@@ -334,7 +441,7 @@ export function WorkshopKanbanClient({ initialStageKey = null }: WorkshopKanbanC
                                 const v = e.target.value;
                                 void setAssignee(task, v === "" ? null : v);
                               }}
-                              className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[11px] text-slate-800 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100 disabled:opacity-60"
+                              className="w-full rounded-lg border border-[var(--enver-border)] bg-[var(--enver-input-bg)] px-2 py-1.5 text-[11px] text-[var(--enver-text)] outline-none focus:border-[var(--enver-accent)] focus:ring-2 focus:ring-[var(--enver-accent-ring)] disabled:opacity-60"
                             >
                               <option value="">Не призначено</option>
                               {assignees.map((u) => (
@@ -357,13 +464,13 @@ export function WorkshopKanbanClient({ initialStageKey = null }: WorkshopKanbanC
                       </div>
                     ) : null}
 
-                    <div className="mt-2 border-t border-slate-100 pt-2">
+                    <div className="mt-2 border-t border-[var(--enver-border)] pt-2">
                       <div className="mb-1 flex items-center justify-between gap-1">
-                        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--enver-muted)]">
                           {workshopMaterialsPanelTitle(column.stageKey as WorkshopKanbanStageKey)}
                         </p>
                         {ratio ? (
-                          <span className="text-[10px] tabular-nums text-slate-500">
+                          <span className="text-[10px] tabular-nums text-[var(--enver-muted)]">
                             {ratio.done}/{ratio.total}
                           </span>
                         ) : null}
@@ -372,7 +479,7 @@ export function WorkshopKanbanClient({ initialStageKey = null }: WorkshopKanbanC
                         {displayedMaterials.map((row) => (
                           <li
                             key={row.id}
-                            className="flex items-start gap-2 rounded-lg border border-slate-100 bg-slate-50/90 px-1.5 py-1"
+                            className="flex items-start gap-2 rounded-lg border border-[var(--enver-border)] bg-[var(--enver-surface)] px-1.5 py-1"
                           >
                             <label className="flex flex-1 cursor-pointer items-start gap-2">
                               <input
@@ -382,7 +489,7 @@ export function WorkshopKanbanClient({ initialStageKey = null }: WorkshopKanbanC
                                 onChange={() => toggleMaterial(task, row.id)}
                                 className="mt-0.5 rounded border-slate-300"
                               />
-                              <span className={row.done ? "text-slate-400 line-through" : "text-slate-700"}>{row.label}</span>
+                              <span className={row.done ? "text-[var(--enver-muted)] line-through" : "text-[var(--enver-text-muted)]"}>{row.label}</span>
                             </label>
                             {canManage ? (
                               <button
@@ -424,13 +531,13 @@ export function WorkshopKanbanClient({ initialStageKey = null }: WorkshopKanbanC
                                   addCustomLine(task, column, newLineByTask[task.id] ?? "");
                                 }
                               }}
-                              className="min-w-0 flex-1 rounded-lg border border-slate-200 px-2 py-1 text-[11px] outline-none focus:border-sky-400"
+                              className="min-w-0 flex-1 rounded-lg border border-[var(--enver-border)] bg-[var(--enver-input-bg)] px-2 py-1 text-[11px] text-[var(--enver-text)] outline-none focus:border-[var(--enver-accent)] focus:ring-2 focus:ring-[var(--enver-accent-ring)]"
                             />
                             <button
                               type="button"
                               disabled={busy}
                               onClick={() => addCustomLine(task, column, newLineByTask[task.id] ?? "")}
-                              className="rounded-lg bg-slate-900 px-2 py-1 text-[11px] font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+                              className="rounded-lg bg-[var(--enver-accent)] px-2 py-1 text-[11px] font-medium text-white hover:bg-[var(--enver-accent-hover)] disabled:opacity-50"
                             >
                               +
                             </button>
@@ -445,10 +552,10 @@ export function WorkshopKanbanClient({ initialStageKey = null }: WorkshopKanbanC
                       )}
                     </div>
 
-                    <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-2">
+                    <div className="mt-2 flex items-center justify-between border-t border-[var(--enver-border)] pt-2">
                       <Link
                         href={`/crm/production/${task.flowId}`}
-                        className="text-[11px] font-medium text-sky-700 hover:underline"
+                        className="text-[11px] font-medium text-[var(--enver-accent)] hover:text-[var(--enver-accent-hover)] hover:underline"
                         onClick={(e) => e.stopPropagation()}
                       >
                         Штаб замовлення

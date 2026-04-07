@@ -1,5 +1,6 @@
 import type { EstimateLineType } from "@prisma/client";
 import { forkLeadEstimateWithNewLines } from "./fork-lead-estimate";
+import { newEstimateStableLineId } from "./new-stable-line-id";
 import type { DraftLine } from "./ai-estimate-draft";
 import { recalculateEstimateTotals } from "./recalculate";
 import type { Prisma } from "@prisma/client";
@@ -72,7 +73,7 @@ export async function createOrForkLeadEstimateFromDraft(
         grossMargin: totals.grossMargin,
         createdById: args.userId,
         lineItems: {
-          create: lineData.map((l) => ({
+          create: lineData.map((l, idx) => ({
             type: l.type,
             category: l.category,
             productName: l.productName,
@@ -83,6 +84,8 @@ export async function createOrForkLeadEstimateFromDraft(
             amountSale: l.amountSale,
             amountCost: l.amountCost,
             margin: l.margin,
+            stableLineId: newEstimateStableLineId(),
+            sortOrder: idx,
           })),
         },
       },

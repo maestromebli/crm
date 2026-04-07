@@ -27,6 +27,7 @@ export function ProductionQueueTableClient({
   const [bulkBusy, setBulkBusy] = useState<"" | "launch_ready" | "retry_failed">("");
   const [errorById, setErrorById] = useState<Record<string, string>>({});
   const [bulkInfo, setBulkInfo] = useState<string>("");
+  const [lastLaunchInfo, setLastLaunchInfo] = useState<string>("");
   const [filter, setFilter] = useState<
     "all" | "failed" | "ready" | "sla" | "waiting"
   >("all");
@@ -61,8 +62,18 @@ export function ProductionQueueTableClient({
         const r = await fetch(`/api/deals/${rowId}/production-launch`, {
           method: "POST",
         });
-        const j = (await r.json().catch(() => ({}))) as { error?: string };
+        const j = (await r.json().catch(() => ({}))) as {
+          error?: string;
+          handoffImportedFileCount?: number | null;
+        };
         if (!r.ok) throw new Error(j.error ?? "Не вдалося виконати запуск");
+        const n = j.handoffImportedFileCount;
+        setLastLaunchInfo(
+          typeof n === "number" && n > 0
+            ? `Запуск: перенесено з передачі файлів: ${n}.`
+            : "Запуск виконано.",
+        );
+        window.setTimeout(() => setLastLaunchInfo(""), 10000);
       } else {
         const r = await fetch(`/api/deals/${rowId}/production-launch`, {
           method: "PATCH",
@@ -73,8 +84,20 @@ export function ProductionQueueTableClient({
               : { action: "fail", error: "Позначено вручну оператором черги" },
           ),
         });
-        const j = (await r.json().catch(() => ({}))) as { error?: string };
+        const j = (await r.json().catch(() => ({}))) as {
+          error?: string;
+          handoffImportedFileCount?: number | null;
+        };
         if (!r.ok) throw new Error(j.error ?? "Не вдалося оновити статус");
+        if (action === "retry") {
+          const n = j.handoffImportedFileCount;
+          setLastLaunchInfo(
+            typeof n === "number" && n > 0
+              ? `Повтор: перенесено з передачі файлів: ${n}.`
+              : "Повтор запуску виконано.",
+          );
+          window.setTimeout(() => setLastLaunchInfo(""), 10000);
+        }
       }
       router.refresh();
     } catch (e) {
@@ -205,6 +228,11 @@ export function ProductionQueueTableClient({
         </button>
         {bulkInfo ? (
           <span className="text-[11px] text-slate-600">{bulkInfo}</span>
+        ) : null}
+        {lastLaunchInfo ? (
+          <span className="max-w-[min(100vw-2rem,28rem)] truncate text-[11px] text-emerald-800">
+            {lastLaunchInfo}
+          </span>
         ) : null}
       </div>
       <table className="min-w-full divide-y divide-slate-200 text-sm">

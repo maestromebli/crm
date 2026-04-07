@@ -28,10 +28,39 @@ import {
   type TransitionValidationResult,
 } from "../../../../lib/crm-core";
 import { prisma } from "../../../../lib/prisma";
+import { CORE_EVENT_TYPES, publishEntityEvent } from "../../../../lib/events/crm-events";
+import { recordWorkflowEvent, WORKFLOW_EVENT_TYPES } from "../../../../features/event-system";
 
 const PRIORITIES = new Set(["low", "normal", "high"]);
 
 type Ctx = { params: Promise<{ leadId: string }> };
+
+/**
+ * Повний зріз ліда для клієнтського кешу (React Query) та Hub workspace.
+ */
+export async function GET(_req: Request, ctx: Ctx) {
+  if (!process.env.DATABASE_URL?.trim()) {
+    return NextResponse.json(
+      { error: "DATABASE_URL не задано" },
+      { status: 503 },
+    );
+  }
+
+  const user = await requireSessionUser();
+  if (user instanceof NextResponse) return user;
+
+  const denied = forbidUnlessPermission(user, P.LEADS_VIEW);
+  if (denied) return denied;
+
+  const { leadId } = await ctx.params;
+  const accessCtx = await resolveAccessContext(prisma, user);
+  const lead = await getLeadById(leadId, accessCtx);
+  if (!lead) {
+    return NextResponse.json({ error: "Лід не знайдено" }, { status: 404 });
+  }
+
+  return NextResponse.json({ lead });
+}
 
 export async function PATCH(req: Request, ctx: Ctx) {
   if (!process.env.DATABASE_URL?.trim()) {
@@ -320,6 +349,9 @@ export async function PATCH(req: Request, ctx: Ctx) {
   }
 
   try {
+    const stageChanged =
+      typeof patch.stageId === "string" && patch.stageId !== lead.stageId;
+
     const updated = await prisma.lead.update({
       where: { id: leadId },
       data: patch,
@@ -342,6 +374,42 @@ export async function PATCH(req: Request, ctx: Ctx) {
       actorUserId: user.id,
       data: { fields: Object.keys(patch) },
     });
+    if (stageChanged) {
+      await publishEntityEvent({
+        type: CORE_EVENT_TYPES.STATUS_CHANGED,
+        entityType: "LEAD",
+        entityId: leadId,
+        userId: user.id,
+        payload: {
+          fromStageId: lead.stageId,
+          toStageId: updated.stageId,
+        },
+      });
+    }
+    if (typeof patch.ownerId === "string" && patch.ownerId !== lead.ownerId) {
+      await recordWorkflowEvent(
+        WORKFLOW_EVENT_TYPES.LEAD_ASSIGNED,
+        { leadId, ownerId: patch.ownerId },
+        {
+          entityType: "LEAD",
+          entityId: leadId,
+          userId: user.id,
+          dedupeKey: `lead-assigned:${leadId}:${patch.ownerId}`,
+        },
+      );
+    }
+    if (body.recordTouch === true) {
+      await recordWorkflowEvent(
+        WORKFLOW_EVENT_TYPES.CONTACT_COMPLETED,
+        { leadId },
+        {
+          entityType: "LEAD",
+          entityId: leadId,
+          userId: user.id,
+          dedupeKey: `contact-completed:${leadId}:${new Date().toISOString().slice(0, 10)}`,
+        },
+      );
+    }
 
     revalidatePath("/leads");
     revalidatePath("/leads/new");

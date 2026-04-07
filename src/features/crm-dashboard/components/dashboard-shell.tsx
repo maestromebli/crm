@@ -26,7 +26,7 @@ export function DashboardShell({
       )}
     >
       <div className="mx-auto max-w-[1600px] px-3 py-6 md:px-8">
-        <header className="flex flex-col gap-4 border-b border-[var(--enver-border)] pb-6 lg:flex-row lg:items-end lg:justify-between">
+        <header className="flex flex-col gap-4 border-b border-[var(--enver-border)] pb-6 transition-colors lg:flex-row lg:items-end lg:justify-between">
           <div className="min-w-0 space-y-1">
             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--enver-muted)]">
               {eyebrow}

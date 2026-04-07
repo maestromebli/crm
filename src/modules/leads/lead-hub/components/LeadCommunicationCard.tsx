@@ -137,9 +137,11 @@ export function LeadCommunicationCard({
     >
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h2 className="text-[18px] font-medium text-[var(--enver-text)]">Стрічка</h2>
+          <h2 className="text-[18px] font-semibold text-[var(--enver-text)]">
+            Комунікаційний центр
+          </h2>
           <p className="mt-0.5 text-[12px] text-[var(--enver-muted)]">
-            Повідомлення, дзвінки та нотатки — як у месенджері.
+            Дзвінки, повідомлення та події — єдиний потік для сканування.
           </p>
         </div>
         <p className="text-[12px] text-[var(--enver-muted)]">

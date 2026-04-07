@@ -93,7 +93,7 @@ export async function POST(request: Request) {
       style,
       stageHint: lead.stage?.name ?? null,
     });
-    if (!gen.ok) {
+    if (gen.ok === false) {
       return NextResponse.json({ error: gen.error }, { status: 503 });
     }
 
@@ -136,7 +136,7 @@ export async function POST(request: Request) {
     style,
     stageHint: deal.stage?.name ?? null,
   });
-  if (!gen.ok) {
+  if (gen.ok === false) {
     return NextResponse.json({ error: gen.error }, { status: 503 });
   }
 

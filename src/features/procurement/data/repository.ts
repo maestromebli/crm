@@ -1,3 +1,4 @@
+import type { ProcurementProjectPageData } from "./live-procurement-project";
 import {
   mockGoodsReceiptItems,
   mockGoodsReceipts,
@@ -11,10 +12,17 @@ import {
 } from "../../shared/data/mock-crm";
 import { sumPurchaseOrderCommitment, sumReceivedValueFromPoItems } from "../../finance/lib/aggregation";
 import { isNeededByPast, isOpenProcurementLine } from "../lib/deadlines";
+import { buildProcurementRiskAlerts } from "../lib/build-procurement-risk-alerts";
+import { buildOrderedLineMonitorFromMock } from "../lib/ordered-line-monitor";
+import type { ProcurementOverviewBundle } from "../types/overview-bundle";
+
+export type { ProcurementOverviewBundle } from "../types/overview-bundle";
+export type { ProcurementProjectPageData } from "./live-procurement-project";
 
 const sum = (arr: number[]): number => arr.reduce((a, b) => a + b, 0);
 
-export async function getProcurementOverviewData() {
+/** Демо-дані (mock-crm) — якщо з БД не вдалося зібрати live-огляд. */
+export async function getProcurementOverviewMockData(): Promise<ProcurementOverviewBundle> {
   const planned = sum(mockProcurementItems.map((i) => i.plannedTotalCost));
   const actual = sum(mockProcurementItems.map((i) => i.actualTotalCost ?? 0));
   const ordered = sum(
@@ -137,18 +145,55 @@ export async function getProcurementOverviewData() {
       1.15,
   );
 
+  const kpi = {
+    planned,
+    actual,
+    ordered,
+    committed,
+    receivedValue,
+    paidSupplier,
+    awaitingDelivery,
+    overrun,
+    openCommitmentGap,
+  };
+
+  const saasControl = {
+    openRequestCount: mockProcurementRequests.filter(
+      (r) => r.status !== "RECEIVED" && r.status !== "CLOSED" && r.status !== "CANCELLED",
+    ).length,
+    overdueOpenRequestCount: overdueOpenRequests.length,
+    onTimeDeliveryRatePct: activeOrders.length
+      ? Number(((onTimeDeliveredOrders / activeOrders.length) * 100).toFixed(1))
+      : 100,
+    commitmentCoveragePct: committed > 0 ? Number(((receivedValue / committed) * 100).toFixed(1)) : 100,
+    topSupplierConcentrationPct,
+    receiptQualityRate,
+    supplierScorecard,
+    overdueRequests: overdueOpenRequests
+      .map((r) => ({
+        requestId: r.id,
+        projectId: r.projectId,
+        neededByDate: r.neededByDate,
+        status: r.status,
+        budgetTotal: r.budgetTotal,
+      }))
+      .sort((a, b) => (a.neededByDate ?? "").localeCompare(b.neededByDate ?? "")),
+    supplierRisks: supplierRisks.sort((a, b) => b.riskScore - a.riskScore),
+    systemicRiskScore: Math.max(0, Math.min(100, systemicRiskScore)),
+  };
+
+  const projectNameById = Object.fromEntries(mockProjects.map((p) => [p.id, `${p.code} · ${p.title}`]));
+  const supplierNameById = Object.fromEntries(mockSuppliers.map((s) => [s.id, s.name]));
+  const orderNumberById = Object.fromEntries(mockPurchaseOrders.map((p) => [p.id, p.orderNumber]));
+
+  const orderedLineMonitor = buildOrderedLineMonitorFromMock(
+    mockProcurementRequests,
+    mockProcurementItems,
+    projectNameById,
+  );
+
   return {
-    kpi: {
-      planned,
-      actual,
-      ordered,
-      committed,
-      receivedValue,
-      paidSupplier,
-      awaitingDelivery,
-      overrun,
-      openCommitmentGap,
-    },
+    kpi,
     requests: mockProcurementRequests,
     items: mockProcurementItems,
     purchaseOrders: mockPurchaseOrders,
@@ -157,34 +202,28 @@ export async function getProcurementOverviewData() {
     receipts: mockGoodsReceipts,
     receiptItems: mockGoodsReceiptItems,
     categories: mockProcurementCategories,
-    saasControl: {
-      openRequestCount: mockProcurementRequests.filter(
-        (r) => r.status !== "RECEIVED" && r.status !== "CLOSED" && r.status !== "CANCELLED",
-      ).length,
-      overdueOpenRequestCount: overdueOpenRequests.length,
-      onTimeDeliveryRatePct: activeOrders.length
-        ? Number(((onTimeDeliveredOrders / activeOrders.length) * 100).toFixed(1))
-        : 100,
-      commitmentCoveragePct: committed > 0 ? Number(((receivedValue / committed) * 100).toFixed(1)) : 100,
-      topSupplierConcentrationPct,
-      receiptQualityRate,
-      supplierScorecard,
-      overdueRequests: overdueOpenRequests
-        .map((r) => ({
-          requestId: r.id,
-          projectId: r.projectId,
-          neededByDate: r.neededByDate,
-          status: r.status,
-          budgetTotal: r.budgetTotal,
-        }))
-        .sort((a, b) => (a.neededByDate ?? "").localeCompare(b.neededByDate ?? "")),
-      supplierRisks: supplierRisks.sort((a, b) => b.riskScore - a.riskScore),
-      systemicRiskScore: Math.max(0, Math.min(100, systemicRiskScore)),
-    },
+    saasControl,
+    projectNameById,
+    supplierNameById,
+    orderNumberById,
+    dataSource: "demo",
+    riskAlerts: buildProcurementRiskAlerts(saasControl, kpi),
+    orderedLineMonitor,
   };
 }
 
-export async function getProcurementProjectData(projectId: string) {
+export async function getProcurementOverviewData(): Promise<ProcurementOverviewBundle> {
+  const { tryLoadLiveProcurementOverview } = await import("./live-procurement-overview");
+  const live = await tryLoadLiveProcurementOverview();
+  if (live) return live;
+  return getProcurementOverviewMockData();
+}
+
+export async function getProcurementProjectData(projectId: string): Promise<ProcurementProjectPageData | null> {
+  const { tryLoadProcurementProjectFromDeal } = await import("./live-procurement-project");
+  const live = await tryLoadProcurementProjectFromDeal(projectId);
+  if (live) return live;
+
   const project = mockProjects.find((p) => p.id === projectId) ?? null;
   if (!project) return null;
   const requests = mockProcurementRequests.filter((r) => r.projectId === projectId);
@@ -208,6 +247,12 @@ export async function getProcurementProjectData(projectId: string) {
     const req = requestById[i.requestId];
     return isNeededByPast(req?.neededByDate ?? null, today);
   }).length;
+
+  const projectNameById = Object.fromEntries(mockProjects.map((p) => [p.id, `${p.code} · ${p.title}`]));
+  const supplierNameById = Object.fromEntries(mockSuppliers.map((s) => [s.id, s.name]));
+  const categoryNameById = Object.fromEntries(mockProcurementCategories.map((c) => [c.id, c.name]));
+  const orderNumberById = Object.fromEntries(mockPurchaseOrders.map((p) => [p.id, p.orderNumber]));
+
   return {
     project,
     summary: { planned, actual, delta, ordered, committed, received, notClosed, overdueLines },
@@ -215,5 +260,10 @@ export async function getProcurementProjectData(projectId: string) {
     items,
     orders,
     receipts,
+    projectNameById,
+    supplierNameById,
+    categoryNameById,
+    orderNumberById,
+    dataSource: "demo",
   };
 }

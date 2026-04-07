@@ -47,7 +47,6 @@ export async function persistConversationInsight(args: {
       recommendedNextStep: d.recommendedNextStep,
       recommendedReply: d.recommendedReply,
       confidenceScore: d.confidenceScore,
-      generatedAt: new Date(),
     },
   });
 

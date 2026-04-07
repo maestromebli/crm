@@ -14,33 +14,36 @@ export default async function ExternalConstructorPage(props: PageProps) {
   const { token } = await props.params;
   if (!token?.trim()) notFound();
 
-  const orch = await prisma.productionOrchestration.findFirst({
-    where: { externalWorkspaceToken: token },
+  const room = await prisma.dealConstructorRoom.findFirst({
+    where: { publicToken: token },
     include: {
       deal: {
         select: {
           id: true,
           title: true,
           client: { select: { name: true } },
+          productionFlow: { select: { number: true, status: true } },
         },
       },
     },
   });
 
-  if (!orch) {
+  if (!room) {
     notFound();
   }
+
+  const flow = room.deal.productionFlow;
 
   return (
     <ExternalConstructorWorkspace
       token={token}
       snapshot={{
-        productionNumber: orch.productionNumber,
-        dealTitle: orch.deal.title,
-        clientName: orch.deal.client.name,
-        status: orch.status,
-        dueDate: orch.dueDate?.toISOString() ?? null,
-        constructorExternalName: orch.constructorExternalName,
+        productionNumber: flow?.number ?? room.deal.title,
+        dealTitle: room.deal.title,
+        clientName: room.deal.client.name,
+        status: room.status,
+        dueDate: room.dueAt?.toISOString() ?? null,
+        constructorExternalName: room.externalConstructorLabel,
       }}
     />
   );

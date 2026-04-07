@@ -39,7 +39,7 @@ export function FunnelCard({
           return (
             <div
               key={s.stageId}
-              className="rounded-xl border border-[var(--enver-border)] bg-[var(--enver-surface)]/80 p-3"
+              className="rounded-xl border border-[var(--enver-border)] bg-[var(--enver-surface)]/80 p-3 transition duration-200 hover:border-[var(--enver-border-strong)] hover:shadow-[var(--enver-shadow)]"
             >
               <div className="flex items-start justify-between gap-2">
                 <div>

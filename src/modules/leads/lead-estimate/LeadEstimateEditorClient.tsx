@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { patchLeadEstimateById } from "../../../features/leads/lead-estimate-api";
 import { cn } from "../../../lib/utils";
 
 type LineRow = {
@@ -113,21 +114,16 @@ export function LeadEstimateEditorClient({
     setBusy(true);
     setErr(null);
     try {
-      const r = await fetch(
-        `/api/leads/${leadId}/estimates/${estimateId}`,
+      const j = await patchLeadEstimateById<{ estimate?: EstPayload }>(
+        leadId,
+        estimateId,
         {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            notes: notes.trim() || null,
-            discountAmount: Number(discount) || 0,
-            deliveryCost: Number(delivery) || 0,
-            installationCost: Number(install) || 0,
-          }),
+          notes: notes.trim() || null,
+          discountAmount: Number(discount) || 0,
+          deliveryCost: Number(delivery) || 0,
+          installationCost: Number(install) || 0,
         },
       );
-      const j = (await r.json()) as { error?: string; estimate?: EstPayload };
-      if (!r.ok) throw new Error(j.error ?? "Помилка");
       if (j.estimate) setEst(j.estimate);
       router.refresh();
     } catch (e) {
@@ -168,16 +164,11 @@ export function LeadEstimateEditorClient({
     setErr(null);
     try {
       const lineItems = buildLineItemsPayload();
-      const r = await fetch(
-        `/api/leads/${leadId}/estimates/${estimateId}`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ lineItems }),
-        },
+      const j = await patchLeadEstimateById<{ estimate?: EstPayload }>(
+        leadId,
+        estimateId,
+        { lineItems },
       );
-      const j = (await r.json()) as { error?: string; estimate?: EstPayload };
-      if (!r.ok) throw new Error(j.error ?? "Помилка");
       if (j.estimate) {
         setEst(j.estimate);
         setLineDrafts(
