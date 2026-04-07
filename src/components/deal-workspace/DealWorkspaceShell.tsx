@@ -168,7 +168,7 @@ export function DealWorkspaceShell({ data, viewerRole }: Props) {
   return (
     <DealWorkspaceToastProvider>
     <div className="flex min-h-[calc(100vh-56px)] flex-col bg-[var(--enver-bg)]">
-      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-3 px-3 py-3 pb-24 md:px-6 md:py-4 md:pb-28">
+      <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-3 px-3 py-4 pb-24 md:px-6 md:py-5 md:pb-28">
         {/*
           Не робимо sticky для всього цього блоку: у хедері є розгорнута форма
           редагування + смуги — закріплена зона займала більшу частину екрана й
@@ -239,7 +239,7 @@ export function DealWorkspaceShell({ data, viewerRole }: Props) {
         <CRMLayout
           main={
             <>
-            <nav className="space-y-2 rounded-2xl border border-slate-200 bg-[var(--enver-card)]/90 p-1.5 shadow-sm">
+            <nav className="space-y-2 rounded-2xl border border-slate-200 bg-[var(--enver-card)]/90 p-2 shadow-sm">
               <div className="flex flex-wrap gap-1">
                 {DEAL_WORKSPACE_TAB_GROUPS.map((g) => {
                   const inGroup = g.tabs.includes(activeTab);
@@ -251,7 +251,7 @@ export function DealWorkspaceShell({ data, viewerRole }: Props) {
                         setTab(inGroup ? activeTab : g.defaultTab)
                       }
                       className={cn(
-                        "rounded-xl px-2.5 py-1.5 text-[11px] font-medium transition",
+                        "rounded-xl px-3 py-2 text-xs font-medium transition",
                         inGroup
                           ? "bg-slate-900 text-white"
                           : "text-slate-600 hover:bg-slate-100",
@@ -270,7 +270,7 @@ export function DealWorkspaceShell({ data, viewerRole }: Props) {
                       type="button"
                       onClick={() => setTab(tid)}
                       className={cn(
-                        "rounded-lg px-2 py-1 text-[10px] font-medium transition",
+                        "rounded-lg px-2.5 py-1.5 text-xs font-medium transition",
                         activeTab === tid
                           ? "bg-slate-200 text-[var(--enver-text)]"
                           : "text-slate-500 hover:bg-slate-100",

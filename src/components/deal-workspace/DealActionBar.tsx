@@ -34,8 +34,8 @@ export function DealActionBar({ data, activeTab, onTab, onRequestEditHeader }: P
   const plan = resolveDealActionPlan(data);
   const telQuick = plan.quick.find((x) => x.kind === "tel");
   return (
-    <div className="sticky bottom-0 z-30 border-t border-slate-200 bg-[var(--enver-card)] px-3 py-2 shadow-[0_-4px_20px_rgba(15,23,42,0.08)] md:px-4">
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2">
+    <div className="sticky bottom-0 z-30 border-t border-slate-200 bg-[var(--enver-card)] px-3 py-2.5 shadow-[0_-4px_20px_rgba(15,23,42,0.08)] md:px-4">
+      <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-1.5">
           <button
             type="button"
@@ -49,7 +49,7 @@ export function DealActionBar({ data, activeTab, onTab, onRequestEditHeader }: P
                 onRequestEditHeader?.();
               }
             }}
-            className="rounded-full border border-indigo-300 bg-indigo-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-indigo-700"
+            className="rounded-full border border-indigo-300 bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
             title={plan.primary.label}
           >
             {plan.primary.label}
@@ -62,7 +62,7 @@ export function DealActionBar({ data, activeTab, onTab, onRequestEditHeader }: P
                 if (a.kind === "tab" && a.tabId) onTab(a.tabId);
               }}
               className={cn(
-                "rounded-full border px-3 py-1.5 text-[11px] font-medium transition",
+                "rounded-full border px-3 py-2 text-xs font-medium transition",
                 a.kind === "tab" && activeTab === a.tabId
                   ? "border-slate-900 bg-slate-900 text-white"
                   : "border-slate-200 bg-[var(--enver-card)] text-slate-700 hover:bg-[var(--enver-hover)]",
@@ -88,7 +88,7 @@ export function DealActionBar({ data, activeTab, onTab, onRequestEditHeader }: P
                 disabled={disabled}
                 onClick={() => onTab(a.tab)}
                 className={cn(
-                  "rounded-full border px-3 py-1.5 text-[11px] font-medium transition",
+                  "rounded-full border px-3 py-2 text-xs font-medium transition",
                   activeTab === a.tab
                     ? "border-slate-900 bg-slate-900 text-white"
                     : "border-slate-200 bg-[var(--enver-card)] text-slate-700 hover:bg-[var(--enver-hover)]",
@@ -103,12 +103,12 @@ export function DealActionBar({ data, activeTab, onTab, onRequestEditHeader }: P
         {telQuick?.href ? (
           <a
             href={telQuick.href}
-            className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-medium text-emerald-950 hover:bg-emerald-100"
+            className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-950 hover:bg-emerald-100"
           >
             {telQuick.label}
           </a>
         ) : null}
-        <p className="hidden max-w-xs text-[10px] text-slate-500 sm:block">
+        <p className="hidden max-w-xs text-xs text-slate-500 sm:block">
           Нижня панель: головна дія + до трьох допоміжних.
         </p>
       </div>

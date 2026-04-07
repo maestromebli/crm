@@ -150,7 +150,7 @@ export function LeadTasksTabClient({
   if (!canView) {
     return (
       <section className={wrap}>
-        <p className="text-xs text-slate-600">
+        <p className="text-sm text-slate-600">
           Немає доступу до задач (потрібне право перегляду задач).
         </p>
       </section>
@@ -161,25 +161,25 @@ export function LeadTasksTabClient({
     <div className="space-y-4">
       {canCreate ? (
         <section className={wrap} ref={formAnchorRef}>
-          <h2 className="text-sm font-semibold text-[var(--enver-text)]">Нова задача</h2>
+          <h2 className="text-base font-semibold text-[var(--enver-text)]">Нова задача</h2>
           {formErr ? (
-            <p className="mt-2 text-xs text-rose-700">{formErr}</p>
+            <p className="mt-2 text-sm text-rose-700">{formErr}</p>
           ) : null}
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            <label className="block text-[11px] sm:col-span-2">
+            <label className="block text-sm sm:col-span-2">
               <span className="text-slate-500">Назва</span>
               <input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs"
+                className="mt-1 w-full rounded-lg border border-slate-200 px-2.5 py-2 text-sm"
               />
             </label>
-            <label className="block text-[11px]">
+            <label className="block text-sm">
               <span className="text-slate-500">Тип</span>
               <select
                 value={taskType}
                 onChange={(e) => setTaskType(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs"
+                className="mt-1 w-full rounded-lg border border-slate-200 px-2.5 py-2 text-sm"
               >
                 {Object.entries(TYPE_UA).map(([k, v]) => (
                   <option key={k} value={k}>
@@ -188,13 +188,13 @@ export function LeadTasksTabClient({
                 ))}
               </select>
             </label>
-            <label className="block text-[11px]">
+            <label className="block text-sm">
               <span className="text-slate-500">Термін (необовʼязково)</span>
               <input
                 type="datetime-local"
                 value={dueAt}
                 onChange={(e) => setDueAt(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs"
+                className="mt-1 w-full rounded-lg border border-slate-200 px-2.5 py-2 text-sm"
               />
             </label>
           </div>
@@ -203,7 +203,7 @@ export function LeadTasksTabClient({
             disabled={busy}
             onClick={() => void createTask()}
             className={cn(
-              "mt-3 rounded-lg bg-slate-900 px-4 py-2 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50",
+              "mt-3 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50",
             )}
           >
             {busy ? "Зберігаю…" : "Створити"}
@@ -212,28 +212,28 @@ export function LeadTasksTabClient({
       ) : null}
 
       <section className={wrap}>
-        <h2 className="text-sm font-semibold text-[var(--enver-text)]">Задачі по ліду</h2>
+        <h2 className="text-base font-semibold text-[var(--enver-text)]">Задачі по ліду</h2>
         {loadErr ? (
-          <p className="mt-2 text-xs text-rose-700">{loadErr}</p>
+          <p className="mt-2 text-sm text-rose-700">{loadErr}</p>
         ) : items.length === 0 ? (
-          <p className="mt-2 text-xs text-slate-500">Поки немає задач.</p>
+          <p className="mt-2 text-sm text-slate-500">Поки немає задач.</p>
         ) : (
           <ul className="mt-3 space-y-2">
             {items.map((t) => (
               <li
                 key={t.id}
-                className="rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2 text-xs"
+                className="rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2.5 text-sm"
               >
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
                     <p className="font-medium text-[var(--enver-text)]">{t.title}</p>
-                    <p className="text-[10px] text-slate-500">
+                    <p className="text-xs text-slate-500">
                       {TYPE_UA[t.taskType] ?? t.taskType} ·{" "}
                       {PRIORITY_UA[t.priority] ?? t.priority}
                       {t.assigneeName ? ` · ${t.assigneeName}` : ""}
                     </p>
                     {t.dueAt ? (
-                      <p className="text-[10px] text-slate-500">
+                      <p className="text-xs text-slate-500">
                         До{" "}
                         {format(new Date(t.dueAt), "d MMM yyyy, HH:mm", {
                           locale: uk,
@@ -243,7 +243,7 @@ export function LeadTasksTabClient({
                   </div>
                   <span
                     className={cn(
-                      "shrink-0 rounded-full px-2 py-0.5 text-[10px]",
+                      "shrink-0 rounded-full px-2 py-1 text-xs font-medium",
                       t.status === "DONE"
                         ? "bg-emerald-100 text-emerald-800"
                         : t.status === "CANCELLED"
@@ -260,7 +260,7 @@ export function LeadTasksTabClient({
                       type="button"
                       disabled={busy}
                       onClick={() => void patchStatus(t.id, "IN_PROGRESS")}
-                      className="rounded border border-slate-200 bg-[var(--enver-card)] px-2 py-0.5 text-[10px] hover:bg-[var(--enver-hover)] disabled:opacity-50"
+                      className="rounded border border-slate-200 bg-[var(--enver-card)] px-2.5 py-1 text-xs hover:bg-[var(--enver-hover)] disabled:opacity-50"
                     >
                       В роботі
                     </button>
@@ -268,7 +268,7 @@ export function LeadTasksTabClient({
                       type="button"
                       disabled={busy}
                       onClick={() => void patchStatus(t.id, "DONE")}
-                      className="rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] text-emerald-900 hover:bg-emerald-100 disabled:opacity-50"
+                      className="rounded border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs text-emerald-900 hover:bg-emerald-100 disabled:opacity-50"
                     >
                       Виконано
                     </button>
@@ -276,7 +276,7 @@ export function LeadTasksTabClient({
                       type="button"
                       disabled={busy}
                       onClick={() => void patchStatus(t.id, "CANCELLED")}
-                      className="rounded border border-slate-200 px-2 py-0.5 text-[10px] text-slate-600 hover:bg-slate-100 disabled:opacity-50"
+                      className="rounded border border-slate-200 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-100 disabled:opacity-50"
                     >
                       Скасувати
                     </button>

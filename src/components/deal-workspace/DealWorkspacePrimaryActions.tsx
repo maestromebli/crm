@@ -13,7 +13,7 @@ type Props = {
 };
 
 const pill =
-  "inline-flex items-center justify-center gap-1 rounded-lg border px-2.5 py-1.5 text-[11px] font-medium transition";
+  "inline-flex items-center justify-center gap-1 rounded-lg border px-3 py-2 text-xs font-medium transition";
 
 export function DealWorkspacePrimaryActions({
   data,
@@ -53,8 +53,8 @@ export function DealWorkspacePrimaryActions({
   );
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-[var(--enver-card)] px-3 py-2 shadow-sm shadow-slate-900/5">
-      <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+    <div className="rounded-2xl border border-slate-200 bg-[var(--enver-card)] px-3 py-2.5 shadow-sm shadow-slate-900/5">
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
         Дії
       </p>
       <div className="flex flex-wrap gap-1.5">

@@ -269,13 +269,13 @@ function StageAiAssistantCard({
 
   return (
     <div className="mt-3 rounded-xl border border-indigo-200 bg-indigo-50/70 p-3">
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-indigo-800">
+      <p className="text-xs font-semibold uppercase tracking-wide text-indigo-800">
         AI Асистент етапу
       </p>
       <p className="mt-1 text-xs text-indigo-900">
         {insight?.summary ?? "Формуємо інсайт..."}
       </p>
-      <p className="mt-1 text-[11px] text-indigo-800/90">
+      <p className="mt-1 text-xs text-indigo-800/90">
         Наступний крок: {insight?.nextAction ?? "очікується"}
       </p>
       <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-indigo-900">
@@ -284,7 +284,7 @@ function StageAiAssistantCard({
         ))}
       </ul>
       {updates.length ? (
-        <ul className="mt-2 list-disc space-y-1 pl-4 text-[11px] text-indigo-700">
+        <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-indigo-700">
           {updates.slice(0, 2).map((tip) => (
             <li key={tip}>{tip}</li>
           ))}
@@ -304,7 +304,7 @@ function StageFormTemplateCard({
   const tpl = DEAL_CORE_STAGE_FORMS[stage];
   return (
     <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-700">
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-700">
         Шаблон форми етапу
       </p>
       <ul className="mt-2 space-y-1 text-xs text-slate-700">
@@ -946,12 +946,12 @@ function ContractTab({
   return (
     <div className="space-y-4">
       {err ? (
-        <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-800">
+        <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800">
           {err}
         </p>
       ) : null}
       {estimateVersusDealHint ? (
-        <div className="flex flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-950 sm:flex-row sm:items-start sm:justify-between">
           <p className="min-w-0 flex-1 leading-relaxed">
             <span className="font-semibold">Смета та сума угоди: </span>
             {estimateVersusDealHint}
@@ -965,10 +965,10 @@ function ContractTab({
       ) : null}
       {contractHappySteps ? (
         <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 px-3 py-2.5 shadow-sm">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-indigo-800">
+          <p className="text-xs font-semibold uppercase tracking-wide text-indigo-800">
             Рекомендований порядок: від чернетки до оплати
           </p>
-          <ol className="mt-2 grid list-none gap-1.5 p-0 text-[11px] text-indigo-950 sm:grid-cols-2 lg:grid-cols-3">
+          <ol className="mt-2 grid list-none gap-1.5 p-0 text-xs text-indigo-950 sm:grid-cols-2 lg:grid-cols-3">
             {contractHappySteps.map((s, i) => (
               <li
                 key={s.id}
@@ -979,7 +979,7 @@ function ContractTab({
                     : "border-indigo-100/80 bg-white/90 text-indigo-900",
                 )}
               >
-                <span className="font-mono text-[10px] text-indigo-500">
+                <span className="font-mono text-xs text-indigo-500">
                   {i + 1}.
                 </span>
                 <span>{s.label}</span>
@@ -988,7 +988,7 @@ function ContractTab({
           </ol>
         </div>
       ) : !data.contract ? (
-        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] leading-relaxed text-slate-700">
+        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs leading-relaxed text-slate-700">
           <span className="font-medium text-slate-800">Типовий шлях: </span>
           чернетка → реквізити та змінні → версія документа → PDF / підпис → віхи
           оплати у вкладці «Оплата».
@@ -996,7 +996,7 @@ function ContractTab({
       ) : null}
       <div className={wrap}>
         <h2 className="text-base font-semibold text-[var(--enver-text)]">Договір</h2>
-        <p className="mt-1 text-xs text-slate-600">
+        <p className="mt-1 text-sm text-slate-600">
           Заповніть реквізити, збережіть чернетку, потім створіть версію та експортуйте документ.
         </p>
         {!data.contract ? (
@@ -1017,7 +1017,7 @@ function ContractTab({
             <div className="rounded-xl border border-slate-200/80 bg-gradient-to-br from-slate-50 via-white to-indigo-50/40 p-3 shadow-sm">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Контекст угоди
                   </p>
                   <p className="mt-0.5 truncate font-semibold text-[var(--enver-text)]" title={data.deal.title}>
@@ -1038,12 +1038,12 @@ function ContractTab({
                       </span>
                     ) : null}
                   </p>
-                  <p className="mt-1 text-[11px] text-slate-500">
+                  <p className="mt-1 text-xs text-slate-500">
                     Етап: {data.stage.name} · Воронка: {data.pipeline.name}
                   </p>
                 </div>
                 <div className="shrink-0 text-right">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Бюджет угоди
                   </p>
                   <p className="text-sm font-semibold tabular-nums text-[var(--enver-text)]">
@@ -1069,13 +1069,13 @@ function ContractTab({
               </li>
             </ul>
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">
                 Прогрес договору
               </p>
               <div className="mt-1 grid gap-1 text-xs text-slate-700 sm:grid-cols-3">
                 <div
                   className={cn(
-                    "rounded border px-2 py-1 transition",
+                    "rounded border px-2 py-1.5 transition",
                     step1Done
                       ? "border-emerald-200 bg-emerald-50 text-emerald-800"
                       : "border-slate-200 bg-[var(--enver-card)]",
@@ -1086,7 +1086,7 @@ function ContractTab({
                 </div>
                 <div
                   className={cn(
-                    "rounded border px-2 py-1 transition",
+                    "rounded border px-2 py-1.5 transition",
                     step2Done
                       ? "border-emerald-200 bg-emerald-50 text-emerald-800"
                       : "border-slate-200 bg-[var(--enver-card)]",
@@ -1097,7 +1097,7 @@ function ContractTab({
                 </div>
                 <div
                   className={cn(
-                    "rounded border px-2 py-1 transition",
+                    "rounded border px-2 py-1.5 transition",
                     step3Done
                       ? "border-emerald-200 bg-emerald-50 text-emerald-800"
                       : "border-slate-200 bg-[var(--enver-card)]",
@@ -1170,20 +1170,20 @@ function ContractTab({
               </div>
             </div>
             {draft ? (
-              <div className="grid gap-2 text-xs sm:grid-cols-3">
-                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+              <div className="grid gap-2 text-sm sm:grid-cols-3">
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
                   <p className="text-slate-500">Реквізити</p>
                   <p className="font-medium text-[var(--enver-text)]">
                     {requisitesCompletion}/{requisitesFields.length}
                   </p>
                 </div>
-                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
                   <p className="text-slate-500">Умови</p>
                   <p className="font-medium text-[var(--enver-text)]">
                     {termsCompletion}/{termsFields.length}
                   </p>
                 </div>
-                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
                   <p className="text-slate-500">Версії</p>
                   <p className="font-medium text-[var(--enver-text)]">{data.contract.version}</p>
                 </div>
@@ -1202,7 +1202,7 @@ function ContractTab({
                   className="scroll-mt-28 space-y-3 rounded-lg border border-slate-100 bg-slate-50/50 p-3"
                 >
                 <div className="grid gap-2 sm:grid-cols-2">
-                  <label className="block text-[11px]">
+                  <label className="block text-sm">
                     <span className="text-slate-500">Тип документа</span>
                     <select
                       value={draft.documentType}
@@ -1225,7 +1225,7 @@ function ContractTab({
                       <option value="SPEC">Специфікація</option>
                     </select>
                   </label>
-                  <label className="block text-[11px]">
+                  <label className="block text-sm">
                     <span className="text-slate-500">Формат</span>
                     <select
                       value={draft.format}
@@ -1246,7 +1246,7 @@ function ContractTab({
                     </select>
                   </label>
                 </div>
-                <label className="block text-[11px]">
+                <label className="block text-sm">
                   <span className="text-slate-500">Шаблон</span>
                   <select
                     value={draft.templateKey}
@@ -1281,7 +1281,7 @@ function ContractTab({
                 >
                   {busy ? "..." : "Застосувати шаблон"}
                 </button>
-                <label className="block text-[11px]">
+                <label className="block text-sm">
                   <span className="text-slate-500">На кого виписується договір</span>
                   <select
                     value={draft.recipientType}
@@ -1318,12 +1318,12 @@ function ContractTab({
                   Заповнити всі поля з даних угоди
                 </button>
                 </div>
-                <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-100 bg-slate-50 p-2 text-xs">
+                <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-100 bg-slate-50 p-2.5 text-sm">
                   <span className="text-slate-500">Режим заповнення:</span>
                   <button
                     type="button"
                     className={cn(
-                      "rounded-md px-2 py-1",
+                      "rounded-md px-2.5 py-1.5",
                       !requiredOnlyMode
                         ? "bg-slate-900 text-white"
                         : "bg-[var(--enver-card)] text-slate-700",
@@ -1335,7 +1335,7 @@ function ContractTab({
                   <button
                     type="button"
                     className={cn(
-                      "rounded-md px-2 py-1",
+                      "rounded-md px-2.5 py-1.5",
                       requiredOnlyMode
                         ? "bg-slate-900 text-white"
                         : "bg-[var(--enver-card)] text-slate-700",
@@ -1345,7 +1345,7 @@ function ContractTab({
                     {"Лише обов'язкові"}
                   </button>
                 </div>
-                <p className="text-[11px] text-slate-500">
+                <p className="text-xs text-slate-500">
                   Порада: спочатку натисніть автозаповнення, перевірте{" "}
                   {"обов'язкові"} поля, потім
                   створюйте версію та експортуйте файл.{" "}
@@ -1360,12 +1360,12 @@ function ContractTab({
                   className="scroll-mt-28 rounded-lg border border-slate-100 bg-[var(--enver-card)] p-2"
                   open
                 >
-                  <summary className="cursor-pointer text-[11px] font-medium text-slate-700">
+                  <summary className="cursor-pointer text-xs font-medium text-slate-700">
                     Реквізити
                   </summary>
                   <div className="mt-2 grid gap-2 sm:grid-cols-2">
                     {visibleRequisitesFields.map(([key, label, placeholder]) => (
-                      <label key={key} className="block text-[11px]">
+                      <label key={key} className="block text-sm">
                         <span className="text-slate-500">{label}</span>
                         <input
                           value={draft.variables?.[key] ?? ""}
@@ -1382,7 +1382,7 @@ function ContractTab({
                   className="scroll-mt-28 rounded-lg border border-slate-100 bg-[var(--enver-card)] p-2"
                   open
                 >
-                  <summary className="cursor-pointer text-[11px] font-medium text-slate-700">
+                  <summary className="cursor-pointer text-xs font-medium text-slate-700">
                     Умови договору
                   </summary>
                   <div className="mt-2 flex flex-wrap gap-1">
@@ -1394,7 +1394,7 @@ function ContractTab({
                       <button
                         key={snippet}
                         type="button"
-                        className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] text-slate-700 hover:bg-slate-100"
+                        className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-700 hover:bg-slate-100"
                         onClick={() =>
                           updateDraftVariable(
                             "paymentTerms",
@@ -1409,7 +1409,7 @@ function ContractTab({
                   </div>
                   <div className="mt-2 grid gap-2 sm:grid-cols-2">
                     {visibleTermsFields.map(([key, label, placeholder]) => (
-                      <label key={key} className="block text-[11px]">
+                      <label key={key} className="block text-sm">
                         <span className="text-slate-500">{label}</span>
                         {key === "paymentTerms" ? (
                           <textarea
@@ -1451,7 +1451,7 @@ function ContractTab({
                     {missingRequired.map((k) => requiredLabelByKey[k]).join(", ")}.
                   </p>
                 ) : null}
-                <label id="contract-section-body" className="block scroll-mt-28 text-[11px]">
+                <label id="contract-section-body" className="block scroll-mt-28 text-sm">
                   <span className="text-slate-500">Вміст документа (HTML/текст)</span>
                   <textarea
                     value={draft.contentHtml}
@@ -1477,7 +1477,7 @@ function ContractTab({
                   className="scroll-mt-28 rounded-lg border border-slate-200 bg-slate-50 p-2 lg:sticky lg:top-4"
                 >
                   <div className="mb-2 flex items-center justify-between gap-2">
-                    <p className="text-[11px] font-medium text-slate-700">
+                    <p className="text-xs font-medium text-slate-700">
                       Попередній перегляд з підстановкою полів
                     </p>
                     <button
@@ -1520,7 +1520,7 @@ function ContractTab({
                     <p className="text-[11px] font-medium text-slate-700">
                       Останні зміни полів (поточна сесія)
                     </p>
-                    <ul className="mt-1 space-y-1 text-[11px] text-slate-600">
+                    <ul className="mt-1 space-y-1 text-xs text-slate-600">
                       {fieldActivity.map((item) => (
                         <li key={item.key}>
                           {item.label} · {new Date(item.at).toLocaleTimeString("uk-UA")}
@@ -1530,7 +1530,7 @@ function ContractTab({
                   </div>
                 ) : null}
                 <div className="sticky top-2 z-10 flex flex-wrap gap-2 rounded-lg border border-slate-200 bg-[var(--enver-card)]/95 p-2 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-[var(--enver-card)]/80">
-                  <div className="w-full text-[11px] font-medium text-slate-500">
+                  <div className="w-full text-xs font-medium text-slate-500">
                     Швидкий сценарій: автозаповнення → версія → PDF/DOCX → підпис
                   </div>
                   <button
@@ -1694,7 +1694,7 @@ function ContractTab({
                   </p>
                 ) : null}
                 <div className="rounded-lg border border-slate-100 bg-slate-50 p-2">
-                  <p className="text-[11px] font-medium text-slate-700">
+                  <p className="text-xs font-medium text-slate-700">
                     Передперегляд документів
                   </p>
                   <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -1719,7 +1719,7 @@ function ContractTab({
                       HTML
                     </button>
                     {docPreviewTab === "pdf" ? (
-                      <div className="ml-auto flex items-center gap-1 text-[11px]">
+                      <div className="ml-auto flex items-center gap-1 text-xs">
                         <button
                           type="button"
                           className={btnGhost}
@@ -1751,12 +1751,12 @@ function ContractTab({
                     ) : null}
                   </div>
                   {contractDocs.length === 0 ? (
-                    <p className="mt-1 text-[11px] text-slate-500">
+                    <p className="mt-1 text-xs text-slate-500">
                       Документів договору поки немає. Згенеруйте PDF або DOCX.
                     </p>
                   ) : (
                     <>
-                      <ul className="mt-1 space-y-1 text-[11px] text-slate-700">
+                      <ul className="mt-1 space-y-1 text-xs text-slate-700">
                         {contractDocs.map((d) => {
                           const isPdf = d.fileName.toLowerCase().endsWith(".pdf");
                           const selected = docPreviewUrl === d.fileUrl;
@@ -1764,7 +1764,7 @@ function ContractTab({
                             <li
                               key={d.id}
                               className={cn(
-                                "flex items-center justify-between gap-2 rounded border px-2 py-1",
+                                "flex items-center justify-between gap-2 rounded border px-2 py-1.5",
                                 selected
                                   ? "border-indigo-200 bg-indigo-50"
                                   : "border-slate-200 bg-[var(--enver-card)]",
@@ -1826,7 +1826,7 @@ function ContractTab({
                           />
                         </div>
                       ) : (
-                        <p className="mt-1 text-[11px] text-slate-500">
+                        <p className="mt-1 text-xs text-slate-500">
                           Для DOCX доступне відкриття в новій вкладці.
                         </p>
                       )}
@@ -1840,10 +1840,10 @@ function ContractTab({
                 ) : null}
                 {diiaEvents.length ? (
                   <div className="rounded-lg border border-emerald-100 bg-emerald-50/50 p-2">
-                    <p className="text-[11px] font-medium text-emerald-800">
+                    <p className="text-xs font-medium text-emerald-800">
                       Історія подій Дія.Підпис
                     </p>
-                    <ul className="mt-1 max-h-40 space-y-1 overflow-y-auto text-[11px] text-emerald-900">
+                    <ul className="mt-1 max-h-40 space-y-1 overflow-y-auto text-xs text-emerald-900">
                       {diiaEvents.map((ev, idx) => (
                         <li
                           key={`${ev.at}-${idx}`}
@@ -1863,17 +1863,17 @@ function ContractTab({
                   </div>
                 ) : null}
                 <div className="rounded-lg border border-slate-100 bg-slate-50 p-2">
-                  <p className="text-[11px] font-medium text-slate-700">
+                  <p className="text-xs font-medium text-slate-700">
                     Задачі по підпису (DIIA)
                   </p>
                   {diiaTasksLoading ? (
-                    <p className="mt-1 text-[11px] text-slate-500">Завантаження...</p>
+                    <p className="mt-1 text-xs text-slate-500">Завантаження...</p>
                   ) : diiaTasksErr ? (
-                    <p className="mt-1 text-[11px] text-rose-700">{diiaTasksErr}</p>
+                    <p className="mt-1 text-xs text-rose-700">{diiaTasksErr}</p>
                   ) : diiaTasks.length === 0 ? (
-                    <p className="mt-1 text-[11px] text-slate-500">Немає задач по підпису.</p>
+                    <p className="mt-1 text-xs text-slate-500">Немає задач по підпису.</p>
                   ) : (
-                    <ul className="mt-1 max-h-36 space-y-1 overflow-y-auto text-[11px] text-slate-700">
+                    <ul className="mt-1 max-h-36 space-y-1 overflow-y-auto text-xs text-slate-700">
                       {diiaTasks.map((t) => (
                         <li key={t.id} className="rounded border border-slate-200 bg-[var(--enver-card)] px-2 py-1">
                           <div className="font-medium text-slate-800">
