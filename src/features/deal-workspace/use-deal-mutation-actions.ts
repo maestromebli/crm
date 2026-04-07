@@ -43,6 +43,25 @@ export async function patchDealById(
   if (!r.ok) throw new Error(j.error ?? j.message ?? "Не вдалося зберегти угоду");
 }
 
+export async function patchDealStageById(
+  dealId: string,
+  stageId: string,
+): Promise<{ blockers?: string[]; stageName?: string }> {
+  const r = await fetch(`/api/deals/${dealId}/stage`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ stageId }),
+  });
+  const j = await parseResponseJson<{
+    error?: string;
+    message?: string;
+    blockers?: string[];
+    stageName?: string;
+  }>(r);
+  if (!r.ok) throw new Error(j.error ?? j.message ?? "Не вдалося змінити стадію");
+  return { blockers: j.blockers, stageName: j.stageName };
+}
+
 export async function patchWorkspaceMetaByDealId(
   dealId: string,
   patch: Partial<DealWorkspaceMeta>,
@@ -74,14 +93,19 @@ export async function patchDealHandoffByDealId(
 export async function patchDealProductionLaunchByDealId(
   dealId: string,
   patch: Record<string, unknown>,
-): Promise<void> {
+): Promise<{ handoffImportedFileCount?: number | null }> {
   const r = await fetch(`/api/deals/${dealId}/production-launch`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(patch),
   });
-  const j = await parseResponseJson<{ error?: string; message?: string }>(r);
+  const j = await parseResponseJson<{
+    error?: string;
+    message?: string;
+    handoffImportedFileCount?: number | null;
+  }>(r);
   if (!r.ok) throw new Error(j.error ?? j.message ?? "Помилка оновлення запуску");
+  return { handoffImportedFileCount: j.handoffImportedFileCount ?? null };
 }
 
 export async function patchDealContractByDealId<T>(

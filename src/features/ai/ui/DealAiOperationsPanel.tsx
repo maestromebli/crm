@@ -29,7 +29,7 @@ export function DealAiOperationsPanel({ dealId, className }: Props) {
         });
         const j = await parseJsonResponse<
           AiOperationSuccess | { error?: string }
-        >(r);
+        >(r, { serviceLabel: "AI" });
         if (!r.ok) {
           throw new Error(
             "error" in j && j.error ? j.error : "Помилка запиту",

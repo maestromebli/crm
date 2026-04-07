@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { patchDealProductionLaunchByDealId } from "@/features/deal-workspace/use-deal-mutation-actions";
 
 export type ProductionQueueTableRow = {
   id: string;
@@ -75,20 +76,12 @@ export function ProductionQueueTableClient({
         );
         window.setTimeout(() => setLastLaunchInfo(""), 10000);
       } else {
-        const r = await fetch(`/api/deals/${rowId}/production-launch`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(
-            action === "retry"
-              ? { action: "retry" }
-              : { action: "fail", error: "Позначено вручну оператором черги" },
-          ),
-        });
-        const j = (await r.json().catch(() => ({}))) as {
-          error?: string;
-          handoffImportedFileCount?: number | null;
-        };
-        if (!r.ok) throw new Error(j.error ?? "Не вдалося оновити статус");
+        const j = await patchDealProductionLaunchByDealId(
+          rowId,
+          action === "retry"
+            ? { action: "retry" }
+            : { action: "fail", error: "Позначено вручну оператором черги" },
+        );
         if (action === "retry") {
           const n = j.handoffImportedFileCount;
           setLastLaunchInfo(

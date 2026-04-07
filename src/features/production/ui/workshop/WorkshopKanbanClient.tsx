@@ -22,6 +22,7 @@ import {
   workshopStageHref,
   type WorkshopKanbanStageKey,
 } from "../../workshop-stages";
+import { patchJson } from "@/lib/api/patch-json";
 import { tryReadResponseJson } from "@/lib/http/read-response-json";
 
 type KanbanColumn = ProductionCommandCenterView["workshopKanban"][number];
@@ -170,13 +171,12 @@ export function WorkshopKanbanClient({ initialStageKey = null }: WorkshopKanbanC
   async function setAssignee(task: WorkshopTask, assigneeUserId: string | null) {
     setSavingTaskId(task.id);
     try {
-      const r = await fetch(`/api/crm/production/workshop/tasks/${task.id}/assign`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assigneeUserId }),
+      await patchJson(`/api/crm/production/workshop/tasks/${task.id}/assign`, {
+        assigneeUserId,
       });
-      if (!r.ok) return;
       await load();
+    } catch {
+      return;
     } finally {
       setSavingTaskId(null);
     }
@@ -185,13 +185,12 @@ export function WorkshopKanbanClient({ initialStageKey = null }: WorkshopKanbanC
   async function saveMaterials(task: WorkshopTask, items: WorkshopTask["materialsChecklist"]) {
     setSavingTaskId(task.id);
     try {
-      const r = await fetch(`/api/crm/production/workshop/tasks/${task.id}/materials`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items }),
+      await patchJson(`/api/crm/production/workshop/tasks/${task.id}/materials`, {
+        items,
       });
-      if (!r.ok) return;
       await load();
+    } catch {
+      return;
     } finally {
       setSavingTaskId(null);
     }

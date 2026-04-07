@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { KanbanBoardSkeleton } from "@/components/shared/KanbanBoardSkeleton";
 import { KanbanEmptyColumn } from "@/components/shared/KanbanEmptyColumn";
+import { patchJson } from "@/lib/api/patch-json";
 /** Колонки дошки (legacy mapping; API може повертати інший набір статусів). */
 type KanbanOrderStatus = "QUEUED" | "IN_PROGRESS" | "PAUSED" | "COMPLETED";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -92,14 +93,10 @@ export function ProductionKanbanClient() {
   }, [load]);
 
   async function moveOrder(orderId: string, status: KanbanOrderStatus) {
-    const r = await fetch(`/api/crm/production/orders/${orderId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
-    });
-    if (!r.ok) {
-      const j = (await r.json()) as { error?: string };
-      setError(j.error ?? "Не вдалося перемістити");
+    try {
+      await patchJson(`/api/crm/production/orders/${orderId}`, { status });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Не вдалося перемістити");
       return;
     }
     await load();

@@ -18,6 +18,7 @@ import { CalendarFilters } from "./CalendarFilters";
 import { EventDetailsPanel } from "./EventDetailsPanel";
 import { UpcomingEventsPanel } from "./UpcomingEventsPanel";
 import { CreateEventDialog } from "./CreateEventDialog";
+import { patchJson } from "../../../lib/api/patch-json";
 
 type CalendarShellProps = {
   initialDate?: Date;
@@ -175,22 +176,13 @@ export function CalendarShell({
   const handleEventReschedule = useCallback(
     async (eventId: string, startAt: Date, endAt: Date) => {
       try {
-        const r = await fetch(`/api/calendar/events/${eventId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            startAt: startAt.toISOString(),
-            endAt: endAt.toISOString(),
-          }),
+        await patchJson(`/api/calendar/events/${eventId}`, {
+          startAt: startAt.toISOString(),
+          endAt: endAt.toISOString(),
         });
-        const j = (await r.json().catch(() => ({}))) as { error?: string };
-        if (!r.ok) {
-          window.alert(j.error ?? "Не вдалося перенести подію");
-          return;
-        }
         router.refresh();
-      } catch {
-        window.alert("Помилка мережі");
+      } catch (e) {
+        window.alert(e instanceof Error ? e.message : "Помилка мережі");
       }
     },
     [router],

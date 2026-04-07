@@ -6,6 +6,7 @@ import type {
   CommunicationsIntegrationsConfig,
   CommunicationsIntegrationsSafe,
 } from "../../../../lib/settings/communications-config";
+import { patchJson } from "../../../../lib/api/patch-json";
 
 type LoadState = "idle" | "loading" | "error" | "ready";
 
@@ -219,23 +220,14 @@ export function CommunicationsSettingsClient({
         ...(phoneSecret.trim() ? { apiSecret: phoneSecret.trim() } : {}),
       };
 
-      const res = await fetch(apiBasePath, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          managerPhone: data.managerPhone,
-          managerDisplayName: data.managerDisplayName,
-          channels,
-        }),
-      });
-      if (!res.ok) {
-        const j = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(j.error ?? `HTTP ${res.status}`);
-      }
-      const out = (await res.json()) as {
+      const out = await patchJson<{
         ok: boolean;
         data: CommunicationsIntegrationsSafe;
-      };
+      }>(apiBasePath, {
+        managerPhone: data.managerPhone,
+        managerDisplayName: data.managerDisplayName,
+        channels,
+      });
       setError(null);
       setData(out.data);
       setSaveOk(true);

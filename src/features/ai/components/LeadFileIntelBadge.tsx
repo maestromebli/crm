@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Sparkles } from "lucide-react";
 import type { LeadAttachmentListItem } from "../../leads/queries";
+import { patchJson } from "../../../lib/api/patch-json";
 import { cn } from "../../../lib/utils";
 
 const AI_CAT_UA: Record<string, string> = {
@@ -177,15 +178,9 @@ function ConfirmCategoryInline({
             setBusy(true);
             setErr(null);
             try {
-              const r = await fetch(`/api/ai/file-extraction/${attachmentId}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ userConfirmedCategory: value }),
+              await patchJson(`/api/ai/file-extraction/${attachmentId}`, {
+                userConfirmedCategory: value,
               });
-              const j = (await r.json().catch(() => ({}))) as {
-                error?: string;
-              };
-              if (!r.ok) throw new Error(j.error ?? "Помилка");
               onDone();
             } catch (e) {
               setErr(e instanceof Error ? e.message : "Помилка");

@@ -36,7 +36,7 @@ export function DashboardAiSummary({
           });
           const data = await parseJsonResponse<
             AiOperationSuccess | { error?: string; ok?: false }
-          >(res);
+          >(res, { serviceLabel: "AI" });
           if (!res.ok || !("ok" in data) || !data.ok) {
             setStructured(null);
             setText(fallback);

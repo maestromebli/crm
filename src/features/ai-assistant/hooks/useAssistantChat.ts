@@ -125,7 +125,7 @@ export function useAssistantChat(options?: UseAssistantChatOptions) {
           text?: string;
           error?: string;
           toolsUsed?: string[];
-        }>(res);
+        }>(res, { serviceLabel: "AI чат" });
         if (!res.ok) {
           setError(data.error ?? "Помилка запиту");
           return;

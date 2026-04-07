@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { SettingsCard } from "./SettingsCard";
 import { Button } from "../ui/button";
 import { CRM_ROLES, ROLE_LABELS, type CrmRole } from "../../config/user-roles";
+import { patchJson } from "../../lib/api/patch-json";
 
 type ApiUser = {
   id: string;
@@ -135,24 +136,16 @@ export function SettingsUsersManager() {
     setResetBusy(true);
     try {
       const trimmed = resetPassword.trim();
-      const r = await fetch(`/api/settings/users/${resetUserId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          trimmed
-            ? { password: trimmed }
-            : { generatePassword: true },
-        ),
-      });
-      const j = (await r.json()) as {
+      const j = await patchJson<{
         ok?: boolean;
         generatedPassword?: string;
         error?: string;
-      };
-      if (!r.ok) {
-        setResetErr(j.error ?? "Не вдалося змінити пароль");
-        return;
-      }
+      }>(
+        `/api/settings/users/${resetUserId}`,
+        trimmed
+          ? { password: trimmed }
+          : { generatePassword: true },
+      );
       setResetPassword("");
       setResetUserId(null);
       if (j.generatedPassword) {

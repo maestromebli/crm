@@ -1,9 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { patchJson } from "@/lib/api/patch-json";
 
 type Flow = {
   id: string;
@@ -12,6 +14,18 @@ type Flow = {
   enabled: boolean;
   graphJson: unknown;
   updatedAt: string;
+};
+
+type EventHealthMini = {
+  window?: {
+    last24h?: {
+      processedRate?: number;
+      pending?: number;
+    };
+  };
+  backlog?: {
+    pendingTotal?: number;
+  };
 };
 
 const TRIGGERS = [
@@ -49,6 +63,7 @@ export function AutomationBuilderClient() {
   const [graphJson, setGraphJson] = useState(
     JSON.stringify(TEMPLATE_GRAPH, null, 2),
   );
+  const [eventHealth, setEventHealth] = useState<EventHealthMini | null>(null);
   const [busy, setBusy] = useState(false);
   const selected = useMemo(
     () => flows.find((x) => x.id === selectedId) ?? null,
@@ -66,6 +81,24 @@ export function AutomationBuilderClient() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    const loadEventHealth = async () => {
+      try {
+        const r = await fetch("/api/crm/event-health");
+        if (!r.ok) return;
+        const j = (await r.json()) as EventHealthMini;
+        if (!cancelled) setEventHealth(j);
+      } catch {
+        // non-blocking widget
+      }
+    };
+    void loadEventHealth();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!selected) return;
     setName(selected.name);
     setTrigger(selected.trigger);
@@ -77,10 +110,10 @@ export function AutomationBuilderClient() {
     try {
       const parsed = JSON.parse(graphJson) as object;
       if (selected) {
-        await fetch(`/api/crm/automation/flows/${selected.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name, trigger, graphJson: parsed }),
+        await patchJson(`/api/crm/automation/flows/${selected.id}`, {
+          name,
+          trigger,
+          graphJson: parsed,
         });
       } else {
         await fetch("/api/crm/automation/flows", {
@@ -96,32 +129,66 @@ export function AutomationBuilderClient() {
   };
 
   const toggleEnabled = async (flow: Flow) => {
-    await fetch(`/api/crm/automation/flows/${flow.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ enabled: !flow.enabled }),
+    await patchJson(`/api/crm/automation/flows/${flow.id}`, {
+      enabled: !flow.enabled,
     });
     await load();
   };
+
+  const pendingTotal = eventHealth?.backlog?.pendingTotal ?? null;
+  const pending24 = eventHealth?.window?.last24h?.pending ?? null;
+  const processedRate = eventHealth?.window?.last24h?.processedRate ?? null;
+
+  const healthStatus =
+    pendingTotal == null || pending24 == null || processedRate == null
+      ? null
+      : pendingTotal > 200 || pending24 > 80
+        ? "backlog"
+        : processedRate < 90 || pending24 > 20
+          ? "warning"
+          : "ok";
 
   return (
     <main className="mx-auto grid max-w-7xl grid-cols-1 gap-4 p-4 md:grid-cols-[280px_1fr] md:p-6">
       <section className="rounded-2xl border border-slate-200 bg-white p-3">
         <div className="mb-2 flex items-center justify-between">
           <h2 className="text-sm font-semibold text-slate-900">Automation Flows</h2>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setSelectedId(null);
-              setName("New automation flow");
-              setTrigger(TRIGGERS[0]);
-              setGraphJson(JSON.stringify(TEMPLATE_GRAPH, null, 2));
-            }}
-          >
-            New
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/crm/automation/event-health">Event Health</Link>
+            </Button>
+            {healthStatus ? (
+              <span
+                className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                  healthStatus === "ok"
+                    ? "bg-emerald-100 text-emerald-900"
+                    : healthStatus === "warning"
+                      ? "bg-amber-100 text-amber-900"
+                      : "bg-rose-100 text-rose-900"
+                }`}
+                title={
+                  pendingTotal != null && pending24 != null && processedRate != null
+                    ? `Backlog: ${pendingTotal} · Pending 24h: ${pending24} · Processed 24h: ${processedRate}%`
+                    : undefined
+                }
+              >
+                {healthStatus}
+              </span>
+            ) : null}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setSelectedId(null);
+                setName("New automation flow");
+                setTrigger(TRIGGERS[0]);
+                setGraphJson(JSON.stringify(TEMPLATE_GRAPH, null, 2));
+              }}
+            >
+              New
+            </Button>
+          </div>
         </div>
         <div className="space-y-2">
           {flows.map((f) => (

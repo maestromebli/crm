@@ -103,7 +103,9 @@ export function AiV2InsightCard({ context, leadId, dealId, className }: Props) {
             applyLowRiskActions,
           }),
         });
-        const data = await parseJsonResponse<InsightResponse | { error?: string }>(res);
+        const data = await parseJsonResponse<InsightResponse | { error?: string }>(res, {
+          serviceLabel: "AI V2",
+        });
         if (!res.ok) {
           throw new Error("error" in data && data.error ? data.error : "Помилка AI V2 запиту");
         }
@@ -123,16 +125,25 @@ export function AiV2InsightCard({ context, leadId, dealId, className }: Props) {
   );
 
   const loadAudit = useCallback(async () => {
-    const q = new URLSearchParams({ context, limit: "6" });
-    if (leadId) q.set("leadId", leadId);
-    if (dealId) q.set("dealId", dealId);
-    const res = await fetch(`/api/ai-v2/audit?${q.toString()}`, {
-      method: "GET",
-      cache: "no-store",
-    });
-    const data = await parseJsonResponse<{ items?: AuditItem[]; error?: string }>(res);
-    if (!res.ok) return;
-    setAuditItems(Array.isArray(data.items) ? data.items : []);
+    try {
+      const q = new URLSearchParams({ context, limit: "6" });
+      if (leadId) q.set("leadId", leadId);
+      if (dealId) q.set("dealId", dealId);
+      const res = await fetch(`/api/ai-v2/audit?${q.toString()}`, {
+        method: "GET",
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        setAuditItems([]);
+        return;
+      }
+      const data = await parseJsonResponse<{ items?: AuditItem[]; error?: string }>(res, {
+        serviceLabel: "AI V2",
+      });
+      setAuditItems(Array.isArray(data.items) ? data.items : []);
+    } catch {
+      setAuditItems([]);
+    }
   }, [context, leadId, dealId]);
 
   useEffect(() => {

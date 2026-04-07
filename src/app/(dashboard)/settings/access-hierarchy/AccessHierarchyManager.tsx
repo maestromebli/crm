@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { patchJson } from "@/lib/api/patch-json";
 
 type Head = { id: string; name: string | null; email: string };
 type Manager = { id: string; name: string | null; email: string; role: string };
@@ -63,16 +64,10 @@ export function AccessHierarchyManager() {
     setError(null);
     setOk(null);
     try {
-      const r = await fetch("/api/settings/access-hierarchy", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          headManagerId: selectedHead,
-          memberIds: selectedMembers,
-        }),
+      await patchJson("/api/settings/access-hierarchy", {
+        headManagerId: selectedHead,
+        memberIds: selectedMembers,
       });
-      const j = (await r.json().catch(() => ({}))) as { error?: string };
-      if (!r.ok) throw new Error(j.error ?? "Не вдалося зберегти");
       setOk("Ієрархію збережено.");
       setData((prev) =>
         prev

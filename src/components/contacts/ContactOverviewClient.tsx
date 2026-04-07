@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ExternalLink, KanbanSquare, Loader2, Save } from "lucide-react";
+import { patchJson } from "../../lib/api/patch-json";
 
 import type { ContactDetailRow } from "../../features/contacts/queries";
 
@@ -57,24 +58,18 @@ export function ContactOverviewClient({
     setErr(null);
     setOk(false);
     try {
-      const r = await fetch(`/api/contacts/${contact.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fullName,
-          firstName: firstName.trim() || null,
-          lastName: lastName.trim() || null,
-          phone: phone.trim() || null,
-          email: email.trim() || null,
-          instagramHandle: instagramHandle.trim() || null,
-          telegramHandle: telegramHandle.trim() || null,
-          city: city.trim() || null,
-          country: country.trim() || null,
-          notes: notes.trim() || null,
-        }),
+      await patchJson(`/api/contacts/${contact.id}`, {
+        fullName,
+        firstName: firstName.trim() || null,
+        lastName: lastName.trim() || null,
+        phone: phone.trim() || null,
+        email: email.trim() || null,
+        instagramHandle: instagramHandle.trim() || null,
+        telegramHandle: telegramHandle.trim() || null,
+        city: city.trim() || null,
+        country: country.trim() || null,
+        notes: notes.trim() || null,
       });
-      const j = (await r.json()) as { error?: string };
-      if (!r.ok) throw new Error(j.error ?? "Не вдалося зберегти");
       setOk(true);
       router.refresh();
     } catch (e) {

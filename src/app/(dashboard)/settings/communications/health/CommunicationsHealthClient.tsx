@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { patchJson } from "@/lib/api/patch-json";
 
 type UserLite = { id: string; name: string | null; email: string };
 type ChannelHealth = {
@@ -162,12 +163,7 @@ export function CommunicationsHealthClient() {
 
   const ackAlert = async (id: string) => {
     try {
-      const r = await fetch("/api/settings/communications/alerts", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
-      });
-      if (!r.ok) return;
+      await patchJson("/api/settings/communications/alerts", { id });
       await loadAlerts();
     } catch {
       // ignore ack errors

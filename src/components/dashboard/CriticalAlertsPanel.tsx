@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { patchJson } from "../../lib/api/patch-json";
 
 type AlertItem = {
   id: string;
@@ -28,12 +29,11 @@ export function CriticalAlertsPanel({ initialAlerts }: Props) {
   );
 
   const acknowledge = async (id: string) => {
-    const r = await fetch("/api/settings/communications/alerts", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id }),
-    });
-    if (!r.ok) return;
+    try {
+      await patchJson("/api/settings/communications/alerts", { id });
+    } catch {
+      return;
+    }
     setAlerts((prev) =>
       prev.map((a) =>
         a.id === id ? { ...a, readAt: new Date().toISOString() } : a,
@@ -42,12 +42,14 @@ export function CriticalAlertsPanel({ initialAlerts }: Props) {
   };
 
   const acknowledgeAll = async () => {
-    const r = await fetch("/api/settings/communications/alerts", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ackAll: true, unreadOnly: true }),
-    });
-    if (!r.ok) return;
+    try {
+      await patchJson("/api/settings/communications/alerts", {
+        ackAll: true,
+        unreadOnly: true,
+      });
+    } catch {
+      return;
+    }
     const now = new Date().toISOString();
     setAlerts((prev) => prev.map((a) => ({ ...a, readAt: a.readAt ?? now })));
   };

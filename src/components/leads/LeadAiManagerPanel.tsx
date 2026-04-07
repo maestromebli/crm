@@ -59,6 +59,7 @@ export function LeadAiManagerPanel({
       });
       const j = await parseJsonResponse<AiInsightResponse & { error?: string }>(
         r,
+        { serviceLabel: "AI" },
       );
       if (!r.ok) {
         throw new Error(j.error ?? "Помилка аналізу");

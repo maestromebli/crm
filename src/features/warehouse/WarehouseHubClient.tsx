@@ -12,6 +12,7 @@ import {
 } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { tryReadResponseJson } from "@/lib/http/read-response-json";
+import { patchJson } from "@/lib/api/patch-json";
 import { formatMoneyUa } from "@/features/finance/lib/format-money";
 import { movementKindLabel, refKindLabel } from "@/features/warehouse/lib/movement-labels";
 import {
@@ -267,18 +268,14 @@ export function WarehouseHubClient({ activeSection }: { activeSection: string })
       setUpdatingZoneFor(stockItemId);
       setErr(null);
       try {
-        const res = await fetch(`/api/crm/warehouse/stock/${stockItemId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ storageZoneId }),
-        });
-        const json = await tryReadResponseJson<{ error?: string; ok?: boolean }>(res);
-        if (!res.ok) {
-          setErr(json && "error" in json && json.error ? String(json.error) : "Не вдалося змінити зону");
-          return;
-        }
+        await patchJson<{ ok?: boolean }>(
+          `/api/crm/warehouse/stock/${stockItemId}`,
+          { storageZoneId },
+        );
         setSuccessMsg("Зону збережено.");
         await load();
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : "Не вдалося змінити зону");
       } finally {
         setUpdatingZoneFor(null);
       }

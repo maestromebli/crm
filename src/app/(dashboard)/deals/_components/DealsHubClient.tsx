@@ -21,6 +21,7 @@ import type {
   DealHubSortKey,
   SavedViewChipId,
 } from "../../../../features/deal-hub/deal-hub-filters";
+import { patchDealStageById } from "../../../../features/deal-workspace/use-deal-mutation-actions";
 import { cn } from "../../../../lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { KanbanEmptyColumn } from "@/components/shared/KanbanEmptyColumn";
@@ -391,48 +392,22 @@ export function DealsHubClient({
       }));
 
       try {
-        const r = await fetch(`/api/deals/${dealId}/stage`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ stageId: target.stageId }),
-        });
-        const j = (await r.json().catch(() => ({}))) as {
-          error?: string;
-          blockers?: string[];
-          stageName?: string;
-        };
-        if (!r.ok) {
-          setStageOverrides((prev) => {
-            const next = { ...prev };
-            delete next[dealId];
-            return next;
-          });
-          const blockers =
-            Array.isArray(j.blockers) && j.blockers.length > 0
-              ? j.blockers.join(" · ")
-              : "";
-          const err =
-            typeof j.error === "string" ? j.error : "Не вдалося змінити стадію";
-          setDndBanner({
-            kind: "err",
-            text: blockers ? `${err}. ${blockers}` : err,
-          });
-          return;
-        }
+        const j = await patchDealStageById(dealId, target.stageId);
         setDndBanner({
           kind: "ok",
           text: `Стадію оновлено: ${j.stageName ?? target.stageName}`,
         });
         router.refresh();
-      } catch {
+      } catch (e) {
         setStageOverrides((prev) => {
           const next = { ...prev };
           delete next[dealId];
           return next;
         });
+        const msg = e instanceof Error ? e.message : "Мережева помилка. Спробуйте ще раз.";
         setDndBanner({
           kind: "err",
-          text: "Мережева помилка. Спробуйте ще раз.",
+          text: msg,
         });
       } finally {
         setMovingDealId(null);

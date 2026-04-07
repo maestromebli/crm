@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { dispatchDealTasksUpdated } from "../../features/ai-assistant/utils/dispatchDealTasksUpdated";
 import { dispatchLeadTasksUpdated } from "../../features/ai-assistant/utils/dispatchLeadTasksUpdated";
+import { patchTaskById } from "../../lib/api/task-api";
 type TaskRow = {
   id: string;
   title: string;
@@ -73,13 +74,7 @@ export function TodayWorkspace() {
       overdue.find((t) => t.id === id) ?? today.find((t) => t.id === id);
     setBusyId(id);
     try {
-      const r = await fetch(`/api/tasks/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "DONE" }),
-      });
-      const j = (await r.json()) as { error?: string };
-      if (!r.ok) throw new Error(j.error ?? "Помилка");
+      await patchTaskById(id, { status: "DONE" });
       await load();
       if (task?.entityType === "LEAD") {
         dispatchLeadTasksUpdated({ leadId: task.entityId });

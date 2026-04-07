@@ -8,6 +8,7 @@ import { CRM_ROLES, ROLE_LABELS, type CrmRole } from "../../config/user-roles";
 import { ROLE_POLICY_SUMMARY_UK } from "../../lib/authz/role-access-policy";
 import { hasPermission } from "../../lib/authz/permissions";
 import type { MenuAccessState, NavSectionManifest } from "../../lib/navigation-access";
+import { patchJson as patchJsonRequest } from "../../lib/api/patch-json";
 import { SettingsCard } from "./SettingsCard";
 import { Button } from "../ui/button";
 
@@ -157,13 +158,7 @@ export function UserSettingsDetailClient({ userId }: { userId: string }) {
   }, [load]);
 
   const patchJson = async (body: Record<string, unknown>) => {
-    const r = await fetch(`/api/settings/users/${userId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const j = await parseApiJson<PatchResponse>(r);
-    if (!r.ok) throw new Error(j.error ?? `Запит не вдався (HTTP ${r.status})`);
+    const j = await patchJsonRequest<PatchResponse>(`/api/settings/users/${userId}`, body);
     if (j.permissionKeys && j.menuAccess !== undefined && j.user) {
       setData((prev) =>
         prev
