@@ -1,5 +1,6 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import type { QuotePrintModel } from "../leads/lead-proposal-document";
+import { externalGetArrayBuffer } from "../api/external-json";
 
 export type LeadProposalPdfInput = {
   leadTitle: string;
@@ -17,10 +18,9 @@ const NOTO_URL =
 
 async function loadUnicodeFont(doc: PDFDocument) {
   try {
-    const res = await fetch(NOTO_URL);
+    const res = await externalGetArrayBuffer(NOTO_URL);
     if (!res.ok) return null;
-    const bytes = await res.arrayBuffer();
-    return doc.embedFont(bytes);
+    return doc.embedFont(res.data);
   } catch {
     return null;
   }

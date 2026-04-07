@@ -3,6 +3,7 @@
 import { useCallback, useState } from "react";
 import { Loader2, RefreshCw, Sparkles } from "lucide-react";
 import type { DirectorAiBlock } from "../executive-types";
+import { postJson } from "@/lib/api/patch-json";
 import { cn } from "../../../lib/utils";
 
 type DirectorAiPanelProps = {
@@ -20,19 +21,10 @@ export function DirectorAiPanel({ initial, aiContextText }: DirectorAiPanelProps
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/ai/summary", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: "executive_dashboard",
-          context: aiContextText,
-        }),
+      const data = await postJson<{ text?: string; error?: string }>("/api/ai/summary", {
+        type: "executive_dashboard",
+        context: aiContextText,
       });
-      const data = (await res.json()) as { text?: string; error?: string };
-      if (!res.ok) {
-        setError(data.error ?? "Помилка AI");
-        return;
-      }
       if (data.text) {
         setBlock((b) => ({
           ...b,

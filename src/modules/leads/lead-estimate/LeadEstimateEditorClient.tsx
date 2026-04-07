@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { patchLeadEstimateById } from "../../../features/leads/lead-estimate-api";
+import { postJson } from "../../../lib/api/patch-json";
 import { cn } from "../../../lib/utils";
 
 type LineRow = {
@@ -200,12 +201,7 @@ export function LeadEstimateEditorClient({
     setAiBusy(true);
     setErr(null);
     try {
-      const r = await fetch(`/api/leads/${leadId}/estimates/ai-draft`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: aiPrompt }),
-      });
-      const j = (await r.json()) as {
+      const j = await postJson<{
         error?: string;
         draft?: {
           lines: Array<{
@@ -216,8 +212,7 @@ export function LeadEstimateEditorClient({
           }>;
           assumptions?: string[];
         };
-      };
-      if (!r.ok) throw new Error(j.error ?? "Помилка");
+      }>(`/api/leads/${leadId}/estimates/ai-draft`, { prompt: aiPrompt });
       const lines = j.draft?.lines ?? [];
       if (lines.length) {
         setLineDrafts(

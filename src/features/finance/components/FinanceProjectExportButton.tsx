@@ -1,6 +1,7 @@
 "use client";
 
 import { Download } from "lucide-react";
+import { postJson } from "@/lib/api/patch-json";
 import { Button } from "../../../components/ui/button";
 import { buildFinanceProjectCsvString, type FinanceProjectCsvPayload } from "../lib/build-finance-project-csv";
 
@@ -28,16 +29,15 @@ export function FinanceProjectExportButton({
     a.click();
     URL.revokeObjectURL(url);
 
-    void fetch("/api/finance/log-export", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    void postJson<{ ok?: boolean }>(
+      "/api/finance/log-export",
+      {
         kind: "project",
         projectId: payload.projectId ?? "",
         projectCode: payload.projectCode,
-      }),
-    }).catch(() => {});
+      },
+      { credentials: "same-origin" },
+    ).catch(() => {});
   };
 
   return (

@@ -55,7 +55,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
           <LeadWorkspaceQueryProvider>
           <motion.main
             key={pathname ?? "/"}
-            className="flex flex-1 flex-col"
+            className="enver-readable flex flex-1 flex-col"
             initial={reduceMotion ? false : { opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{

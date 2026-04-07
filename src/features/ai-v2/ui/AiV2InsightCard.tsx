@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, Loader2, Shield, Sparkles } from "lucide-react";
+import { postJson } from "@/lib/api/patch-json";
 import { parseJsonResponse } from "@/lib/http/parse-json-response";
 import { cn } from "@/lib/utils";
 import type { AiV2ContextName } from "../core/types";
@@ -93,22 +94,15 @@ export function AiV2InsightCard({ context, leadId, dealId, className }: Props) {
       if (applyLowRiskActions) setApplying(true);
       else setLoading(true);
       try {
-        const res = await fetch("/api/ai-v2/insights", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+        const data = await postJson<InsightResponse | { error?: string }>(
+          "/api/ai-v2/insights",
+          {
             context,
             leadId,
             dealId,
             applyLowRiskActions,
-          }),
-        });
-        const data = await parseJsonResponse<InsightResponse | { error?: string }>(res, {
-          serviceLabel: "AI V2",
-        });
-        if (!res.ok) {
-          throw new Error("error" in data && data.error ? data.error : "Помилка AI V2 запиту");
-        }
+          },
+        );
         if (!("decision" in data)) {
           throw new Error("Некоректна AI V2 відповідь");
         }

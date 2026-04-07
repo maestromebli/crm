@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { SettingsCard } from "./SettingsCard";
 import { Button } from "../ui/button";
 import { CRM_ROLES, ROLE_LABELS, type CrmRole } from "../../config/user-roles";
-import { patchJson } from "../../lib/api/patch-json";
+import { patchJson, postJson } from "../../lib/api/patch-json";
 
 type ApiUser = {
   id: string;
@@ -90,25 +90,16 @@ export function SettingsUsersManager() {
     setCreateMsg(null);
     setCreateBusy(true);
     try {
-      const r = await fetch("/api/settings/users", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: email.trim(),
-          name: name.trim() || null,
-          role,
-          password: password.trim() || undefined,
-        }),
-      });
-      const j = (await r.json()) as {
+      const j = await postJson<{
         user?: ApiUser;
         generatedPassword?: string;
         error?: string;
-      };
-      if (!r.ok) {
-        setCreateErr(j.error ?? "Не вдалося створити");
-        return;
-      }
+      }>("/api/settings/users", {
+        email: email.trim(),
+        name: name.trim() || null,
+        role,
+        ...(password.trim() ? { password: password.trim() } : {}),
+      });
       setEmail("");
       setName("");
       setPassword("");

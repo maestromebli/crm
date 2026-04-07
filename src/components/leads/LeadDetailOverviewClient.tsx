@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { postJson } from "../../lib/api/patch-json";
 import { useLeadMutationActions } from "../../features/leads/use-lead-mutation-actions";
 import type { LeadDetailRow } from "../../features/leads/queries";
 import { LeadAiManagerPanel } from "./LeadAiManagerPanel";
@@ -94,20 +95,15 @@ export function LeadDetailOverviewClient({
     setConverting(true);
     setErr(null);
     try {
-      const r = await fetch(`/api/leads/${lead.id}/convert-to-deal`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          dealTitle: dealTitleDraft.trim() || undefined,
-        }),
-      });
-      const data = (await r.json()) as {
+      const data = await postJson<{
         error?: string;
         dealId?: string;
         alreadyLinked?: boolean;
         filesMigrated?: number;
-      };
-      if (!r.ok || !data.dealId) {
+      }>(`/api/leads/${lead.id}/convert-to-deal`, {
+        ...(dealTitleDraft.trim() ? { dealTitle: dealTitleDraft.trim() } : {}),
+      });
+      if (!data.dealId) {
         setErr(data.error ?? "Не вдалося створити угоду");
         return;
       }

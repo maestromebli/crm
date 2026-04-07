@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { X } from "lucide-react";
+import { postJson } from "@/lib/api/patch-json";
 import { prismaCalendarTypeOptions } from "../event-type-styles";
 import type { CalendarEventType as PrismaCalendarEventType } from "@prisma/client";
 import { cn } from "../../../lib/utils";
@@ -74,21 +75,15 @@ export function CreateEventDialog({ open, onClose, anchorDate }: Props) {
     }
     setSaving(true);
     try {
-      const r = await fetch("/api/calendar/events", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: t,
-          type,
-          startAt: start.toISOString(),
-          endAt: end.toISOString(),
-          location: location.trim() || null,
-          description: description.trim() || null,
-          isAllDay: false,
-        }),
+      await postJson<{ id?: string }>("/api/calendar/events", {
+        title: t,
+        type,
+        startAt: start.toISOString(),
+        endAt: end.toISOString(),
+        location: location.trim() || null,
+        description: description.trim() || null,
+        isAllDay: false,
       });
-      const j = (await r.json().catch(() => ({}))) as { error?: string };
-      if (!r.ok) throw new Error(j.error ?? "Помилка збереження");
       onClose();
       router.refresh();
     } catch (e) {

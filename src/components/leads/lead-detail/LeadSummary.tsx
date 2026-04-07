@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { uk } from "date-fns/locale";
 import { useEffect, useState } from "react";
+import { postJson } from "../../../lib/api/patch-json";
 import { useLeadMutationActions } from "../../../features/leads/use-lead-mutation-actions";
 import type { LeadDetailRow } from "../../../features/leads/queries";
 import { dateToNextStepDateString } from "../../../lib/leads/next-step-date";
@@ -90,13 +91,11 @@ export function LeadSummary({
     setConverting(true);
     setErr(null);
     try {
-      const r = await fetch(`/api/leads/${lead.id}/convert-to-deal`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      });
-      const data = (await r.json()) as { error?: string; dealId?: string };
-      if (!r.ok || !data.dealId) {
+      const data = await postJson<{ error?: string; dealId?: string }>(
+        `/api/leads/${lead.id}/convert-to-deal`,
+        {},
+      );
+      if (!data.dealId) {
         throw new Error(data.error ?? "Не вдалося створити угоду");
       }
       router.push(`/deals/${data.dealId}/workspace?fromLead=1`);

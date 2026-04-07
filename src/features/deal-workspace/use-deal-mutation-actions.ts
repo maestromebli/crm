@@ -3,6 +3,7 @@
 import { useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { parseResponseJson } from "@/lib/api/parse-response-json";
+import { postJson } from "@/lib/api/patch-json";
 import { dealQueryKeys } from "./deal-query-keys";
 import {
   useDealStageMutation,
@@ -183,18 +184,11 @@ export function useDealMutationActions(dealId: string): DealMutationActions {
   );
 
   const advanceToNextStage = useCallback(async (): Promise<NextStageResult> => {
-    const r = await fetch(`/api/deals/${dealId}/stage/next`, {
-      method: "POST",
-    });
-    const j = await parseResponseJson<{
+    const j = await postJson<{
       error?: string;
       blockers?: string[];
       message?: string;
-    }>(r);
-    if (!r.ok) {
-      const error = j.error ?? "Перехід заблоковано";
-      throw new Error(error);
-    }
+    }>(`/api/deals/${dealId}/stage/next`, {});
     await queryClient.invalidateQueries({
       queryKey: dealQueryKeys.workspace(dealId),
     });

@@ -20,6 +20,7 @@ import { buildEstimateLinePayload } from "../../../lib/estimates/build-estimate-
 import { estimateVersionPreviewStorageKey } from "../../../lib/estimates/estimate-version-preview-storage";
 import type { CompareEstimateVersionsResult } from "../../../lib/estimates/compare-estimate-versions";
 import { patchLeadEstimateById } from "../../../features/leads/lead-estimate-api";
+import { postJson } from "../../../lib/api/patch-json";
 import { cn } from "../../../lib/utils";
 import { CreateProposalModal } from "./CreateProposalModal";
 
@@ -484,12 +485,7 @@ export function LeadEstimateWorkspace({
     setAiBusy(true);
     setErr(null);
     try {
-      const r = await fetch(`/api/leads/${leadId}/estimates/ai-draft`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: aiPrompt }),
-      });
-      const j = (await r.json()) as {
+      const j = await postJson<{
         error?: string;
         draft?: {
           lines: Array<{
@@ -501,8 +497,7 @@ export function LeadEstimateWorkspace({
           }>;
           assumptions?: string[];
         };
-      };
-      if (!r.ok) throw new Error(j.error ?? "Помилка");
+      }>(`/api/leads/${leadId}/estimates/ai-draft`, { prompt: aiPrompt });
       const raw = j.draft?.lines ?? [];
       const mapped: LineDraft[] = raw.map((l) => ({
         key: newLineKey(),
@@ -570,13 +565,10 @@ export function LeadEstimateWorkspace({
   const duplicateEstimate = async () => {
     setErr(null);
     try {
-      const r = await fetch(`/api/leads/${leadId}/estimates`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cloneFromEstimateId: estimateId }),
-      });
-      const j = (await r.json()) as { error?: string; estimate?: { id: string } };
-      if (!r.ok) throw new Error(j.error ?? "Помилка");
+      const j = await postJson<{ error?: string; estimate?: { id: string } }>(
+        `/api/leads/${leadId}/estimates`,
+        { cloneFromEstimateId: estimateId },
+      );
       if (j.estimate?.id) {
         router.push(`/leads/${leadId}/estimate/${j.estimate.id}`);
       }
@@ -588,16 +580,10 @@ export function LeadEstimateWorkspace({
   const createBlankEstimate = async () => {
     setErr(null);
     try {
-      const r = await fetch(`/api/leads/${leadId}/estimates`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      });
-      const j = (await r.json()) as {
+      const j = await postJson<{
         error?: string;
         estimate?: { id: string };
-      };
-      if (!r.ok) throw new Error(j.error ?? "Помилка");
+      }>(`/api/leads/${leadId}/estimates`, {});
       if (j.estimate?.id) {
         router.push(`/leads/${leadId}/estimate/${j.estimate.id}`);
       }
@@ -1639,22 +1625,12 @@ export function LeadEstimateWorkspace({
                             className="font-semibold text-blue-700 hover:underline"
                             onClick={() => {
                               void (async () => {
-                                const r = await fetch(
-                                  `/api/leads/${leadId}/estimates`,
-                                  {
-                                    method: "POST",
-                                    headers: {
-                                      "Content-Type": "application/json",
-                                    },
-                                    body: JSON.stringify({
-                                      cloneFromEstimateId: v.id,
-                                    }),
-                                  },
-                                );
-                                const j = (await r.json()) as {
+                                const j = await postJson<{
                                   estimate?: { id: string };
-                                };
-                                if (r.ok && j.estimate?.id) {
+                                }>(`/api/leads/${leadId}/estimates`, {
+                                  cloneFromEstimateId: v.id,
+                                });
+                                if (j.estimate?.id) {
                                   router.push(
                                     `/leads/${leadId}/estimate/${j.estimate.id}`,
                                   );

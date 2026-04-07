@@ -1,14 +1,14 @@
 import { PDFDocument, rgb } from "pdf-lib";
+import { externalGetArrayBuffer } from "../api/external-json";
 
 const NOTO_URL =
   "https://cdn.jsdelivr.net/npm/@fontsource/noto-sans@5.2.5/files/noto-sans-cyrillic-400-normal.ttf";
 
 async function loadUnicodeFont(doc: PDFDocument) {
   try {
-    const res = await fetch(NOTO_URL);
+    const res = await externalGetArrayBuffer(NOTO_URL);
     if (!res.ok) return null;
-    const bytes = await res.arrayBuffer();
-    return doc.embedFont(bytes);
+    return doc.embedFont(res.data);
   } catch {
     return null;
   }

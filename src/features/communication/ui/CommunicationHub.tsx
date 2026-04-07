@@ -10,6 +10,7 @@ import {
   Sparkles,
   WifiOff,
 } from "lucide-react";
+import { postJson } from "@/lib/api/patch-json";
 import { cn } from "../../../lib/utils";
 import type {
   CommunicationHubPayload,
@@ -101,13 +102,10 @@ export function CommunicationHub({
   const runInsight = async () => {
     setAiBusy("insight");
     try {
-      const r = await fetch("/api/communication/ai/insight", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ leadId, dealId }),
+      await postJson<{ ok?: boolean }>("/api/communication/ai/insight", {
+        leadId,
+        dealId,
       });
-      const j = (await r.json()) as { error?: string };
-      if (!r.ok) throw new Error(j.error ?? "Помилка");
       await load();
     } catch (e) {
       setLoadErr(e instanceof Error ? e.message : "Помилка AI");
@@ -119,13 +117,10 @@ export function CommunicationHub({
   const runReply = async (style: string) => {
     setAiBusy("reply");
     try {
-      const r = await fetch("/api/communication/ai/reply", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ leadId, dealId, style }),
-      });
-      const j = (await r.json()) as { text?: string; error?: string };
-      if (!r.ok) throw new Error(j.error ?? "Помилка");
+      const j = await postJson<{ text?: string; error?: string }>(
+        "/api/communication/ai/reply",
+        { leadId, dealId, style },
+      );
       setReplyDraft(j.text ?? "");
     } catch (e) {
       setLoadErr(e instanceof Error ? e.message : "Помилка AI");
@@ -140,17 +135,11 @@ export function CommunicationHub({
     if (!text) return;
     setNoteErr(null);
     try {
-      const r = await fetch(`/api/leads/${leadId}/messages`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          body: text,
-          channel: "INTERNAL",
-          interactionKind: "NOTE",
-        }),
+      await postJson<{ ok?: boolean }>(`/api/leads/${leadId}/messages`, {
+        body: text,
+        channel: "INTERNAL",
+        interactionKind: "NOTE",
       });
-      const j = (await r.json()) as { error?: string };
-      if (!r.ok) throw new Error(j.error ?? "Помилка");
       setNoteDraft("");
       onPostedInternalNote?.();
       await load();

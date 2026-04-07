@@ -2,9 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
+import { postJson } from "../../lib/api/patch-json";
 import { useLeadMutationActions } from "../../features/leads/use-lead-mutation-actions";
 import type { LeadDetailRow } from "../../features/leads/queries";
-import { parseJsonResponse } from "../../lib/http/parse-json-response";
 import { cn } from "../../lib/utils";
 
 export type AiInsightResponse = {
@@ -52,18 +52,10 @@ export function LeadAiManagerPanel({
     setErr(null);
     setLoading(true);
     try {
-      const r = await fetch(`/api/leads/${lead.id}/ai-insight`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ autoApplyStage }),
-      });
-      const j = await parseJsonResponse<AiInsightResponse & { error?: string }>(
-        r,
-        { serviceLabel: "AI" },
+      const j = await postJson<AiInsightResponse & { error?: string }>(
+        `/api/leads/${lead.id}/ai-insight`,
+        { autoApplyStage },
       );
-      if (!r.ok) {
-        throw new Error(j.error ?? "Помилка аналізу");
-      }
       setInsight(j);
       if (j.appliedStage) {
         router.refresh();

@@ -45,6 +45,8 @@
   body {
     @apply min-h-screen bg-[var(--enver-bg)] text-[var(--enver-text)] antialiased;
     font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+    line-height: 1.5;
+    text-rendering: optimizeLegibility;
   }
 }
 
@@ -300,6 +302,31 @@
 .enver-page-shell {
   min-height: calc(100vh - 3.5rem);
   background: var(--enver-bg);
+}
+
+/*
+ * Readability helpers for dense CRM screens.
+ * Apply `enver-readable` to high-level containers.
+ */
+.enver-readable {
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: var(--enver-text);
+}
+
+.enver-readable :where(h1, h2, h3, h4) {
+  color: var(--enver-text);
+  letter-spacing: -0.012em;
+  line-height: 1.25;
+  text-wrap: balance;
+}
+
+.enver-readable :where(p, li, td, th, label, input, textarea, select, button) {
+  line-height: 1.45;
+}
+
+.enver-readable :where(small, .text-xs) {
+  letter-spacing: 0.005em;
 }
 
 @media (prefers-reduced-motion: reduce) {

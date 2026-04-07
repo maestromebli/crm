@@ -21,6 +21,7 @@ import type {
   LeadProposalSummary,
 } from "../../../features/leads/queries";
 import { patchLeadEstimateById } from "../../../features/leads/lead-estimate-api";
+import { postJson } from "../../../lib/api/patch-json";
 import { parseResponseJson } from "../../../lib/api/parse-response-json";
 import { parseEstimateLineBreakdown } from "../../../lib/estimates/estimate-line-breakdown";
 import {
@@ -584,19 +585,13 @@ export function LeadPricingWorkspaceClient({
     setCreateBusy(true);
     setErr(null);
     try {
-      const r = await fetch(`/api/leads/${leadId}/estimates`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          estimateName: leadTitle,
-          templateKey: KITCHEN_NO_COUNTER_TEMPLATE_KEY,
-        }),
-      });
-      const j = await parseResponseJson<{
+      const j = await postJson<{
         estimate?: { id: string };
         error?: string;
-      }>(r);
-      if (!r.ok) throw new Error(j.error ?? "Не створено");
+      }>(`/api/leads/${leadId}/estimates`, {
+        estimateName: leadTitle,
+        templateKey: KITCHEN_NO_COUNTER_TEMPLATE_KEY,
+      });
       if (j.estimate?.id) {
         await refreshList();
         setSelectedId(j.estimate.id);
@@ -857,23 +852,7 @@ export function LeadPricingWorkspaceClient({
     setAiBusy(true);
     setErr(null);
     try {
-      const r = await fetch(`/api/leads/${leadId}/estimates/ai-assist`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt: aiPrompt,
-          estimateName: leadTitle,
-          lines: lines.map((li) => ({
-            type: li.type,
-            category: li.category,
-            productName: li.productName,
-            qty: li.qty,
-            unit: li.unit,
-            salePrice: li.salePrice,
-          })),
-        }),
-      });
-      const j = await parseResponseJson<{
+      const j = await postJson<{
         draft?: {
           lines: Array<{
             type: LineType;
@@ -888,8 +867,18 @@ export function LeadPricingWorkspaceClient({
           missing?: string[];
         };
         error?: string;
-      }>(r);
-      if (!r.ok) throw new Error(j.error ?? "AI недоступний");
+      }>(`/api/leads/${leadId}/estimates/ai-assist`, {
+        prompt: aiPrompt,
+        estimateName: leadTitle,
+        lines: lines.map((li) => ({
+          type: li.type,
+          category: li.category,
+          productName: li.productName,
+          qty: li.qty,
+          unit: li.unit,
+          salePrice: li.salePrice,
+        })),
+      });
       const aiLines = j.draft?.lines ?? [];
       if (!aiLines.length) return;
       setAiHints([...(j.draft?.assumptions ?? []), ...(j.draft?.missing ?? [])]);
@@ -1211,16 +1200,14 @@ export function LeadPricingWorkspaceClient({
     setPdfBusyId(proposalId);
     setErr(null);
     try {
-      const r = await fetch(
-        `/api/leads/${leadId}/proposals/${proposalId}/pdf`,
-        { method: "POST" },
-      );
-      const j = await parseResponseJson<{
+      const j = await postJson<{
         pdfUrl?: string;
         publicToken?: string;
         error?: string;
-      }>(r);
-      if (!r.ok) throw new Error(j.error ?? "Не вдалося згенерувати PDF");
+      }>(
+        `/api/leads/${leadId}/proposals/${proposalId}/pdf`,
+        {},
+      );
       const pdfFileUrl =
         typeof j.pdfUrl === "string" && j.pdfUrl.trim() ? j.pdfUrl.trim() : null;
       setProposals((prev) =>

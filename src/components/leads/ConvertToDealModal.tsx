@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import type { LeadDetailRow } from "../../features/leads/queries";
+import { postJson } from "../../lib/api/patch-json";
 import type { LeadHubSummaryApiResponse } from "../../lib/leads/hub-summary-api";
 import {
   computeLeadReadinessRows,
@@ -260,17 +261,12 @@ export function ConvertToDealModal({
       },
     };
     try {
-      const r = await fetch(`/api/leads/${lead.id}/convert-to-deal`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(input),
-      });
-      const data = (await r.json()) as {
+      const data = await postJson<{
         error?: string;
         dealId?: string;
         alreadyLinked?: boolean;
-      };
-      if (!r.ok || !data.dealId) {
+      }>(`/api/leads/${lead.id}/convert-to-deal`, input);
+      if (!data.dealId) {
         throw new Error(data.error ?? "Не вдалося створити угоду");
       }
       onConverted(data.dealId);

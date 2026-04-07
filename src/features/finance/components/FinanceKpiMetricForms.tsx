@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
 import { Textarea } from "../../../components/ui/textarea";
+import { putJson } from "@/lib/api/patch-json";
 import type { FinanceExecutiveKpi } from "../lib/aggregation";
 import type {
   ExecutiveKpiNoteRow,
@@ -122,15 +123,10 @@ export function FinanceKpiMetricFormPanel({ kpi, metric, noteRow, canEdit, onPer
       setSaving(true);
       setError(null);
       try {
-        const res = await fetch(`/api/finance/executive-kpi-notes/${encodeURIComponent(metric)}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ payload: data }),
-        });
-        const j = (await res.json().catch(() => ({}))) as ExecutiveKpiNoteRow & { error?: string };
-        if (!res.ok) {
-          throw new Error(j.error ?? "Не вдалося зберегти");
-        }
+        const j = await putJson<ExecutiveKpiNoteRow & { error?: string }>(
+          `/api/finance/executive-kpi-notes/${encodeURIComponent(metric)}`,
+          { payload: data },
+        );
         if (!j.metricId || !j.updatedAt) {
           throw new Error("Некоректна відповідь сервера");
         }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { postFormData } from "@/lib/api/patch-json";
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
 import { Textarea } from "../../../components/ui/textarea";
@@ -212,17 +213,10 @@ function ExpenseDrawer({
     try {
       const form = new FormData();
       form.append("file", sourceFile);
-      const res = await fetch("/api/finance/expense-recognize", {
-        method: "POST",
-        body: form,
-      });
-      if (!res.ok) {
-        const fail = (await res.json()) as { error?: string };
-        setAiNote(fail.error ?? "Не вдалося розпізнати файл.");
-        setAiLineItems([]);
-        return;
-      }
-      const data = (await res.json()) as RecognizedExpenseResponse;
+      const data = await postFormData<RecognizedExpenseResponse>(
+        "/api/finance/expense-recognize",
+        form,
+      );
       const recognized = data.recognized;
       setAiLineItems(recognized.lineItems ?? []);
 
@@ -258,8 +252,9 @@ function ExpenseDrawer({
       setAiNote(
         `Розпізнано із впевненістю ${(recognized.confidence * 100).toFixed(0)}%. Поля форми оновлено.`,
       );
-    } catch {
-      setAiNote("Помилка з'єднання з сервісом розпізнавання.");
+    } catch (e) {
+      setAiLineItems([]);
+      setAiNote(e instanceof Error ? e.message : "Помилка з'єднання з сервісом розпізнавання.");
     } finally {
       setIsAiAnalyzing(false);
     }

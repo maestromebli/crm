@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { postJson } from "@/lib/api/patch-json";
 
 type Props = {
   token: string;
@@ -40,13 +41,7 @@ export function ConstructorWorkspaceClient({ token, flow }: Props) {
     setBusy(true);
     setError(null);
     try {
-      const response = await fetch(path, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const payload = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(payload.error ?? "Помилка запиту");
+      await postJson<{ ok?: boolean }>(path, body as Record<string, unknown>);
       window.location.reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Помилка запиту");

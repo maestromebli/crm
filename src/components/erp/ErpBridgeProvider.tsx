@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
+import { putJson } from "@/lib/api/patch-json";
 import {
   ERP_BRIDGE_INITIAL_STATE,
   type ErpEvent,
@@ -104,11 +105,7 @@ export function ErpBridgeProvider({ children }: { children: ReactNode }) {
     if (!hydrated) return;
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     const timer = window.setTimeout(() => {
-      void fetch("/api/crm/erp/bridge", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(state),
-      }).catch(() => {
+      void putJson<Record<string, unknown>>("/api/crm/erp/bridge", state).catch(() => {
         // Silent fallback to localStorage when API is unavailable.
       });
     }, 350);

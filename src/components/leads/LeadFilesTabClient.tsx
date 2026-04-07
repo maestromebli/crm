@@ -4,6 +4,7 @@ import type { AttachmentCategory } from "@prisma/client";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { LeadAttachmentListItem } from "../../features/leads/queries";
+import { postFormData } from "../../lib/api/patch-json";
 import { LEAD_CREATE_FILE_WARNINGS_KEY } from "../../lib/leads/lead-file-warnings-storage";
 import { cn } from "../../lib/utils";
 import { LeadFileIntelBadge } from "../../features/ai/components/LeadFileIntelBadge";
@@ -128,16 +129,9 @@ export function LeadFilesTabClient({ leadId, attachments, canUpload }: Props) {
                   const fd = new FormData();
                   fd.append("file", file);
                   fd.append("category", category);
-                  const r = await fetch(`/api/leads/${leadId}/attachments`, {
-                    method: "POST",
-                    body: fd,
-                  });
-                  const j = (await r.json().catch(() => ({}))) as {
+                  const j = await postFormData<{
                     error?: string;
-                  };
-                  if (!r.ok) {
-                    throw new Error(j.error ?? file.name);
-                  }
+                  }>(`/api/leads/${leadId}/attachments`, fd);
                 }
                 el.value = "";
                 router.refresh();

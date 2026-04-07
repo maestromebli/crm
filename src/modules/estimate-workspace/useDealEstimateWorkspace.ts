@@ -33,6 +33,7 @@ import {
   type EstimateWorkspaceSettingsV2,
 } from "../../features/estimate/utils/settings-json";
 import { mapEstimateToQuotePayload } from "../../features/estimate/mappers/quote-payload";
+import { postJson } from "../../lib/api/patch-json";
 import { patchDealEstimateById } from "./deal-estimate-api";
 
 export type { LineModel, SectionModel };
@@ -352,13 +353,10 @@ export function useDealEstimateWorkspace(dealId: string) {
   const newVersion = useCallback(async () => {
     setError(null);
     try {
-      const r = await fetch(`/api/deals/${dealId}/estimates`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      });
-      const j = (await r.json()) as { estimate?: { id: string }; error?: string };
-      if (!r.ok) throw new Error(j.error ?? "Помилка");
+      const j = await postJson<{ estimate?: { id: string }; error?: string }>(
+        `/api/deals/${dealId}/estimates`,
+        {},
+      );
       await loadList();
       if (j.estimate?.id) setActiveId(j.estimate.id);
     } catch (e) {
@@ -370,13 +368,10 @@ export function useDealEstimateWorkspace(dealId: string) {
     if (!activeId) return;
     setError(null);
     try {
-      const r = await fetch(`/api/deals/${dealId}/estimates`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cloneFromEstimateId: activeId }),
-      });
-      const j = (await r.json()) as { estimate?: { id: string }; error?: string };
-      if (!r.ok) throw new Error(j.error ?? "Помилка");
+      const j = await postJson<{ estimate?: { id: string }; error?: string }>(
+        `/api/deals/${dealId}/estimates`,
+        { cloneFromEstimateId: activeId },
+      );
       await loadList();
       if (j.estimate?.id) setActiveId(j.estimate.id);
     } catch (e) {

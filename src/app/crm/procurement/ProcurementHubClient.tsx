@@ -6,6 +6,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { useErpBridge } from "@/components/erp/ErpBridgeProvider";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ProcurementOrderedMonitorTable } from "@/features/procurement/components/ProcurementOrderedMonitorTable";
+import { postJson } from "@/lib/api/patch-json";
 import {
   readHubSegment,
   writeHubSegment,
@@ -400,25 +401,19 @@ export function ProcurementHubClient() {
     if (dealId.trim()) {
       setDbRequestSaving(true);
       try {
-        const r = await fetch("/api/crm/procurement/requests", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            dealId: dealId.trim(),
-            lines: [
-              {
-                name: requestForm.materialCode.trim(),
-                qty: requestForm.qty,
-                plannedUnitCost: 0,
-              },
-            ],
-            neededByDate: requestForm.requiredDate || null,
-            priority: requestForm.priority,
-            comment: requestForm.comment || null,
-          }),
+        await postJson<{ ok?: boolean }>("/api/crm/procurement/requests", {
+          dealId: dealId.trim(),
+          lines: [
+            {
+              name: requestForm.materialCode.trim(),
+              qty: requestForm.qty,
+              plannedUnitCost: 0,
+            },
+          ],
+          neededByDate: requestForm.requiredDate || null,
+          priority: requestForm.priority,
+          comment: requestForm.comment || null,
         });
-        const j = await tryReadResponseJson<{ error?: string }>(r);
-        if (!r.ok) throw new Error(j?.error ?? "Помилка збереження");
         setOpsFeed((prev) => [
           `CRM → заявка збережена для угоди, матеріал ${requestForm.materialCode}`,
           ...prev,
@@ -462,13 +457,10 @@ export function ProcurementHubClient() {
     const name = supplierForm.name.trim();
     const category = supplierForm.category.trim();
     try {
-      const r = await fetch("/api/crm/procurement/suppliers", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, category }),
+      await postJson<{ ok?: boolean }>("/api/crm/procurement/suppliers", {
+        name,
+        category,
       });
-      const j = await tryReadResponseJson<{ error?: string }>(r);
-      if (!r.ok) throw new Error(j?.error ?? "Помилка");
       addEvent({
         module: "procurement",
         type: "SUPPLIER_ONBOARDING",

@@ -4,6 +4,7 @@ import type { AttachmentCategory } from "@prisma/client";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { postFormData, postJson } from "../../../lib/api/patch-json";
 import { LEAD_CREATE_FILE_WARNINGS_KEY } from "../../../lib/leads/lead-file-warnings-storage";
 import { normalizePhoneDigits } from "../../../lib/leads/phone-normalize";
 import { cn } from "../../../lib/utils";
@@ -214,7 +215,7 @@ export function NewLeadModal({
 
     setSaving(true);
     try {
-      let r: Response;
+      let j: { error?: string; id?: string; uploadErrors?: string[] };
       if (p.useMultipart) {
         const fd = new FormData();
         fd.append("title", p.leadTitle);
@@ -228,12 +229,15 @@ export function NewLeadModal({
         for (const f of pendingFiles) {
           fd.append("files", f);
         }
-        r = await fetch("/api/leads", { method: "POST", body: fd });
+        j = await postFormData<{
+          error?: string;
+          id?: string;
+          uploadErrors?: string[];
+        }>("/api/leads", fd);
       } else {
-        r = await fetch("/api/leads", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+        j = await postJson<{ error?: string; id?: string; uploadErrors?: string[] }>(
+          "/api/leads",
+          {
             title: p.leadTitle,
             contactName: p.name || undefined,
             phone: p.ph || undefined,
@@ -241,17 +245,8 @@ export function NewLeadModal({
             source: p.src,
             note: p.note,
             ownerId: p.oid,
-          }),
-        });
-      }
-
-      const j = (await r.json().catch(() => ({}))) as {
-        error?: string;
-        id?: string;
-        uploadErrors?: string[];
-      };
-      if (!r.ok) {
-        throw new Error(j.error ?? "Не вдалося створити лід");
+          },
+        );
       }
       if (j.uploadErrors?.length && j.id) {
         try {

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import type { DealWorkspacePayload } from "@/features/deal-workspace/types";
+import { postJson } from "@/lib/api/patch-json";
 import { getApiErrorMessage, parseResponseJson } from "@/lib/api/parse-response-json";
 import { cn } from "@/lib/utils";
 
@@ -108,11 +109,10 @@ export function DealFinanceProcurementTab({ data, roleView }: Props) {
     setGenBusy(true);
     setErr(null);
     try {
-      const r = await fetch(`/api/deals/${data.deal.id}/fp/generate-procurement`, {
-        method: "POST",
-      });
-      const j = await parseResponseJson<{ error?: string; orderNumber?: string }>(r);
-      if (!r.ok) throw new Error(getApiErrorMessage(r, j, "Не вдалося"));
+      await postJson<{ orderNumber?: string }>(
+        `/api/deals/${data.deal.id}/fp/generate-procurement`,
+        {},
+      );
       await load();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Помилка");
@@ -243,16 +243,15 @@ export function DealFinanceProcurementTab({ data, roleView }: Props) {
               type="button"
               className="text-xs text-sky-700 hover:underline"
               onClick={() => {
-                void fetch(`/api/deals/${data.deal.id}/finance/invoices`, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
+                void postJson<{ id?: string }>(
+                  `/api/deals/${data.deal.id}/finance/invoices`,
+                  {
                     type: "PREPAYMENT_70",
                     amount:
                       m0?.amount ??
                       (data.deal.value != null ? data.deal.value * 0.7 : 0),
-                  }),
-                }).then(() => load());
+                  },
+                ).then(() => load());
               }}
             >
               Створити рахунок (70%)

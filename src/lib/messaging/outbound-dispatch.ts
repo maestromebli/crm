@@ -2,6 +2,7 @@ import type { InboxChannel } from "../../features/inbox/types";
 import { prisma } from "../prisma";
 import { getEffectiveCommunicationsConfigForUser } from "../settings/communications-settings-store";
 import { markChannelHealth } from "./communications-health";
+import { externalPostJson } from "../api/external-json";
 
 type LeadContactLite = {
   phone: string | null;
@@ -57,22 +58,18 @@ async function sendTelegram(args: {
     return { sent: false, delivery: "failed", error: "telegram_chat_missing" };
   }
 
-  const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_id: chatId, text: args.text }),
-  });
-  const data = (await res.json().catch(() => null)) as
-    | { ok?: boolean; result?: { message_id?: number } }
-    | null;
-  if (!res.ok || !data?.ok) {
+  const res = await externalPostJson<{ ok?: boolean; result?: { message_id?: number } }>(
+    `https://api.telegram.org/bot${token}/sendMessage`,
+    { chat_id: chatId, text: args.text },
+  );
+  if (!res.ok || !res.data?.ok) {
     return { sent: false, delivery: "failed", error: "telegram_send_failed" };
   }
   return {
     sent: true,
     delivery: "sent",
-    providerMessageId: data.result?.message_id
-      ? String(data.result.message_id)
+    providerMessageId: res.data.result?.message_id
+      ? String(res.data.result.message_id)
       : undefined,
   };
 }
@@ -98,29 +95,27 @@ async function sendWhatsApp(args: {
     /\/$/,
     "",
   );
-  const res = await fetch(`${apiBase}/${phoneNumberId}/messages`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({
+  const res = await externalPostJson<{ messages?: Array<{ id?: string }> }>(
+    `${apiBase}/${phoneNumberId}/messages`,
+    {
       messaging_product: "whatsapp",
       to,
       type: "text",
       text: { body: args.text },
-    }),
-  });
-  const data = (await res.json().catch(() => null)) as
-    | { messages?: Array<{ id?: string }> }
-    | null;
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
   if (!res.ok) {
     return { sent: false, delivery: "failed", error: "whatsapp_send_failed" };
   }
   return {
     sent: true,
     delivery: "sent",
-    providerMessageId: data?.messages?.[0]?.id,
+    providerMessageId: res.data?.messages?.[0]?.id,
   };
 }
 
@@ -150,30 +145,28 @@ async function sendViber(args: {
     return { sent: false, delivery: "failed", error: "viber_receiver_missing" };
   }
 
-  const res = await fetch("https://chatapi.viber.com/pa/send_message", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Viber-Auth-Token": token,
-    },
-    body: JSON.stringify({
+  const res = await externalPostJson<{ message_token?: number; status?: number }>(
+    "https://chatapi.viber.com/pa/send_message",
+    {
       receiver,
       type: "text",
       text: args.text,
-    }),
-  });
-  const data = (await res.json().catch(() => null)) as
-    | { message_token?: number; status?: number }
-    | null;
-  if (!res.ok || (typeof data?.status === "number" && data.status !== 0)) {
+    },
+    {
+      headers: {
+        "X-Viber-Auth-Token": token,
+      },
+    },
+  );
+  if (!res.ok || (typeof res.data?.status === "number" && res.data.status !== 0)) {
     return { sent: false, delivery: "failed", error: "viber_send_failed" };
   }
   return {
     sent: true,
     delivery: "sent",
     providerMessageId:
-      typeof data?.message_token === "number"
-        ? String(data.message_token)
+      typeof res.data?.message_token === "number"
+        ? String(res.data.message_token)
         : undefined,
   };
 }

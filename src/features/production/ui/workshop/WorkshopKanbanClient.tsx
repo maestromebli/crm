@@ -22,7 +22,7 @@ import {
   workshopStageHref,
   type WorkshopKanbanStageKey,
 } from "../../workshop-stages";
-import { patchJson } from "@/lib/api/patch-json";
+import { patchJson, postJson } from "@/lib/api/patch-json";
 import { tryReadResponseJson } from "@/lib/http/read-response-json";
 
 type KanbanColumn = ProductionCommandCenterView["workshopKanban"][number];
@@ -160,11 +160,10 @@ export function WorkshopKanbanClient({ initialStageKey = null }: WorkshopKanbanC
   }, []);
 
   async function move(taskId: string, stageKey: KanbanColumn["stageKey"]) {
-    await fetch(`/api/crm/production/workshop/tasks/${taskId}/move`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ stageKey }),
-    });
+    await postJson<{ ok?: boolean }>(
+      `/api/crm/production/workshop/tasks/${taskId}/move`,
+      { stageKey },
+    );
     await load();
   }
 

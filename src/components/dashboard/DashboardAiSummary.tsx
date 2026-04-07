@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Loader2, Sun } from "lucide-react";
+import { postJson } from "../../lib/api/patch-json";
 import { parseJsonResponse } from "../../lib/http/parse-json-response";
 import type { AiOperationSuccess } from "../../features/ai/core/types";
 import { AIStructuredResult } from "../../features/ai/ui/AIStructuredResult";
@@ -26,18 +27,13 @@ export function DashboardAiSummary({
       try {
         setLoading(true);
         if (dashboardBriefContext?.trim()) {
-          const res = await fetch("/api/ai/operations", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              operation: "dashboard_brief",
-              dashboardContext: dashboardBriefContext,
-            }),
-          });
-          const data = await parseJsonResponse<
+          const data = await postJson<
             AiOperationSuccess | { error?: string; ok?: false }
-          >(res, { serviceLabel: "AI" });
-          if (!res.ok || !("ok" in data) || !data.ok) {
+          >("/api/ai/operations", {
+            operation: "dashboard_brief",
+            dashboardContext: dashboardBriefContext,
+          });
+          if (!("ok" in data) || !data.ok) {
             setStructured(null);
             setText(fallback);
             return;
@@ -48,16 +44,11 @@ export function DashboardAiSummary({
           return;
         }
 
-        const res = await fetch("/api/ai/summary", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            type: "dashboard",
-            context:
-              "Онбордингова CRM для меблів під замовлення. Потрібен короткий огляд дня по лідах, угодах та handoff.",
-          }),
+        const data = await postJson<{ text?: string }>("/api/ai/summary", {
+          type: "dashboard",
+          context:
+            "Онбордингова CRM для меблів під замовлення. Потрібен короткий огляд дня по лідах, угодах та handoff.",
         });
-        const data = (await res.json()) as { text?: string };
         if (data.text) setText(data.text);
       } catch {
         setStructured(null);

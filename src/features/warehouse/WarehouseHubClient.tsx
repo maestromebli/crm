@@ -11,6 +11,7 @@ import {
   type ComponentType,
 } from "react";
 import { motion, useReducedMotion } from "framer-motion";
+import { postJson } from "@/lib/api/patch-json";
 import { tryReadResponseJson } from "@/lib/http/read-response-json";
 import { patchJson } from "@/lib/api/patch-json";
 import { formatMoneyUa } from "@/features/finance/lib/format-money";
@@ -215,23 +216,20 @@ export function WarehouseHubClient({ activeSection }: { activeSection: string })
     setSyncBusy(true);
     setErr(null);
     try {
-      const res = await fetch("/api/crm/warehouse/sync-reservations", { method: "POST" });
-      const json = await tryReadResponseJson<{
+      const json = await postJson<{
         error?: string;
         ok?: boolean;
         reservationsUpserted?: number;
         tasksWithLines?: number;
         tasksConsidered?: number;
         stockItemsRecomputed?: number;
-      }>(res);
-      if (!res.ok) {
-        setErr(json && "error" in json && json.error ? String(json.error) : "Синхронізація не вдалася");
-        return;
-      }
+      }>("/api/crm/warehouse/sync-reservations", {});
       setSuccessMsg(
         `Резерви оновлено: +${json.reservationsUpserted ?? 0} рядків, задач зі специфікацією: ${json.tasksWithLines ?? 0} з ${json.tasksConsidered ?? 0}, перераховано позицій: ${json.stockItemsRecomputed ?? 0}.`,
       );
       await load();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Синхронізація не вдалася");
     } finally {
       setSyncBusy(false);
     }
@@ -244,20 +242,13 @@ export function WarehouseHubClient({ activeSection }: { activeSection: string })
     setZoneSaving(true);
     setErr(null);
     try {
-      const res = await fetch("/api/crm/warehouse/zones", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, code }),
-      });
-      const json = await tryReadResponseJson<{ error?: string }>(res);
-      if (!res.ok) {
-        setErr(json && "error" in json && json.error ? String(json.error) : "Не вдалося створити зону");
-        return;
-      }
+      await postJson<{ ok?: boolean }>("/api/crm/warehouse/zones", { name, code });
       setSuccessMsg(`Зону «${name}» створено.`);
       setZoneName("");
       setZoneCode("");
       await load();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Не вдалося створити зону");
     } finally {
       setZoneSaving(false);
     }

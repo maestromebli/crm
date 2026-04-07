@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { Loader2, Sparkles } from "lucide-react";
-import { parseJsonResponse } from "../../../lib/http/parse-json-response";
+import { postJson } from "@/lib/api/patch-json";
 import { cn } from "../../../lib/utils";
 import type { AiOperationSuccess } from "../core/types";
 import { AIStructuredResult } from "./AIStructuredResult";
@@ -25,23 +25,13 @@ export function LeadAiOperationsPanel({ leadId, className }: Props) {
       setErr(null);
       setLoading(operation);
       try {
-        const r = await fetch("/api/ai/operations", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            operation,
-            leadId,
-            ...(operation === "lead_follow_up" ? { tone } : {}),
-          }),
-        });
-        const j = await parseJsonResponse<
+        const j = await postJson<
           AiOperationSuccess | { error?: string }
-        >(r, { serviceLabel: "AI" });
-        if (!r.ok) {
-          throw new Error(
-            "error" in j && j.error ? j.error : "Помилка запиту",
-          );
-        }
+        >("/api/ai/operations", {
+          operation,
+          leadId,
+          ...(operation === "lead_follow_up" ? { tone } : {}),
+        });
         if (!("ok" in j) || !j.ok) {
           throw new Error("Некоректна відповідь сервера");
         }

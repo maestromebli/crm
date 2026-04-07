@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Loader2, UploadCloud } from "lucide-react";
+import { postFormData } from "../../lib/api/patch-json";
 import { parseResponseJson } from "../../lib/api/parse-response-json";
 
 type ProviderRow = {
@@ -64,18 +65,13 @@ export function SettingsMaterialsCatalogManager() {
       fd.append("providerName", providerName);
       fd.append("mode", mode);
 
-      const r = await fetch("/api/settings/materials/import", {
-        method: "POST",
-        body: fd,
-      });
-      const j = await parseResponseJson<{
+      const j = await postFormData<{
         ok?: boolean;
         upserted?: number;
         skipped?: number;
         deleted?: number;
         error?: string;
-      }>(r);
-      if (!r.ok) throw new Error(j.error ?? "Імпорт не виконано");
+      }>("/api/settings/materials/import", fd);
       setOk(
         `Імпорт виконано: ${j.upserted ?? 0} рядків оновлено` +
           (typeof j.skipped === "number" ? `, пропущено ${j.skipped}` : "") +

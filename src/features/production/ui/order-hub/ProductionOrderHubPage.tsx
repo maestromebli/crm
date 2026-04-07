@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { ProductionOrderHubView } from "../../types/production";
+import { postJson } from "@/lib/api/patch-json";
 
 export function ProductionOrderHubPage({ data }: { data: ProductionOrderHubView }) {
   const router = useRouter();
@@ -19,13 +20,12 @@ export function ProductionOrderHubPage({ data }: { data: ProductionOrderHubView 
     setError(null);
     setBusy(true);
     try {
-      const response = await fetch(path, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: body ? JSON.stringify(body) : undefined,
-      });
-      const payload = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(payload.error ?? "Помилка запиту.");
+      await postJson<{ ok?: boolean }>(
+        path,
+        body && typeof body === "object" && !Array.isArray(body)
+          ? (body as Record<string, unknown>)
+          : {},
+      );
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Помилка запиту.");

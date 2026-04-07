@@ -2,6 +2,7 @@
 
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useState } from "react";
+import { postJson } from "@/lib/api/patch-json";
 import { readResponseJson } from "@/lib/http/read-response-json";
 import { cn } from "@/lib/utils";
 
@@ -186,18 +187,12 @@ export function ProductionOrchestrationHandoffPanel({
                   void (async () => {
                     setBusy(true);
                     try {
-                      const r = await fetch(
+                      await postJson<{ ok?: boolean }>(
                         `/api/deals/${dealId}/production-orchestration/accept`,
                         {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            estimateId: activeEstimateId,
-                          }),
+                          estimateId: activeEstimateId,
                         },
                       );
-                      const j = await readResponseJson<{ ok?: boolean; error?: string }>(r);
-                      if (!r.ok) throw new Error(j.error ?? "Помилка");
                       await load();
                     } catch (e) {
                       setLoadErr(e instanceof Error ? e.message : "Помилка");
@@ -221,19 +216,13 @@ export function ProductionOrchestrationHandoffPanel({
                         .split("\n")
                         .map((s) => s.trim())
                         .filter(Boolean);
-                      const r = await fetch(
+                      await postJson<{ ok?: boolean }>(
                         `/api/deals/${dealId}/production-orchestration/clarify`,
                         {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            issues: issues.length ? issues : ["Потрібні уточнення"],
-                            messageToManager: clarifyMsg || null,
-                          }),
+                          issues: issues.length ? issues : ["Потрібні уточнення"],
+                          messageToManager: clarifyMsg || null,
                         },
                       );
-                      const j = await readResponseJson<{ ok?: boolean; error?: string }>(r);
-                      if (!r.ok) throw new Error(j.error ?? "Помилка");
                       setClarifyIssues("");
                       setClarifyMsg("");
                       await load();
@@ -255,16 +244,10 @@ export function ProductionOrchestrationHandoffPanel({
                   void (async () => {
                     setBusy(true);
                     try {
-                      const r = await fetch(
+                      await postJson<{ ok?: boolean }>(
                         `/api/deals/${dealId}/production-orchestration/reject`,
-                        {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ reason: rejectReason.trim() }),
-                        },
+                        { reason: rejectReason.trim() },
                       );
-                      const j = await readResponseJson<{ ok?: boolean; error?: string }>(r);
-                      if (!r.ok) throw new Error(j.error ?? "Помилка");
                       setRejectReason("");
                       await load();
                     } catch (e) {
@@ -417,33 +400,23 @@ export function ProductionOrchestrationHandoffPanel({
               void (async () => {
                 setBusy(true);
                 try {
-                  const r = await fetch(
+                  await postJson<{ ok?: boolean; externalWorkspaceToken?: string | null }>(
                     `/api/deals/${dealId}/production-orchestration/assign-constructor`,
                     {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({
-                        type: assignMode,
-                        constructorUserId:
-                          assignMode === "INTERNAL" ? selectedUserId || null : null,
-                        constructorExternalName:
-                          assignMode === "OUTSOURCED" ? extName.trim() || null : null,
-                        constructorExternalPhone:
-                          assignMode === "OUTSOURCED" ? extPhone.trim() || null : null,
-                        constructorExternalEmail:
-                          assignMode === "OUTSOURCED" ? extEmail.trim() || null : null,
-                        dueDate: dueLocal ? new Date(dueLocal).toISOString() : null,
-                        productionNotes: notesAssign.trim() || null,
-                        regenerateToken: assignMode === "OUTSOURCED" ? regenToken : false,
-                      }),
+                      type: assignMode,
+                      constructorUserId:
+                        assignMode === "INTERNAL" ? selectedUserId || null : null,
+                      constructorExternalName:
+                        assignMode === "OUTSOURCED" ? extName.trim() || null : null,
+                      constructorExternalPhone:
+                        assignMode === "OUTSOURCED" ? extPhone.trim() || null : null,
+                      constructorExternalEmail:
+                        assignMode === "OUTSOURCED" ? extEmail.trim() || null : null,
+                      dueDate: dueLocal ? new Date(dueLocal).toISOString() : null,
+                      productionNotes: notesAssign.trim() || null,
+                      regenerateToken: assignMode === "OUTSOURCED" ? regenToken : false,
                     },
                   );
-                  const j = await readResponseJson<{
-                    ok?: boolean;
-                    error?: string;
-                    externalWorkspaceToken?: string | null;
-                  }>(r);
-                  if (!r.ok) throw new Error(j.error ?? "Помилка");
                   setRegenToken(false);
                   await load();
                 } catch (e) {

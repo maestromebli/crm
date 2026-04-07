@@ -9,6 +9,7 @@ import {
 import { leadQueryKeys } from "../../../features/leads/lead-query-keys";
 import type { LeadDetailRow } from "../../../features/leads/queries";
 import { emitLeadWorkflowEvent } from "../../../features/event-system/lead-events";
+import { postFormData, postJson } from "../../../lib/api/patch-json";
 import { parseResponseJson } from "../../../lib/api/parse-response-json";
 import { suggestAttachmentCategoryFromFile } from "../../../lib/attachments/suggest-category";
 import { useLeadWorkspaceSlice } from "../../../stores/lead-workspace-store";
@@ -134,15 +135,10 @@ export function LeadHubOverviewClient({
         const fd = new FormData();
         fd.append("file", file);
         fd.append("category", cat);
-        const r = await fetch(`/api/leads/${leadRow.id}/attachments`, {
-          method: "POST",
-          body: fd,
-        });
-        const j = await parseResponseJson<{
+        const j = await postFormData<{
           error?: string;
           id?: string;
-        }>(r);
-        if (!r.ok) throw new Error(j.error ?? file.name);
+        }>(`/api/leads/${leadRow.id}/attachments`, fd);
         if (j.id) {
           emitLeadWorkflowEvent("file.uploaded", {
             leadId: leadRow.id,
@@ -175,19 +171,13 @@ export function LeadHubOverviewClient({
     setMeasureBusy(true);
     setQErr(null);
     try {
-      const r = await fetch("/api/calendar/events", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: measureTitle.trim() || "Замір",
-          type: "MEASUREMENT",
-          startAt: start.toISOString(),
-          endAt: new Date(start.getTime() + 60 * 60 * 1000).toISOString(),
-          leadId: leadRow.id,
-        }),
+      await postJson<{ id?: string }>("/api/calendar/events", {
+        title: measureTitle.trim() || "Замір",
+        type: "MEASUREMENT",
+        startAt: start.toISOString(),
+        endAt: new Date(start.getTime() + 60 * 60 * 1000).toISOString(),
+        leadId: leadRow.id,
       });
-      const j = await parseResponseJson<{ error?: string; id?: string }>(r);
-      if (!r.ok) throw new Error(j.error ?? "Помилка");
       setMeasureOpen(false);
       await queryClient.invalidateQueries({
         queryKey: leadQueryKeys.detail(leadRow.id),

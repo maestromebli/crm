@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { postJson } from "@/lib/api/patch-json";
 
 type PortalPayload = {
   dealId: string;
@@ -145,10 +146,8 @@ export function ClientPortalView({
             type="button"
             className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white"
             onClick={async () => {
-              await fetch(`/api/client/${token}/approvals`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action: "approve_quote" }),
+              await postJson<{ ok?: boolean }>(`/api/client/${token}/approvals`, {
+                action: "approve_quote",
               });
             }}
           >
@@ -158,10 +157,8 @@ export function ClientPortalView({
             type="button"
             className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white"
             onClick={async () => {
-              await fetch(`/api/client/${token}/approvals`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action: "approve_changes" }),
+              await postJson<{ ok?: boolean }>(`/api/client/${token}/approvals`, {
+                action: "approve_changes",
               });
             }}
           >
@@ -195,11 +192,7 @@ export function ClientPortalView({
             onClick={async () => {
               const msg = text.trim();
               if (!msg) return;
-              await fetch(`/api/client/${token}/messages`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ message: msg }),
-              });
+              await postJson<{ ok?: boolean }>(`/api/client/${token}/messages`, { message: msg });
               setText("");
               await loadMessages();
             }}

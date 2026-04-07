@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { postJson } from "@/lib/api/patch-json";
 import { isAllowedPublicConstructorFileUrl } from "../../../lib/constructor-room/public-file-url";
 
 type PublicPayload = {
@@ -155,16 +156,10 @@ export function ConstructorPortalClient({ token }: { token: string }) {
     setBusy(true);
     setFormErr(null);
     try {
-      const r = await fetch(
+      await postJson<{ ok?: boolean }>(
         `/api/public/constructor/${encodeURIComponent(token)}/messages`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ body: t }),
-        },
+        { body: t },
       );
-      const j = (await r.json().catch(() => ({}))) as { error?: string };
-      if (!r.ok) throw new Error(j.error ?? "Не надіслано");
       setMsg("");
       await load({ silent: true });
     } catch (e) {
@@ -190,21 +185,15 @@ export function ConstructorPortalClient({ token }: { token: string }) {
     }
     setBusy(true);
     try {
-      const r = await fetch(
+      await postJson<{ ok?: boolean }>(
         `/api/public/constructor/${encodeURIComponent(token)}/attachment`,
         {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            fileName,
-            fileUrl,
-            mimeType: "application/octet-stream",
-            category: upCat,
-          }),
+          fileName,
+          fileUrl,
+          mimeType: "application/octet-stream",
+          category: upCat,
         },
       );
-      const j = (await r.json().catch(() => ({}))) as { error?: string };
-      if (!r.ok) throw new Error(j.error ?? "Не збережено");
       setUpFileName("");
       setUpFileUrl("");
       await load({ silent: true });
@@ -231,21 +220,15 @@ export function ConstructorPortalClient({ token }: { token: string }) {
     }
     setBusy(true);
     try {
-      const r = await fetch(
+      await postJson<{ ok?: boolean }>(
         `/api/public/constructor/${encodeURIComponent(token)}/deliver`,
         {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            fileName,
-            fileUrl,
-            mimeType: "application/octet-stream",
-            category: deliverCat,
-          }),
+          fileName,
+          fileUrl,
+          mimeType: "application/octet-stream",
+          category: deliverCat,
         },
       );
-      const j = (await r.json().catch(() => ({}))) as { error?: string };
-      if (!r.ok) throw new Error(j.error ?? "Не збережено");
       setDeliverFileName("");
       setDeliverFileUrl("");
       await load({ silent: true });

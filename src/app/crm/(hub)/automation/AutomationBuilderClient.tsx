@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { patchJson } from "@/lib/api/patch-json";
+import { deleteJson, patchJson, postJson } from "@/lib/api/patch-json";
 
 type Flow = {
   id: string;
@@ -116,10 +116,11 @@ export function AutomationBuilderClient() {
           graphJson: parsed,
         });
       } else {
-        await fetch("/api/crm/automation/flows", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name, trigger, graphJson: parsed, enabled: true }),
+        await postJson<{ ok?: boolean }>("/api/crm/automation/flows", {
+          name,
+          trigger,
+          graphJson: parsed,
+          enabled: true,
         });
       }
       await load();
@@ -279,9 +280,9 @@ export function AutomationBuilderClient() {
                 type="button"
                 variant="enverDanger"
                 onClick={async () => {
-                  await fetch(`/api/crm/automation/flows/${selected.id}`, {
-                    method: "DELETE",
-                  });
+                  await deleteJson<{ ok?: boolean }>(
+                    `/api/crm/automation/flows/${selected.id}`,
+                  );
                   setSelectedId(null);
                   await load();
                 }}

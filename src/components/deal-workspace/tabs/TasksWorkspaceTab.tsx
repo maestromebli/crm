@@ -5,6 +5,7 @@ import { useState } from "react";
 import { dealQueryKeys } from "../../../features/deal-workspace/deal-query-keys";
 import { patchTaskById } from "../../../features/deal-workspace/use-deal-mutation-actions";
 import type { DealWorkspacePayload } from "../../../features/deal-workspace/types";
+import { postJson } from "../../../lib/api/patch-json";
 import { cn } from "../../../lib/utils";
 import { dispatchDealTasksUpdated } from "../../../features/ai-assistant/utils/dispatchDealTasksUpdated";
 import { useDealWorkspaceToast } from "../DealWorkspaceToast";
@@ -49,18 +50,13 @@ export function TasksWorkspaceTab({ data }: { data: DealWorkspacePayload }) {
     { previous?: TaskRow[]; tempId: string }
   >({
     mutationFn: async ({ title: nextTitle, taskType: nextType }) => {
-      const r = await fetch("/api/tasks", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: nextTitle,
-          entityType: "DEAL",
-          entityId: dealId,
-          taskType: nextType,
-        }),
+      const j = await postJson<{ task?: TaskRow; error?: string }>("/api/tasks", {
+        title: nextTitle,
+        entityType: "DEAL",
+        entityId: dealId,
+        taskType: nextType,
       });
-      const j = (await r.json()) as { error?: string; task?: TaskRow };
-      if (!r.ok || !j.task) throw new Error(j.error ?? "Помилка");
+      if (!j.task) throw new Error(j.error ?? "Помилка");
       return j.task;
     },
     onMutate: async ({ title: nextTitle, taskType: nextType }) => {

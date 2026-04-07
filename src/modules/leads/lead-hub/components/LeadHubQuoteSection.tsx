@@ -5,9 +5,9 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { format } from "date-fns";
 import { uk } from "date-fns/locale";
+import { postJson } from "../../../../lib/api/patch-json";
 import type { LeadDetailRow } from "../../../../features/leads/queries";
 import { leadProposalStatusUa } from "../../../../lib/leads/lead-proposal-labels";
-import { parseJsonResponse } from "../../../../lib/http/parse-json-response";
 import { cn } from "../../../../lib/utils";
 
 type QuoteState = "draft" | "sent" | "approved";
@@ -33,12 +33,10 @@ export function LeadHubQuoteSection({ lead, canManageEstimates }: Props) {
     if (!latest || !canManageEstimates) return;
     setPdfBusy(true);
     try {
-      const r = await fetch(
+      await postJson<{ ok?: boolean }>(
         `/api/leads/${lead.id}/proposals/${latest.id}/pdf`,
-        { method: "POST" },
+        {},
       );
-      const j = await parseJsonResponse<{ error?: string }>(r);
-      if (!r.ok) throw new Error(j.error ?? "Не вдалося згенерувати PDF");
       router.refresh();
     } catch {
       /* surface via UI — keep minimal */

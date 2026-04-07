@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ImageIcon, Info } from "lucide-react";
+import { postJson } from "../../../lib/api/patch-json";
 
 type Props = {
   open: boolean;
@@ -99,31 +100,18 @@ export function CreateProposalModal({
     setBusy(true);
     setErr(null);
     try {
-      const r = await fetch(`/api/leads/${leadId}/proposals`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          estimateId,
-          title: title.trim() || undefined,
-          notes: notes.trim() || undefined,
-          summary: summary.trim() || undefined,
-          visualizationUrls: visualizationUrls.map((u) => u.trim()),
-        }),
-      });
-      const j = (await r.json()) as {
+      const j = await postJson<{
         error?: string;
         details?: string;
         warning?: string;
         proposal?: { id: string; publicToken?: string | null };
-      };
-      if (!r.ok) {
-        const base = j.error ?? "Помилка";
-        const detail =
-          typeof j.details === "string" && j.details.trim()
-            ? `\n\n${j.details.trim()}`
-            : "";
-        throw new Error(`${base}${detail}`);
-      }
+      }>(`/api/leads/${leadId}/proposals`, {
+        estimateId,
+        title: title.trim() || undefined,
+        notes: notes.trim() || undefined,
+        summary: summary.trim() || undefined,
+        visualizationUrls: visualizationUrls.map((u) => u.trim()),
+      });
       if (typeof j.warning === "string" && j.warning.trim()) {
         window.alert(j.warning.trim());
       }

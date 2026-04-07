@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { dealQueryKeys } from "../../features/deal-workspace/deal-query-keys";
 import type { DealWorkspacePayload } from "../../features/deal-workspace/types";
 import { patchDealConstructorRoomByDealId } from "../../features/deal-workspace/use-deal-mutation-actions";
+import { postJson } from "../../lib/api/patch-json";
 import { cn } from "../../lib/utils";
 import { qaRowParts } from "../../lib/constructor-room/qa-format";
 import {
@@ -186,16 +187,10 @@ export function ConstructorRoomPanel({
 
   const ensureRoom = useCallback(() => {
     void run(async () => {
-      const r = await fetch(`/api/deals/${dealId}/constructor-room`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "ensure" }),
-      });
-      const j = (await r.json().catch(() => ({}))) as {
+      const j = await postJson<{
         error?: string;
         room?: Room;
-      };
-      if (!r.ok) throw new Error(j.error ?? "Не вдалося створити кімнату");
+      }>(`/api/deals/${dealId}/constructor-room`, { action: "ensure" });
       if (j.room) applyServerRoom(j.room);
       showToast("Кімнату конструктора створено", { tone: "success" });
     });
@@ -250,29 +245,17 @@ export function ConstructorRoomPanel({
       setErr(null);
       void (async () => {
         try {
-          const r = await fetch(
-            `/api/deals/${dealId}/constructor-room/ai-qa`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                transcript: t,
-                saveToRoom,
-              }),
-            },
-          );
-          const j = (await r.json()) as {
+          const j = await postJson<{
             error?: string;
             detail?: string;
             items?: { question: string; answer: string }[];
-          };
-          if (!r.ok) {
-            const detail = j.detail?.trim();
-            throw new Error(
-              (j.error ?? "Помилка AI") +
-                (detail ? `: ${detail.slice(0, 200)}` : ""),
-            );
-          }
+          }>(
+            `/api/deals/${dealId}/constructor-room/ai-qa`,
+            {
+              transcript: t,
+              saveToRoom,
+            },
+          );
           const items = j.items ?? [];
           setAiQaText(JSON.stringify(items, null, 2));
           showToast(
@@ -324,16 +307,10 @@ export function ConstructorRoomPanel({
     const t = msg.trim();
     if (!t) return;
     void run(async () => {
-      const r = await fetch(`/api/deals/${dealId}/constructor-room/messages`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ body: t }),
-      });
-      const j = (await r.json().catch(() => ({}))) as {
+      const j = await postJson<{
         error?: string;
         room?: Room;
-      };
-      if (!r.ok) throw new Error(j.error ?? "Не надіслано");
+      }>(`/api/deals/${dealId}/constructor-room/messages`, { body: t });
       if (j.room) applyServerRoom(j.room);
       setMsg("");
       showToast("Повідомлення додано", { tone: "info" });

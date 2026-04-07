@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { InboxChannel, InboxConversation } from "../../features/inbox/types";
+import { postJson } from "../../lib/api/patch-json";
 
 export function useLeadMessengerThread(leadId: string) {
   const [conv, setConv] = useState<InboxConversation | null>(null);
@@ -50,16 +51,13 @@ export function useLeadMessengerThread(leadId: string) {
     async (text: string) => {
       setSendErr(null);
       try {
-        const r = await fetch(`/api/leads/${leadId}/messenger-thread`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text, channel: selectedChannel }),
-        });
-        const j = (await r.json()) as {
+        const j = await postJson<{
           error?: string;
           providerError?: string | null;
-        };
-        if (!r.ok) throw new Error(j.error ?? "Не вдалося надіслати");
+        }>(`/api/leads/${leadId}/messenger-thread`, {
+          text,
+          channel: selectedChannel,
+        });
         if (j.providerError) {
           setSendErr(
             `Повідомлення збережено в CRM, але канал повернув помилку: ${j.providerError}`,

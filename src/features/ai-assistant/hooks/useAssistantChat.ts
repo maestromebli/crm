@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { parseJsonResponse } from "../../../lib/http/parse-json-response";
+import { postJson } from "@/lib/api/patch-json";
 
 export type AssistantChatMessage = {
   id: string;
@@ -111,25 +111,16 @@ export function useAssistantChat(options?: UseAssistantChatOptions) {
       setLoading(true);
 
       try {
-        const res = await fetch("/api/ai/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            messages: history.map((m) => ({
-              role: m.role,
-              content: m.content,
-            })),
-          }),
-        });
-        const data = await parseJsonResponse<{
+        const data = await postJson<{
           text?: string;
           error?: string;
           toolsUsed?: string[];
-        }>(res, { serviceLabel: "AI чат" });
-        if (!res.ok) {
-          setError(data.error ?? "Помилка запиту");
-          return;
-        }
+        }>("/api/ai/chat", {
+          messages: history.map((m) => ({
+            role: m.role,
+            content: m.content,
+          })),
+        });
         const reply = data.text?.trim() ?? "Порожня відповідь від сервера.";
         const assistantMsg: AssistantChatMessage = {
           id: crypto.randomUUID(),

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BookOpen, CheckSquare, Loader2, Sparkles, UploadCloud } from "lucide-react";
+import { postFormData, postJson } from "../../lib/api/patch-json";
 import { parseResponseJson } from "../../lib/api/parse-response-json";
 import type { PriceImportRowNorm } from "../../lib/materials/price-import-excel";
 import type { AiEnrichedPriceRow } from "../../lib/materials/price-import-ai";
@@ -78,13 +79,11 @@ export function LibraryMaterialsPricesClient({ canManage }: Props) {
     try {
       const fd = new FormData();
       fd.append("file", file);
-      const r = await fetch("/api/library/materials/parse", { method: "POST", body: fd });
-      const j = await parseResponseJson<{
+      const j = await postFormData<{
         rows?: PriceImportRowNorm[];
         fileName?: string;
         error?: string;
-      }>(r);
-      if (!r.ok) throw new Error(j.error ?? "Парсинг не виконано");
+      }>("/api/library/materials/parse", fd);
       setRawRows(j.rows ?? []);
       setParsedName(j.fileName ?? file.name);
     } catch (e) {
@@ -103,18 +102,12 @@ export function LibraryMaterialsPricesClient({ canManage }: Props) {
     setErr(null);
     setOk(null);
     try {
-      const r = await fetch("/api/library/materials/ai-normalize", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rows: rawRows, skipAi }),
-      });
-      const j = await parseResponseJson<{
+      const j = await postJson<{
         enriched?: AiEnrichedPriceRow[];
         usedAi?: boolean;
         aiError?: string | null;
         error?: string;
-      }>(r);
-      if (!r.ok) throw new Error(j.error ?? "AI не виконано");
+      }>("/api/library/materials/ai-normalize", { rows: rawRows, skipAi });
       setEnriched(j.enriched ?? []);
       setUsedAi(Boolean(j.usedAi));
       setAiNote(
@@ -182,23 +175,17 @@ export function LibraryMaterialsPricesClient({ canManage }: Props) {
         };
       });
 
-      const r = await fetch("/api/library/materials/commit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          providerKey,
-          providerName,
-          mode,
-          items,
-        }),
-      });
-      const j = await parseResponseJson<{
+      const j = await postJson<{
         ok?: boolean;
         upserted?: number;
         deleted?: number;
         error?: string;
-      }>(r);
-      if (!r.ok) throw new Error(j.error ?? "Не збережено");
+      }>("/api/library/materials/commit", {
+          providerKey,
+          providerName,
+          mode,
+          items,
+      });
       setOk(
         `Збережено в каталог: ${j.upserted ?? 0} позицій` +
           (typeof j.deleted === "number" && j.deleted > 0

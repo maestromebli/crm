@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { postJson } from "@/lib/api/patch-json";
 import type { InboxConversation } from "../types";
 
 type Props = {
@@ -23,15 +24,10 @@ SLA: ${conversation.slaState}. Останнє повідомлення: ${
     const run = async () => {
       try {
         setLoading(true);
-        const res = await fetch("/api/ai/summary", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            type: "inbox_conversation",
-            context,
-          }),
+        const data = await postJson<{ text?: string }>("/api/ai/summary", {
+          type: "inbox_conversation",
+          context,
         });
-        const data = (await res.json()) as { text?: string };
         if (data.text) setText(data.text);
       } catch {
         setText(

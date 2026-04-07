@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { patchLeadEstimateById } from "../../../../features/leads/lead-estimate-api";
+import { postJson } from "../../../../lib/api/patch-json";
 import { buildEstimateLinePayload } from "../../../../lib/estimates/build-estimate-line-payload";
 import type { EstimateCategoryKey } from "../../../../lib/estimates/estimate-categories";
 import { estimateVersionPreviewStorageKey } from "../../../../lib/estimates/estimate-version-preview-storage";
@@ -265,26 +266,20 @@ export function EstimateVersionPreviewClient({
     marginPctPreview != null ? marginPctPreview < 8 : false;
 
   const duplicateEstimate = async () => {
-    const r = await fetch(`/api/leads/${leadId}/estimates`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cloneFromEstimateId: estimateId }),
-    });
-    const j = (await r.json()) as { estimate?: { id: string }; error?: string };
-    if (!r.ok) throw new Error(j.error ?? "Помилка");
+    const j = await postJson<{ estimate?: { id: string }; error?: string }>(
+      `/api/leads/${leadId}/estimates`,
+      { cloneFromEstimateId: estimateId },
+    );
     if (j.estimate?.id) {
       router.push(`/leads/${leadId}/estimate/${j.estimate.id}`);
     }
   };
 
   const createBlank = async () => {
-    const r = await fetch(`/api/leads/${leadId}/estimates`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
-    });
-    const j = (await r.json()) as { estimate?: { id: string }; error?: string };
-    if (!r.ok) throw new Error(j.error ?? "Помилка");
+    const j = await postJson<{ estimate?: { id: string }; error?: string }>(
+      `/api/leads/${leadId}/estimates`,
+      {},
+    );
     if (j.estimate?.id) {
       router.push(`/leads/${leadId}/estimate/${j.estimate.id}`);
     }

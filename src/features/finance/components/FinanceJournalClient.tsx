@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatMoneyUa } from "@/features/finance/lib/format-money";
+import { postJson } from "@/lib/api/patch-json";
 
 type LedgerAccount = {
   id: string;
@@ -240,11 +241,10 @@ export function FinanceJournalClient() {
     setVoidingId(entryId);
     setErr(null);
     try {
-      const r = await fetch(`/api/crm/finance/journal-entries/${encodeURIComponent(entryId)}/void`, {
-        method: "POST",
-      });
-      const j = (await r.json()) as { error?: string };
-      if (!r.ok) throw new Error(j.error ?? "Не вдалося скасувати");
+      await postJson<{ ok?: boolean }>(
+        `/api/crm/finance/journal-entries/${encodeURIComponent(entryId)}/void`,
+        {},
+      );
       await loadEntries(listFilterDealId, { append: false });
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Помилка");
@@ -271,13 +271,7 @@ export function FinanceJournalClient() {
           lineMemo: l.lineMemo.trim() || null,
         })),
       };
-      const r = await fetch("/api/crm/finance/journal-entries", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const j = (await r.json()) as { error?: string };
-      if (!r.ok) throw new Error(j.error ?? "Не вдалося зберегти");
+      await postJson<{ ok?: boolean }>("/api/crm/finance/journal-entries", payload);
       setMemo("");
       setDealId("");
       setLines(defaultLines());

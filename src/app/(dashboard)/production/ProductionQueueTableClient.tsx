@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { patchDealProductionLaunchByDealId } from "@/features/deal-workspace/use-deal-mutation-actions";
+import { postJson } from "@/lib/api/patch-json";
 
 export type ProductionQueueTableRow = {
   id: string;
@@ -60,14 +61,10 @@ export function ProductionQueueTableClient({
     setErrorById((prev) => ({ ...prev, [rowId]: "" }));
     try {
       if (action === "launch") {
-        const r = await fetch(`/api/deals/${rowId}/production-launch`, {
-          method: "POST",
-        });
-        const j = (await r.json().catch(() => ({}))) as {
+        const j = await postJson<{
           error?: string;
           handoffImportedFileCount?: number | null;
-        };
-        if (!r.ok) throw new Error(j.error ?? "Не вдалося виконати запуск");
+        }>(`/api/deals/${rowId}/production-launch`, {});
         const n = j.handoffImportedFileCount;
         setLastLaunchInfo(
           typeof n === "number" && n > 0
@@ -107,16 +104,10 @@ export function ProductionQueueTableClient({
     setBulkBusy(action);
     setBulkInfo("");
     try {
-      const r = await fetch("/api/production/queue-actions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
-      });
-      const j = (await r.json().catch(() => ({}))) as {
+      const j = await postJson<{
         error?: string;
         affected?: number;
-      };
-      if (!r.ok) throw new Error(j.error ?? "Помилка bulk-операції");
+      }>("/api/production/queue-actions", { action });
       setBulkInfo(
         action === "launch_ready"
           ? `Bulk launch: ${j.affected ?? 0}`

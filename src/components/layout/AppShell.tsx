@@ -8,7 +8,7 @@ type AppShellProps = {
 
 export function AppShell({ children }: AppShellProps) {
   return (
-    <div className="flex min-h-screen bg-[var(--enver-bg)] text-[var(--enver-text)]">
+    <div className="enver-readable flex min-h-screen bg-[var(--enver-bg)] text-[var(--enver-text)]">
       <AppSidebar />
 
       <div className="flex min-h-screen flex-1 flex-col md:pl-80">

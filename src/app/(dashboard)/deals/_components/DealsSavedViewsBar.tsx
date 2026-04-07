@@ -2,6 +2,7 @@
 
 import { Bookmark, Loader2, Plus, Trash2 } from "lucide-react";
 import { useCallback, useState } from "react";
+import { deleteJson, postJson } from "@/lib/api/patch-json";
 
 import { cn } from "../../../../lib/utils";
 import type {
@@ -33,13 +34,10 @@ export function DealsSavedViewsBar({
     setBusy(true);
     try {
       const filters = getSnapshot();
-      const r = await fetch("/api/user/deal-hub-saved-views", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), filters }),
+      await postJson<{ ok?: boolean }>("/api/user/deal-hub-saved-views", {
+        name: name.trim(),
+        filters,
       });
-      const j = (await r.json().catch(() => ({}))) as { error?: string };
-      if (!r.ok) throw new Error(j.error ?? "Не вдалося зберегти");
       setName("");
       setOpenSave(false);
       onMutated();
@@ -56,11 +54,7 @@ export function DealsSavedViewsBar({
       setBusy(true);
       setErr(null);
       try {
-        const r = await fetch(`/api/user/deal-hub-saved-views/${id}`, {
-          method: "DELETE",
-        });
-        const j = (await r.json().catch(() => ({}))) as { error?: string };
-        if (!r.ok) throw new Error(j.error ?? "Не вдалося видалити");
+        await deleteJson<{ ok?: boolean }>(`/api/user/deal-hub-saved-views/${id}`);
         if (activeId === id) setActiveId(null);
         onMutated();
       } catch (e) {

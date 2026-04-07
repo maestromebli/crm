@@ -11,6 +11,7 @@ import {
   type ExecutiveKpiNoteRow,
   type ExecutiveKpiNotesMap,
 } from "../lib/executive-kpi-notes";
+import { postJson } from "@/lib/api/patch-json";
 import { SummaryCard } from "@/components/shared/SummaryCard";
 import { Button } from "../../../components/ui/button";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle } from "../../../components/ui/sheet";
@@ -106,15 +107,9 @@ export function FinanceExecutiveKpiStrip({ kpi, initialNotesMap, canEditNotes }:
         for (const metricId of metricIds) {
           notes[metricId] = payloadFromImportedValue(metricId, obj[metricId]);
         }
-        const res = await fetch("/api/finance/executive-kpi-notes/import", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ notes }),
+        await postJson<{ ok?: boolean }>("/api/finance/executive-kpi-notes/import", {
+          notes,
         });
-        if (!res.ok) {
-          const j = (await res.json().catch(() => ({}))) as { error?: string };
-          throw new Error(j.error ?? "Помилка масового імпорту");
-        }
         await loadNotesFromApi({ showSpinner: false });
       } catch (e) {
         setImportError(e instanceof Error ? e.message : "Помилка імпорту");

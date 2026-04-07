@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { format } from "date-fns";
 import { uk } from "date-fns/locale";
 import { cn } from "../../lib/utils";
+import { postJson } from "../../lib/api/patch-json";
 import { patchTaskById } from "../../lib/api/task-api";
 import { dispatchLeadTasksUpdated } from "../../features/ai-assistant/utils/dispatchLeadTasksUpdated";
 
@@ -110,19 +111,13 @@ export function LeadTasksTabClient({
     setFormErr(null);
     setBusy(true);
     try {
-      const r = await fetch("/api/tasks", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: t,
-          entityType: "LEAD",
-          entityId: leadId,
-          taskType,
-          ...(dueAt ? { dueAt: new Date(dueAt).toISOString() } : {}),
-        }),
+      await postJson<{ task?: unknown }>("/api/tasks", {
+        title: t,
+        entityType: "LEAD",
+        entityId: leadId,
+        taskType,
+        ...(dueAt ? { dueAt: new Date(dueAt).toISOString() } : {}),
       });
-      const j = (await r.json()) as { error?: string };
-      if (!r.ok) throw new Error(j.error ?? "Помилка");
       setTitle("");
       setDueAt("");
       await load();

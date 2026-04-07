@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { RefreshCw } from "lucide-react";
 import { Button } from "../../../components/ui/button";
+import { postJson } from "@/lib/api/patch-json";
 
 type Props = {
   integrationId: string;
@@ -24,19 +25,10 @@ export function BankIntegrationSyncButton({ integrationId, canSync, isDemo }: Pr
   const run = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/finance/banking/sync", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ integrationId }),
-      });
-      const data = (await res.json().catch(() => ({}))) as {
+      const data = await postJson<{
         error?: string;
         simulated?: boolean;
-      };
-      if (!res.ok) {
-        throw new Error(data.error ?? `HTTP ${res.status}`);
-      }
+      }>("/api/finance/banking/sync", { integrationId }, { credentials: "same-origin" });
       router.refresh();
       if (data.simulated) {
         window.alert(

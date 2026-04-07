@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { postJson } from "@/lib/api/patch-json";
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
 
@@ -105,19 +106,13 @@ export function ProcurementRequestDrawer({
     }
     setSaving(true);
     try {
-      const r = await fetch("/api/crm/procurement/requests", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          dealId: dealId.trim(),
-          lines: payloadLines,
-          neededByDate: neededByDate || null,
-          priority,
-          comment: headerComment || null,
-        }),
+      await postJson<{ ok?: boolean }>("/api/crm/procurement/requests", {
+        dealId: dealId.trim(),
+        lines: payloadLines,
+        neededByDate: neededByDate || null,
+        priority,
+        comment: headerComment || null,
       });
-      const j = (await r.json()) as { error?: string };
-      if (!r.ok) throw new Error(j.error ?? "Не вдалося зберегти");
       setOpen(false);
       router.refresh();
     } catch (e) {
