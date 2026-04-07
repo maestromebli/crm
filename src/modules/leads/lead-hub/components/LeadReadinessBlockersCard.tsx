@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import type { LeadDetailRow } from "../../../../features/leads/queries";
+import { detectLeadMissingData } from "../../../../lib/ai/context-builders/missing-data-detector";
+import { calcLeadContactSla } from "../../../../lib/health/sla-monitor";
 import {
   evaluateLeadChecksForStage,
   getStageConfig,
@@ -67,6 +69,18 @@ export function LeadReadinessBlockersCard({ lead }: Props) {
   );
   const all = [...required, ...soft];
   const missing = all.filter((x) => !x.pass);
+  const missingData = detectLeadMissingData({
+    contactName: lead.contactName,
+    phone: lead.phone,
+    email: lead.email,
+    qualification: lead.qualification,
+  });
+  const sla = calcLeadContactSla({
+    createdAt: lead.createdAt,
+    lastActivityAt: lead.lastActivityAt,
+    leadMessagesCount: lead.lastActivityAt ? 1 : 0,
+    slaHours: 24,
+  });
 
   return (
     <section className="rounded-[12px] border border-[var(--enver-border)] bg-[var(--enver-card)] p-4 shadow-[var(--enver-shadow)]">
@@ -78,6 +92,18 @@ export function LeadReadinessBlockersCard({ lead }: Props) {
           ? `Закрийте ${missing.length} обов’язкових або рекомендованих пунктів перед переходом далі.`
           : "Базові вимоги стадії закриті."}
       </p>
+      {sla.breached || missingData.length > 0 ? (
+        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11px] text-amber-900">
+          {sla.breached ? (
+            <p>SLA першого контакту порушено на {sla.overdueHours} год.</p>
+          ) : null}
+          {missingData.length > 0 ? (
+            <p className={sla.breached ? "mt-1" : undefined}>
+              Missing data: {missingData.slice(0, 3).join("; ")}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
       <ul className="mt-3 space-y-2">
         {all.map((r) => (
           <Row key={r.id} r={r} leadId={lead.id} />

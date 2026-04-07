@@ -18,6 +18,12 @@ import {
 } from "../../features/deal-workspace/next-cta";
 import { derivePaymentMoneySummaryForPayload } from "../../features/deal-workspace/payment-aggregate";
 import { cn } from "../../lib/utils";
+import {
+  buildDealSmartPanelContext,
+  resolveDealUiVisibilityRules,
+} from "../../lib/dynamic-layer";
+import { detectDealMissingData } from "../../lib/ai/context-builders/missing-data-detector";
+import { SmartPanelSummaryCard } from "../dynamic/SmartPanelSummaryCard";
 
 type Props = {
   data: DealWorkspacePayload;
@@ -30,6 +36,19 @@ export function DealRightRail({ data, nextBestAction, aiSummary }: Props) {
   const blockers = data.readiness.filter((c) => !c.done);
   const primaryCta = useMemo(() => deriveDealPrimaryCta(data), [data]);
   const fin = useMemo(() => derivePaymentMoneySummaryForPayload(data), [data]);
+  const smart = useMemo(() => buildDealSmartPanelContext(data), [data]);
+  const visibility = useMemo(() => resolveDealUiVisibilityRules(data), [data]);
+  const missingDealData = useMemo(
+    () =>
+      detectDealMissingData({
+        expectedCloseDate: data.deal.expectedCloseDate
+          ? new Date(data.deal.expectedCloseDate)
+          : null,
+        value: data.deal.value,
+        controlMeasurementJson: data.controlMeasurement,
+      }),
+    [data.deal.expectedCloseDate, data.deal.value, data.controlMeasurement],
+  );
 
   return (
     <aside className="flex w-full flex-col gap-3 lg:w-80 lg:shrink-0">
@@ -89,7 +108,36 @@ export function DealRightRail({ data, nextBestAction, aiSummary }: Props) {
           Рекомендація CRM
         </p>
         <p className="font-medium text-[var(--enver-text)]">{nextBestAction}</p>
+        {smart.missingData.length > 0 ? (
+          <p className="mt-2 text-[11px] text-slate-500">
+            Missing data: {smart.missingData.join(", ")}
+          </p>
+        ) : null}
       </div>
+      {missingDealData.length > 0 ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50/80 p-3 text-xs shadow-sm">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-900">
+            Missing data alerts
+          </p>
+          <ul className="space-y-1.5 text-amber-900">
+            {missingDealData.slice(0, 4).map((line) => (
+              <li key={line}>- {line}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      <SmartPanelSummaryCard context={smart} title="Smart Panel" />
+
+      {visibility.showMeasurementCalendar ? (
+        <div className="rounded-2xl border border-slate-200 bg-[var(--enver-card)] p-3 text-xs shadow-sm">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+            Умовний блок
+          </p>
+          <p className="text-slate-700">
+            Показуємо календар замірів, бо замір ще не завершений.
+          </p>
+        </div>
+      ) : null}
 
       {microHints.length > 0 ? (
         <div className="rounded-2xl border border-violet-100 bg-violet-50/60 p-3 text-xs shadow-sm">

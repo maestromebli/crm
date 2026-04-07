@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { uk } from "date-fns/locale";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { useLeadMutationActions } from "../../../features/leads/use-lead-mutation-actions";
 import type { LeadDetailRow } from "../../../features/leads/queries";
 import { dateToNextStepDateString } from "../../../lib/leads/next-step-date";
 import {
@@ -33,15 +34,15 @@ export function LeadSummary({
   canConvertToDeal,
 }: LeadSummaryProps) {
   const router = useRouter();
+  const leadActions = useLeadMutationActions(lead.id);
   const [nextStep, setNextStep] = useState(lead.nextStep ?? "");
   const [nextStepDate, setNextStepDate] = useState(() =>
     dateToNextStepDateString(lead.nextContactAt) ?? "",
   );
-  const [savingMeta, setSavingMeta] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [converting, setConverting] = useState(false);
   const [quickStageId, setQuickStageId] = useState(lead.stageId);
-  const [stageBusy, setStageBusy] = useState(false);
+  const patchBusy = leadActions.isPending;
 
   useEffect(() => {
     setQuickStageId(lead.stageId);
@@ -49,49 +50,28 @@ export function LeadSummary({
     setNextStepDate(dateToNextStepDateString(lead.nextContactAt) ?? "");
   }, [lead.stageId, lead.nextStep, lead.nextContactAt]);
 
-  const saveMeta = useCallback(async () => {
+  const saveMeta = async () => {
     if (!canUpdateLead) return;
-    setSavingMeta(true);
     setErr(null);
     try {
-      const r = await fetch(`/api/leads/${lead.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          nextStep: nextStep.trim() || null,
-          nextStepDate: nextStepDate.trim() || null,
-        }),
+      await leadActions.updateNextStep({
+        nextStep: nextStep.trim() || null,
+        nextStepDate: nextStepDate.trim() || null,
       });
-      const j = (await r.json()) as { error?: string };
-      if (!r.ok) throw new Error(j.error ?? "Помилка");
-      router.refresh();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Помилка");
-    } finally {
-      setSavingMeta(false);
     }
-  }, [canUpdateLead, lead.id, nextStepDate, nextStep, router]);
+  };
 
   const saveQuickStage = async (nextId: string) => {
     if (!canUpdateLead || nextId === lead.stageId) return;
-    setStageBusy(true);
     setErr(null);
     try {
-      const r = await fetch(`/api/leads/${lead.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ stageId: nextId }),
-      });
-      const j = (await r.json()) as { error?: string };
-      if (!r.ok) {
-        setErr(j.error ?? "Не вдалося змінити стадію");
-        setQuickStageId(lead.stageId);
-        return;
-      }
+      await leadActions.updateStage(nextId);
       setQuickStageId(nextId);
-      router.refresh();
-    } finally {
-      setStageBusy(false);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Не вдалося змінити стадію");
+      setQuickStageId(lead.stageId);
     }
   };
 
@@ -99,16 +79,7 @@ export function LeadSummary({
     if (!canUpdateLead) return;
     setErr(null);
     try {
-      const r = await fetch(`/api/leads/${lead.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ recordTouch: true }),
-      });
-      if (!r.ok) {
-        const j = (await r.json()) as { error?: string };
-        throw new Error(j.error ?? "Помилка");
-      }
-      router.refresh();
+      await leadActions.recordTouch();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Помилка");
     }
@@ -223,7 +194,7 @@ export function LeadSummary({
           {canUpdateLead ? (
             <select
               value={quickStageId}
-              disabled={stageBusy}
+              disabled={patchBusy}
               onChange={(e) => void saveQuickStage(e.target.value)}
               className="mt-1 w-full rounded-lg border border-slate-200 bg-[var(--enver-card)] px-2 py-1.5 text-sm outline-none focus:border-slate-400 disabled:opacity-50"
             >
@@ -269,11 +240,11 @@ export function LeadSummary({
           <div className="sm:col-span-2">
             <button
               type="button"
-              disabled={savingMeta}
+              disabled={patchBusy}
               onClick={() => void saveMeta()}
               className="rounded-full bg-slate-900 px-4 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
             >
-              {savingMeta ? "Зберігаю…" : "Зберегти крок і дату"}
+              {patchBusy ? "Зберігаю…" : "Зберегти крок і дату"}
             </button>
           </div>
         </div>
