@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { TodayWorkspace } from "../../../components/today/TodayWorkspace";
+import { AiV2InsightCard } from "../../../features/ai-v2";
 import {
   hasEffectivePermission,
   P,
@@ -22,5 +23,10 @@ export default async function TodayPage() {
   ) {
     redirect("/crm/dashboard");
   }
-  return <TodayWorkspace />;
+  return (
+    <div className="space-y-3">
+      <AiV2InsightCard context="dashboard" />
+      <TodayWorkspace />
+    </div>
+  );
 }

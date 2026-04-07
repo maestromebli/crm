@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
-import { ArrowUpRight, Loader2, MessageSquare, Send, X } from "lucide-react";
+import { ArrowUpRight, ChevronDown, ChevronUp, Loader2, MessageSquare, Send, X } from "lucide-react";
 import { cn } from "../../../lib/utils";
 import { assistantConfig } from "../config/assistantConfig";
 import type { AssistantChatMessage } from "../hooks/useAssistantChat";
@@ -18,6 +18,8 @@ import { AssistantQuickActions } from "./AssistantQuickActions";
 import { AssistantChatThread } from "./AssistantChatThread";
 import { AiWorkspaceBlocks } from "./AiWorkspaceBlocks";
 import type { AiWorkspacePayload } from "../../ai/workspace/types";
+
+const DETAILS_OPEN_STORAGE_KEY = "enver.assistant.details_open";
 
 type Props = {
   open: boolean;
@@ -55,6 +57,28 @@ export function AssistantPanel({
   workspaceError,
 }: Props) {
   const closeBtnRef = useRef<HTMLButtonElement>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(DETAILS_OPEN_STORAGE_KEY);
+      setDetailsOpen(raw === "1");
+    } catch {
+      setDetailsOpen(false);
+    }
+  }, []);
+
+  const toggleDetails = () => {
+    setDetailsOpen((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem(DETAILS_OPEN_STORAGE_KEY, next ? "1" : "0");
+      } catch {
+        // ignore storage write failures
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -77,7 +101,7 @@ export function AssistantPanel({
       aria-modal="true"
       aria-label={assistantConfig.copy.panelTitle}
       className={cn(
-        "flex max-h-[min(var(--panel-max),86vh)] w-[min(100vw-1.5rem,400px)] flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-[var(--enver-card)] shadow-xl shadow-slate-900/5",
+        "flex max-h-[min(var(--panel-max),86vh)] w-[min(100vw-1.5rem,400px)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-[var(--enver-card)] shadow-lg shadow-slate-900/5",
         "motion-safe:transition motion-safe:duration-200 motion-safe:ease-out",
       )}
       style={
@@ -89,7 +113,7 @@ export function AssistantPanel({
         } as CSSProperties
       }
     >
-      <div className="flex shrink-0 items-start justify-between gap-2 border-b border-slate-100/90 bg-gradient-to-r from-slate-50/80 to-white px-3 py-2.5">
+      <div className="flex shrink-0 items-start justify-between gap-2 border-b border-slate-100 bg-white px-3 py-2.5">
         <div className="flex min-w-0 items-center gap-2.5">
           <AssistantAvatar
             state={visualState}
@@ -98,13 +122,10 @@ export function AssistantPanel({
             size={36}
           />
           <div className="min-w-0">
-            <p className="text-sm font-medium text-[var(--enver-text)]">
+            <p className="text-sm font-semibold text-[var(--enver-text)]">
               {assistantConfig.copy.panelTitle}
             </p>
-            <p className="text-[10px] leading-snug text-slate-400">
-              {assistantConfig.copy.panelSubtitleHint}
-            </p>
-            <p className="truncate text-[11px] text-slate-500">{statusLabel}</p>
+            <p className="truncate text-xs text-slate-500">{statusLabel}</p>
           </div>
         </div>
         <button
@@ -118,57 +139,86 @@ export function AssistantPanel({
         </button>
       </div>
 
-      <div className="max-h-[min(240px,34vh)] shrink-0 space-y-3 overflow-y-auto overscroll-contain px-3 py-3">
-        <p className="text-xs leading-snug text-slate-600">{greeting}</p>
-        <AiWorkspaceBlocks
-          workspace={workspace}
-          loading={workspaceLoading}
-          error={workspaceError}
-        />
-        <AssistantContextCard resolved={resolved} />
-        <div className="border-l-2 border-slate-200 pl-3">
-          <p className="text-xs text-slate-700">{summary}</p>
-          <ul className="mt-2 space-y-2 text-xs text-slate-600">
-            {resolved.recommendations.map((r) => (
-              <li key={r.id}>
-                <span className="font-medium text-slate-800">{r.title}</span>
-                {r.description ? (
-                  <span className="mt-0.5 block text-slate-600">{r.description}</span>
-                ) : null}
-              </li>
-            ))}
-          </ul>
+      <div className="max-h-[min(260px,38vh)] shrink-0 space-y-2.5 overflow-y-auto overscroll-contain px-3 py-3">
+        <div className="rounded-xl border border-slate-200 bg-white p-2.5">
+          <p className="text-[13px] leading-relaxed text-slate-700">{greeting}</p>
+          <p className="mt-2 text-xs font-medium text-slate-700">{summary}</p>
           {resolved.nextBestAction ? (
-            <p className="mt-3 border-t border-slate-100 pt-3 text-xs text-slate-700">
-              <span className="font-medium text-slate-800">Наступний крок: </span>
+            <p className="mt-2 border-t border-slate-100 pt-2 text-xs text-slate-700">
+              <span className="font-semibold text-slate-800">Наступний крок: </span>
               {resolved.nextBestAction}
             </p>
           ) : null}
         </div>
-        <div>
-          <p className="mb-1.5 text-xs text-slate-500">Швидкі дії</p>
-          <AssistantQuickActions actions={resolved.quickActions} />
+
+        <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-2.5">
+          <button
+            type="button"
+            onClick={toggleDetails}
+            className="inline-flex w-full items-center justify-between text-left text-xs font-medium text-slate-700"
+            aria-expanded={detailsOpen}
+          >
+            <span>Деталі та швидкі дії</span>
+            {detailsOpen ? (
+              <ChevronUp className="h-4 w-4 text-slate-500" />
+            ) : (
+              <ChevronDown className="h-4 w-4 text-slate-500" />
+            )}
+          </button>
+
+          {detailsOpen ? (
+            <div className="mt-2 space-y-2.5 border-t border-slate-200 pt-2.5">
+              <AiWorkspaceBlocks
+                workspace={workspace}
+                loading={workspaceLoading}
+                error={workspaceError}
+              />
+              <AssistantContextCard resolved={resolved} />
+              {resolved.recommendations.length > 0 ? (
+                <div className="rounded-xl border border-slate-200 bg-white p-2.5">
+                  <p className="text-[11px] font-medium text-slate-600">
+                    Рекомендації
+                  </p>
+                  <ul className="mt-1.5 space-y-1.5 text-xs text-slate-700">
+                    {resolved.recommendations.slice(0, 3).map((r) => (
+                      <li key={r.id}>
+                        <span className="font-medium text-slate-800">{r.title}</span>
+                        {r.description ? (
+                          <span className="mt-0.5 block text-slate-600 line-clamp-2">
+                            {r.description}
+                          </span>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              <div>
+                <p className="mb-1.5 text-xs font-medium text-slate-600">
+                  Швидкі дії
+                </p>
+                <AssistantQuickActions actions={resolved.quickActions} />
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col border-t border-slate-100/90 bg-gradient-to-b from-slate-50/50 to-slate-50/90">
-        <div className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-100/80 px-3 py-2">
+      <div className="flex min-h-0 flex-1 flex-col border-t border-slate-100 bg-white">
+        <div className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-100 px-3 py-2">
           <div className="flex items-center gap-2">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white text-violet-600 shadow-sm ring-1 ring-slate-200/80">
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
               <MessageSquare className="h-3.5 w-3.5" strokeWidth={2} />
             </span>
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                 {assistantConfig.copy.chatSectionTitle}
               </p>
-              <p className="text-[10px] leading-tight text-slate-400">
-                {assistantConfig.copy.chatThreadSubtitle}
-              </p>
             </div>
           </div>
           <Link
             href={assistantConfig.copy.fullChatHref}
-            className="inline-flex shrink-0 items-center gap-0.5 rounded-lg px-2 py-1 text-[10px] font-medium text-violet-700 transition hover:bg-violet-50 hover:text-violet-600"
+            className="inline-flex shrink-0 items-center gap-0.5 rounded-lg px-2 py-1 text-[10px] font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-800"
             onClick={onClose}
           >
             {assistantConfig.copy.openFullChat}
@@ -184,7 +234,7 @@ export function AssistantPanel({
         />
       </div>
 
-      <div className="flex shrink-0 gap-2 border-t border-slate-100/90 bg-white/95 p-2.5 backdrop-blur-sm">
+      <div className="flex shrink-0 gap-2 border-t border-slate-100 bg-white p-2.5">
         <textarea
           value={input}
           onChange={(e) => onInputChange(e.target.value)}
@@ -197,8 +247,8 @@ export function AssistantPanel({
           rows={2}
           placeholder={assistantConfig.copy.chatPlaceholder}
           className={cn(
-            "min-h-[44px] flex-1 resize-none rounded-xl border border-slate-200/90 bg-slate-50/50 px-3 py-2.5 text-[13px] leading-snug text-[var(--enver-text)] placeholder:text-slate-400",
-            "outline-none transition focus:border-violet-300 focus:bg-white focus:ring-2 focus:ring-violet-500/15",
+            "min-h-[44px] flex-1 resize-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[13px] leading-snug text-[var(--enver-text)] placeholder:text-slate-400",
+            "outline-none transition focus:border-slate-300 focus:ring-2 focus:ring-slate-200",
           )}
           aria-label="Повідомлення для AI"
         />
@@ -208,8 +258,8 @@ export function AssistantPanel({
           disabled={loading || !input.trim()}
           className={cn(
             "group flex shrink-0 items-center justify-center self-end rounded-xl px-3 py-2.5 text-white transition",
-            "bg-gradient-to-br from-violet-600 to-indigo-600 shadow-md shadow-violet-500/25",
-            "hover:brightness-105 focus-visible:outline focus-visible:ring-2 focus-visible:ring-violet-400/50",
+            "bg-slate-900 shadow-sm",
+            "hover:bg-slate-800 focus-visible:outline focus-visible:ring-2 focus-visible:ring-slate-400/40",
             "disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none",
           )}
           aria-label="Надіслати"

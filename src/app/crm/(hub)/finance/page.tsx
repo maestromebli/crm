@@ -2,7 +2,6 @@ import { PageHeader } from "../../../../components/shared/PageHeader";
 import { SectionCard } from "../../../../components/shared/SectionCard";
 import { StickySidePanel } from "../../../../components/shared/StickySidePanel";
 import Link from "next/link";
-import { mockProjectObjects, mockProjects } from "../../../../features/shared/data/mock-crm";
 import { getFinanceOverviewData } from "../../../../features/finance/data/repository";
 import { FinanceKpiCards } from "../../../../features/finance/components/FinanceKpiCards";
 import { FinanceSummaryPanel } from "../../../../features/finance/components/FinanceSummaryPanel";
@@ -17,6 +16,7 @@ import { FinanceObjectFinanceMatrix } from "../../../../features/finance/compone
 import { FinanceOperationsScopePanel } from "../../../../features/finance/components/FinanceOperationsScopePanel";
 import { FinancePayrollEntryDrawer } from "../../../../features/finance/components/FinancePayrollEntryDrawer";
 import { FinanceDirectorIntakePanel } from "../../../../features/finance/components/FinanceDirectorIntakePanel";
+import { AiV2InsightCard } from "../../../../features/ai-v2";
 
 type Props = { searchParams?: Promise<{ role?: string; view?: string }> };
 
@@ -45,23 +45,42 @@ export default async function FinanceOverviewPage({ searchParams }: Props) {
             </div>
           }
         />
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600">
+          <span className="font-medium text-slate-700">Операційні контури:</span>
+          <Link href="/crm/finance" className="text-sky-700 underline-offset-2 hover:underline">
+            аналітика фінансів
+          </Link>
+          <Link href="/crm/finance/journal" className="text-emerald-800 underline-offset-2 hover:underline">
+            журнал проводок
+          </Link>
+          <Link href="/crm/production" className="text-sky-700 underline-offset-2 hover:underline">
+            штаб виробництва
+          </Link>
+          <Link href="/crm/production/workshop" className="text-sky-700 underline-offset-2 hover:underline">
+            Kanban цеху
+          </Link>
+          <Link href="/crm/procurement" className="text-sky-700 underline-offset-2 hover:underline">
+            закупівлі
+          </Link>
+        </p>
+        <AiV2InsightCard context="finance" />
         <FinanceHubClient />
       </main>
     );
   }
 
   const data = await getFinanceOverviewData();
-  const projectNameById = Object.fromEntries(mockProjects.map((p) => [p.id, `${p.code} · ${p.title}`]));
+  const projectNameById = data.saasAccounting.projectNameById;
   const categoryNameById = Object.fromEntries(data.categories.map((c) => [c.id, c.name]));
   const objectNameById = Object.fromEntries(
-    mockProjectObjects.map((o) => [o.id, `${o.title} · ${o.address}`]),
+    Object.entries(projectNameById).map(([pid, label]) => [`${pid}-obj`, `${label} · об'єкт`]),
   );
   const accountLabelById = Object.fromEntries(data.accounts.map((a) => [a.id, a.name]));
-  const projectOptions = mockProjects.map((p) => ({ id: p.id, label: `${p.code} · ${p.title}` }));
-  const objectOptions = mockProjectObjects.map((o) => ({
-    id: o.id,
-    projectId: o.projectId,
-    label: `${o.title} (${o.address})`,
+  const projectOptions = Object.entries(projectNameById).map(([id, label]) => ({ id, label }));
+  const objectOptions = projectOptions.map((p) => ({
+    id: `${p.id}-obj`,
+    projectId: p.id,
+    label: p.label,
   }));
 
   return (
@@ -84,7 +103,7 @@ export default async function FinanceOverviewPage({ searchParams }: Props) {
             </div>
             {canAccess(role, "FINANCE_FULL") || canAccess(role, "FINANCE_SUMMARY") ? (
               <FinanceHeaderActions
-                projects={mockProjects.map((p) => ({ id: p.id, label: `${p.code} · ${p.title}` }))}
+                projects={projectOptions}
                 expenseCategories={data.categories
                   .filter((c) => c.group === "EXPENSE")
                   .map((c) => ({ id: c.id, label: c.name }))}
@@ -95,6 +114,22 @@ export default async function FinanceOverviewPage({ searchParams }: Props) {
           </div>
         }
       />
+      <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600">
+        <span className="font-medium text-slate-700">Операційні контури:</span>
+        <Link href="/crm/production" className="text-sky-700 underline-offset-2 hover:underline">
+          штаб виробництва
+        </Link>
+        <Link href="/crm/production/workshop" className="text-sky-700 underline-offset-2 hover:underline">
+          Kanban цеху
+        </Link>
+        <Link href="/crm/procurement" className="text-sky-700 underline-offset-2 hover:underline">
+          закупівлі
+        </Link>
+        <Link href="/crm/finance/journal" className="text-emerald-800 underline-offset-2 hover:underline">
+          журнал проводок
+        </Link>
+      </p>
+      <AiV2InsightCard context="finance" />
       <div className="flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-gradient-to-br from-slate-50/90 via-white to-slate-50/50 p-4 shadow-sm sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <p className="text-sm text-slate-600">
           <span className="font-medium text-slate-800">Швидкі дії:</span> нова проводка або нарахування зарплати
@@ -342,13 +377,7 @@ export default async function FinanceOverviewPage({ searchParams }: Props) {
           </SectionCard>
         </div>
         <StickySidePanel>
-          <FinanceSummaryPanel
-            alerts={[
-              { level: "P1", text: "Є прострочені платежі по 2 проєктах." },
-              { level: "P0", text: "Перевищено бюджет закупок у проєкті EN-2026-003." },
-              { level: "P2", text: "Потрібно закрити 3 акти підрядників." },
-            ]}
-          />
+          <FinanceSummaryPanel alerts={data.financeAlerts} />
         </StickySidePanel>
       </div>
     </main>

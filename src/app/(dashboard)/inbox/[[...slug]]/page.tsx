@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { InboxShell } from "../../../../features/inbox/components/InboxShell";
+import { AiV2InsightCard } from "../../../../features/ai-v2";
 import {
   buildModulePath,
   pageTitleFromPath,
@@ -26,11 +27,14 @@ export default async function InboxPage({ params }: PageProps) {
 
   return (
     <main className="flex min-h-[calc(100vh-56px)] flex-col bg-slate-50 px-3 py-3 md:px-6 md:py-4">
-      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col rounded-2xl border border-slate-200 bg-[var(--enver-card)]/90 shadow-sm shadow-slate-900/5">
+      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-3">
+        <AiV2InsightCard context="dashboard" />
+        <div className="flex flex-1 flex-col rounded-2xl border border-slate-200 bg-[var(--enver-card)]/90 shadow-sm shadow-slate-900/5">
         <InboxShell
           initialTab={initialTab}
           channelFilter={channelFilter}
         />
+        </div>
       </div>
     </main>
   );

@@ -8,6 +8,8 @@ import {
   AssistantFloatingHost,
   AssistantPageEntityProvider,
 } from "../../features/ai-assistant";
+import { AiV2CockpitRail } from "../../features/ai-v2";
+import { LeadWorkspaceQueryProvider } from "../../features/leads/lead-workspace-query-provider";
 import { AppHeader } from "./AppHeader";
 import { AppSidebar } from "./AppSidebar";
 
@@ -50,6 +52,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
           onToggleSidebar={toggleSidebar}
         />
         <AssistantPageEntityProvider>
+          <LeadWorkspaceQueryProvider>
           <motion.main
             key={pathname ?? "/"}
             className="flex flex-1 flex-col"
@@ -62,7 +65,9 @@ export function DashboardShell({ children }: { children: ReactNode }) {
           >
             {children}
           </motion.main>
+          <AiV2CockpitRail />
           <AssistantFloatingHost />
+          </LeadWorkspaceQueryProvider>
         </AssistantPageEntityProvider>
       </div>
     </div>

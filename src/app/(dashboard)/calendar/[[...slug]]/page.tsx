@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { CalendarShell } from "../../../../features/calendar/components/CalendarShell";
+import { AiV2InsightCard } from "../../../../features/ai-v2";
 import { demoCalendarEvents } from "../../../../features/calendar/demo-events";
 import { loadCalendarEventsFromDb } from "../../../../features/calendar/load-events";
 import { presetFromCalendarSlug } from "../../../../features/calendar/route-presets";
@@ -50,6 +51,8 @@ export default async function CalendarPage({ params }: PageProps) {
           календарі ENVER CRM. Підмаршрут з меню задає стартові фільтри.
         </p>
       </div>
+
+      <AiV2InsightCard context="dashboard" />
 
       <CalendarShell
         events={events}

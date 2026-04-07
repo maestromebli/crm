@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import type { DealWorkspacePayload } from "../../features/deal-workspace/types";
 import type { DealWorkspaceTabId } from "../../features/deal-workspace/types";
 import type { EffectiveRole } from "../../lib/authz/roles";
@@ -20,6 +21,7 @@ import {
 import { DealWorkspaceHeader } from "./DealWorkspaceHeader";
 import { DealWorkspacePrimaryActions } from "./DealWorkspacePrimaryActions";
 import { DealFinanceProjectLinks } from "./DealFinanceProjectLinks";
+import { DealProcurementLink } from "./DealProcurementLink";
 import { DealReadinessStrip } from "./DealReadinessStrip";
 import { DealAssistantCards } from "./DealAssistantCards";
 import { DealStageProgress } from "./DealStageProgress";
@@ -32,9 +34,12 @@ import { DealWorkspaceExecutionBlocks } from "./DealWorkspaceExecutionBlocks";
 import { cn } from "../../lib/utils";
 import { ENVER_DEAL_TASKS_UPDATED_EVENT } from "../../features/ai-assistant/constants/leadTasksSync";
 import type { EnverDealTasksUpdatedDetail } from "../../features/ai-assistant/constants/leadTasksSync";
+import { dealQueryKeys } from "../../features/deal-workspace/deal-query-keys";
 import { useAssistantPageEntitySetter } from "../../features/ai-assistant/context/AssistantPageEntityContext";
 import { buildDealPageEntitySnapshot } from "../../features/ai-assistant/utils/buildAssistantPageEntitySnapshot";
 import { DealAiOperationsPanel } from "../../features/ai";
+import { AiV2InsightCard } from "../../features/ai-v2";
+import { CRMLayout } from "../layout/CRMLayout";
 
 type Props = {
   data: DealWorkspacePayload;
@@ -51,9 +56,11 @@ function estimateVisibilityForRole(
 
 export function DealWorkspaceShell({ data, viewerRole }: Props) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const setDealEntity = useAssistantPageEntitySetter();
   const [headerEditSignal, setHeaderEditSignal] = useState(0);
+  const tasksRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setDealEntity(buildDealPageEntitySnapshot(data));
@@ -61,11 +68,19 @@ export function DealWorkspaceShell({ data, viewerRole }: Props) {
   }, [data, setDealEntity]);
 
   useEffect(() => {
+    queryClient.setQueryData(dealQueryKeys.workspace(data.deal.id), data);
+  }, [data, queryClient]);
+
+  useEffect(() => {
     const dealId = data.deal.id;
     const onDealTasksUpdated = (ev: Event) => {
       const ce = ev as CustomEvent<EnverDealTasksUpdatedDetail>;
       if (ce.detail?.dealId === dealId) {
-        router.refresh();
+        if (tasksRefreshTimerRef.current) return;
+        tasksRefreshTimerRef.current = setTimeout(() => {
+          tasksRefreshTimerRef.current = null;
+          router.refresh();
+        }, 180);
       }
     };
     window.addEventListener(
@@ -73,6 +88,10 @@ export function DealWorkspaceShell({ data, viewerRole }: Props) {
       onDealTasksUpdated as EventListener,
     );
     return () => {
+      if (tasksRefreshTimerRef.current) {
+        clearTimeout(tasksRefreshTimerRef.current);
+        tasksRefreshTimerRef.current = null;
+      }
       window.removeEventListener(
         ENVER_DEAL_TASKS_UPDATED_EVENT,
         onDealTasksUpdated as EventListener,
@@ -148,6 +167,7 @@ export function DealWorkspaceShell({ data, viewerRole }: Props) {
           />
           <DealWorkspaceCommandStrip data={data} onTab={setTab} />
           <DealFinanceProjectLinks data={data} />
+          <DealProcurementLink dealId={data.deal.id} />
           <DealReadinessStrip data={data} />
         </div>
 
@@ -158,6 +178,7 @@ export function DealWorkspaceShell({ data, viewerRole }: Props) {
           onTab={setTab}
           onRequestEditHeader={bumpHeaderEdit}
         />
+        <AiV2InsightCard context="deal" dealId={data.deal.id} />
         <DealAiOperationsPanel dealId={data.deal.id} />
 
         {showLeadBridge ? (
@@ -194,8 +215,9 @@ export function DealWorkspaceShell({ data, viewerRole }: Props) {
         ) : null}
         <DealStageProgress data={data} />
 
-        <div className="grid flex-1 grid-cols-1 gap-3 xl:grid-cols-[2fr_1fr] xl:items-start">
-          <div className="min-w-0 space-y-3">
+        <CRMLayout
+          main={
+            <>
             <nav className="space-y-2 rounded-2xl border border-slate-200 bg-[var(--enver-card)]/90 p-1.5 shadow-sm">
               <div className="flex flex-wrap gap-1">
                 {DEAL_WORKSPACE_TAB_GROUPS.map((g) => {
@@ -246,20 +268,23 @@ export function DealWorkspaceShell({ data, viewerRole }: Props) {
               onTab={setTab}
               estimateVisibility={estimateVisibility}
             />
-          </div>
-
-          <DealRightRail
-            data={data}
-            nextBestAction={nextBest}
-            aiSummary={aiSummary}
-          />
-        </div>
+            </>
+          }
+          smartPanel={
+            <DealRightRail
+              data={data}
+              nextBestAction={nextBest}
+              aiSummary={aiSummary}
+            />
+          }
+        />
       </div>
 
       <DealActionBar
         data={data}
         activeTab={activeTab}
         onTab={setTab}
+        onRequestEditHeader={bumpHeaderEdit}
       />
     </div>
     </DealWorkspaceToastProvider>

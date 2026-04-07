@@ -10,20 +10,18 @@ import { PurchaseOrdersTable } from "../../../../features/procurement/components
 import { SuppliersTable } from "../../../../features/procurement/components/SuppliersTable";
 import { GoodsReceiptsTable } from "../../../../features/procurement/components/GoodsReceiptsTable";
 import { ProcurementRiskPanel } from "../../../../features/procurement/components/ProcurementRiskPanel";
+import { ProcurementOrderedMonitorTable } from "../../../../features/procurement/components/ProcurementOrderedMonitorTable";
 import { ProcurementRequestDrawer } from "../../../../features/procurement/components/ProcurementRequestDrawer";
 import { EmptyState } from "../../../../components/shared/EmptyState";
 import { canAccess, resolveRole } from "../../../../features/shared/lib/rbac";
-import {
-  mockProcurementCategories,
-  mockProjects,
-  mockPurchaseOrders,
-  mockSuppliers,
-} from "../../../../features/shared/data/mock-crm";
 import { formatMoneyUa } from "../../../../features/finance/lib/format-money";
 import { StatusBadge } from "../../../../components/shared/StatusBadge";
 import { ProcurementHubClient } from "./ProcurementHubClient";
+import { AiV2InsightCard } from "../../../../features/ai-v2";
 
-type Props = { searchParams?: Promise<{ role?: string; view?: string }> };
+type Props = {
+  searchParams?: Promise<{ role?: string; view?: string; newRequest?: string; dealId?: string }>;
+};
 
 export default async function ProcurementOverviewPage({ searchParams }: Props) {
   const params = await searchParams;
@@ -50,38 +48,95 @@ export default async function ProcurementOverviewPage({ searchParams }: Props) {
             </div>
           }
         />
+        <AiV2InsightCard context="procurement" />
         <ProcurementHubClient />
       </main>
     );
   }
 
   const data = await getProcurementOverviewData();
-  const projectNameById = Object.fromEntries(mockProjects.map((p) => [p.id, `${p.code} · ${p.title}`]));
-  const supplierNameById = Object.fromEntries(mockSuppliers.map((s) => [s.id, s.name]));
-  const categoryNameById = Object.fromEntries(mockProcurementCategories.map((c) => [c.id, c.name]));
-  const orderNumberById = Object.fromEntries(mockPurchaseOrders.map((p) => [p.id, p.orderNumber]));
+  const projectNameById = data.projectNameById;
+  const supplierNameById = data.supplierNameById;
+  const categoryNameById = Object.fromEntries(data.categories.map((c) => [c.id, c.name]));
+  const orderNumberById = data.orderNumberById;
 
   return (
     <main className="space-y-4 p-4">
       <PageHeader
         title="Закупки"
-        subtitle="Управління заявками, постачальниками, замовленнями і бюджетом."
+        subtitle={
+          data.dataSource === "live"
+            ? "Управління заявками, постачальниками, замовленнями і бюджетом (дані з CRM)."
+            : "Управління заявками, постачальниками, замовленнями і бюджетом (демо-набір)."
+        }
         actionsSlot={
-          <div className="inline-flex rounded-lg border border-[var(--enver-border)] bg-[var(--enver-bg)] p-1">
-            <span className="rounded-md bg-[var(--enver-accent-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--enver-accent-hover)]">
-              Аналітичний огляд
-            </span>
-            <Link
-              href="/crm/procurement?view=hub"
-              className="rounded-md px-3 py-1.5 text-xs font-medium text-[var(--enver-muted)] hover:bg-[var(--enver-hover)]"
-            >
-              Live hub
-            </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex rounded-lg border border-[var(--enver-border)] bg-[var(--enver-bg)] p-1">
+              <span className="rounded-md bg-[var(--enver-accent-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--enver-accent-hover)]">
+                Аналітичний огляд
+              </span>
+              <Link
+                href="/crm/procurement?view=hub"
+                className="rounded-md px-3 py-1.5 text-xs font-medium text-[var(--enver-muted)] hover:bg-[var(--enver-hover)]"
+              >
+                Live hub
+              </Link>
+            </div>
+            {canAccess(role, "PROCUREMENT_FULL") ? (
+              <>
+                <Link
+                  href="/crm/procurement?newRequest=1"
+                  className="rounded-lg border border-[var(--enver-border)] bg-[var(--enver-card)] px-3 py-1.5 text-xs font-medium text-[var(--enver-text)] hover:bg-[var(--enver-hover)]"
+                >
+                  Нова заявка
+                </Link>
+                <Link
+                  href="/crm/procurement?view=hub#supplier-onboarding"
+                  className="rounded-lg border border-[var(--enver-border)] bg-[var(--enver-card)] px-3 py-1.5 text-xs font-medium text-[var(--enver-text)] hover:bg-[var(--enver-hover)]"
+                >
+                  Постачальник у hub
+                </Link>
+              </>
+            ) : null}
           </div>
         }
       />
-      {canAccess(role, "PROCUREMENT_FULL") ? <ProcurementRequestDrawer /> : null}
+      {data.dataSource === "demo" ? (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+          Показано демо-дані. Підключіть БД і заповніть угоди / закупівлі — тут з’являться реальні цифри.
+        </p>
+      ) : null}
+      <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600">
+        <span className="font-medium text-slate-700">Швидкі звʼязки:</span>
+        <Link href="/crm/production" className="text-sky-700 underline-offset-2 hover:underline">
+          штаб виробництва
+        </Link>
+        <Link href="/crm/production/workshop" className="text-sky-700 underline-offset-2 hover:underline">
+          Kanban цеху
+        </Link>
+        <Link href="/crm/finance" className="text-sky-700 underline-offset-2 hover:underline">
+          фінанси
+        </Link>
+      </p>
+      <AiV2InsightCard context="procurement" />
+      {canAccess(role, "PROCUREMENT_FULL") ? (
+        <ProcurementRequestDrawer
+          defaultOpen={params?.newRequest === "1"}
+          initialDealId={params?.dealId}
+        />
+      ) : null}
       <ProcurementKpiCards kpi={data.kpi} />
+      <SectionCard
+        title="Моніторинг замовлених позицій"
+        subtitle="KPI, пошук, сортування, експорт CSV; строки дедлайну, залишок бюджету та % виконання по кожному рядку"
+      >
+        <ProcurementOrderedMonitorTable
+          rows={data.orderedLineMonitor}
+          maxRows={60}
+          compact
+          tableScrollClassName="max-h-[min(560px,70vh)] overflow-y-auto"
+        />
+      </SectionCard>
       <SectionCard
         title="SaaS procurement control"
         subtitle="SLA постачальників, концентрація, якість приймання і прострочені потреби"
@@ -204,7 +259,7 @@ export default async function ProcurementOverviewPage({ searchParams }: Props) {
                 <table className="min-w-full text-left text-sm">
                   <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                     <tr>
-                      <th className="px-2 py-2">Request</th>
+                      <th className="px-2 py-2">Заявка</th>
                       <th className="px-2 py-2">Проєкт</th>
                       <th className="px-2 py-2">Потрібно до</th>
                       <th className="px-2 py-2">Бюджет</th>
@@ -214,8 +269,22 @@ export default async function ProcurementOverviewPage({ searchParams }: Props) {
                   <tbody>
                     {data.saasControl.overdueRequests.map((row) => (
                       <tr key={row.requestId} className="border-t border-slate-100">
-                        <td className="px-2 py-2 font-medium text-[var(--enver-text)]">{row.requestId}</td>
-                        <td className="px-2 py-2 text-slate-600">{projectNameById[row.projectId] ?? row.projectId}</td>
+                        <td className="px-2 py-2 font-medium text-[var(--enver-text)]">
+                          <Link
+                            href={`/crm/procurement/${row.projectId}`}
+                            className="text-sky-800 underline-offset-2 hover:text-sky-950 hover:underline"
+                          >
+                            {row.requestId}
+                          </Link>
+                        </td>
+                        <td className="px-2 py-2 text-slate-600">
+                          <Link
+                            href={`/crm/procurement/${row.projectId}`}
+                            className="text-sky-800 underline-offset-2 hover:text-sky-950 hover:underline"
+                          >
+                            {projectNameById[row.projectId] ?? row.projectId}
+                          </Link>
+                        </td>
                         <td className="px-2 py-2">{row.neededByDate ?? "—"}</td>
                         <td className="px-2 py-2">{formatMoneyUa(row.budgetTotal)} грн</td>
                         <td className="px-2 py-2">
@@ -266,13 +335,7 @@ export default async function ProcurementOverviewPage({ searchParams }: Props) {
           </SectionCard>
         </div>
         <StickySidePanel>
-          <ProcurementRiskPanel
-            risks={[
-              { level: "P0", text: "Перевищення бюджету по матеріалах у EN-2026-003." },
-              { level: "P1", text: "4 позиції не замовлені при близькому дедлайні." },
-              { level: "P1", text: "Є частково доставлені замовлення без закриття." },
-            ]}
-          />
+          <ProcurementRiskPanel risks={data.riskAlerts} />
         </StickySidePanel>
       </div>
     </main>

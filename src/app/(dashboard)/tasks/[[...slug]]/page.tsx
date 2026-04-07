@@ -3,6 +3,7 @@ import {
   moduleCatchAllMetadata,
 } from "../../_components/ModuleCatchAllPage";
 import { TasksWorkspace } from "../../../../components/tasks/TasksWorkspace";
+import { AiV2InsightCard } from "../../../../features/ai-v2";
 import { buildModulePath } from "../../../../lib/navigation-resolve";
 
 type PageProps = {
@@ -25,8 +26,18 @@ export default async function TasksCatchAllPage(props: PageProps) {
     pathname.startsWith("/tasks/diia");
 
   if (useTasksUi) {
-    return <TasksWorkspace pathname={pathname} />;
+    return (
+      <div className="space-y-3">
+        <AiV2InsightCard context="dashboard" />
+        <TasksWorkspace pathname={pathname} />
+      </div>
+    );
   }
 
-  return <ModuleCatchAllPage {...props} baseHref="/tasks" />;
+  return (
+    <div className="space-y-3">
+      <AiV2InsightCard context="dashboard" />
+      <ModuleCatchAllPage {...props} baseHref="/tasks" />
+    </div>
+  );
 }

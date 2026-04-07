@@ -2,6 +2,7 @@ import {
   ModuleCatchAllPage,
   moduleCatchAllMetadata,
 } from "../../_components/ModuleCatchAllPage";
+import { AiV2InsightCard } from "../../../../features/ai-v2";
 
 type PageProps = {
   params: Promise<{ slug?: string[] }>;
@@ -12,5 +13,10 @@ export function generateMetadata(props: PageProps) {
 }
 
 export default function ReportsCatchAllPage(props: PageProps) {
-  return <ModuleCatchAllPage {...props} baseHref="/reports" />;
+  return (
+    <div className="space-y-3">
+      <AiV2InsightCard context="dashboard" />
+      <ModuleCatchAllPage {...props} baseHref="/reports" />
+    </div>
+  );
 }

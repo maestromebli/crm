@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { parseJsonResponse } from "../../../lib/http/parse-json-response";
 
 export type AssistantChatMessage = {
   id: string;
@@ -120,11 +121,11 @@ export function useAssistantChat(options?: UseAssistantChatOptions) {
             })),
           }),
         });
-        const data = (await res.json()) as {
+        const data = await parseJsonResponse<{
           text?: string;
           error?: string;
           toolsUsed?: string[];
-        };
+        }>(res);
         if (!res.ok) {
           setError(data.error ?? "Помилка запиту");
           return;
@@ -140,8 +141,10 @@ export function useAssistantChat(options?: UseAssistantChatOptions) {
               : undefined,
         };
         setMessages((prev) => [...prev, assistantMsg].slice(-MAX_MESSAGES));
-      } catch {
-        setError("Не вдалося з’єднатися з сервером");
+      } catch (e) {
+        setError(
+          e instanceof Error ? e.message : "Не вдалося з’єднатися з сервером",
+        );
       } finally {
         setLoading(false);
         onComplete?.();

@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth/options";
 import { getProductionOrderHub } from "@/features/production/server/queries/get-production-order-hub";
 import { ProductionOrderHubPage } from "@/features/production/ui/order-hub/ProductionOrderHubPage";
+import { AiV2InsightCard } from "@/features/ai-v2";
 
 export const metadata: Metadata = {
   title: "Потік виробництва · ENVER CRM",
@@ -22,6 +23,7 @@ export default async function ProductionFlowPage(props: { params: Promise<{ flow
   }
   return (
     <main className="mx-auto max-w-7xl space-y-6 p-4 md:p-6">
+      <AiV2InsightCard context="production" />
       <ProductionOrderHubPage data={data} />
     </main>
   );
