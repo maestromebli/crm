@@ -19,7 +19,7 @@ type TaskRow = {
 };
 
 const btn =
-  "rounded-lg border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50";
+  "rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50";
 
 export function TasksWorkspaceTab({ data }: { data: DealWorkspacePayload }) {
   const dealId = data.deal.id;
@@ -150,17 +150,17 @@ export function TasksWorkspaceTab({ data }: { data: DealWorkspacePayload }) {
           Швидка задача
         </h2>
         {err ?? queryErr ? (
-          <p className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-800">
+          <p className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800">
             {err ?? queryErr}
           </p>
         ) : null}
         <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
-          <label className="flex-1 text-xs">
+          <label className="flex-1 text-sm">
             <span className="text-slate-500">Тип</span>
             <select
               value={taskType}
               onChange={(e) => setTaskType(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5"
+              className="mt-1 w-full rounded-lg border border-slate-200 px-2.5 py-2 text-sm"
             >
               <option value="CALLBACK">Перезвін</option>
               <option value="SEND_QUOTE">Надіслати КП</option>
@@ -171,12 +171,12 @@ export function TasksWorkspaceTab({ data }: { data: DealWorkspacePayload }) {
               <option value="OTHER">Інше</option>
             </select>
           </label>
-          <label className="flex-[2] text-xs">
+          <label className="flex-[2] text-sm">
             <span className="text-slate-500">Назва</span>
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5"
+              className="mt-1 w-full rounded-lg border border-slate-200 px-2.5 py-2 text-sm"
               placeholder="Що зробити"
             />
           </label>
@@ -198,19 +198,19 @@ export function TasksWorkspaceTab({ data }: { data: DealWorkspacePayload }) {
           Задачі по угоді
         </h2>
         {tasksQuery.isPending ? (
-          <p className="mt-2 text-xs text-slate-500">Завантаження…</p>
+          <p className="mt-2 text-sm text-slate-500">Завантаження…</p>
         ) : (tasksQuery.data ?? []).length === 0 ? (
-          <p className="mt-2 text-xs text-slate-500">Поки немає задач.</p>
+          <p className="mt-2 text-sm text-slate-500">Поки немає задач.</p>
         ) : (
           <ul className="mt-3 space-y-2">
             {(tasksQuery.data ?? []).map((t) => (
               <li
                 key={t.id}
-                className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50/80 px-2 py-1.5 text-xs"
+                className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2 text-sm"
               >
                 <span>
                   <span className="font-medium text-[var(--enver-text)]">{t.title}</span>
-                  <span className="ml-2 text-slate-500">
+                  <span className="ml-2 text-xs text-slate-500">
                     {t.taskType} · {t.status}
                     {t.dueAt
                       ? ` · ${new Date(t.dueAt).toLocaleDateString("uk-UA")}`
@@ -221,7 +221,7 @@ export function TasksWorkspaceTab({ data }: { data: DealWorkspacePayload }) {
                   <button
                     type="button"
                     disabled={createMutation.isPending || completeMutation.isPending}
-                    className="rounded border border-slate-300 bg-[var(--enver-card)] px-2 py-0.5 text-[11px] font-medium"
+                    className="rounded border border-slate-300 bg-[var(--enver-card)] px-2.5 py-1 text-xs font-medium"
                     onClick={() => void complete(t.id)}
                   >
                     OK

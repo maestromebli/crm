@@ -21,7 +21,7 @@ type TaskRow = {
 };
 
 const btn =
-  "rounded-xl border border-[var(--enver-accent)]/35 bg-[var(--enver-accent)] px-3 py-1.5 text-xs font-semibold text-white shadow-sm shadow-[var(--enver-accent)]/25 transition hover:brightness-110 disabled:opacity-50";
+  "rounded-xl border border-[var(--enver-accent)]/35 bg-[var(--enver-accent)] px-3 py-2 text-sm font-semibold text-white shadow-sm shadow-[var(--enver-accent)]/25 transition hover:brightness-110 disabled:opacity-50";
 
 type Props = {
   pathname: string;
@@ -106,8 +106,8 @@ export function TasksWorkspace({ pathname }: Props) {
             : "Задачі";
 
   return (
-    <div className="enver-page-shell flex flex-col px-3 py-3 md:px-6 md:py-4">
-      <div className="mx-auto w-full max-w-6xl flex-1 space-y-4">
+    <div className="enver-page-shell flex flex-col px-3 py-4 md:px-6 md:py-5">
+      <div className="mx-auto w-full max-w-7xl flex-1 space-y-4">
         <motion.header
           className="enver-panel enver-panel--interactive px-4 py-3"
           initial={reduceMotion ? false : { opacity: 0.94, y: 6 }}
@@ -115,10 +115,10 @@ export function TasksWorkspace({ pathname }: Props) {
           transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
         >
           <h1 className="text-lg font-semibold text-[var(--enver-text)]">{title}</h1>
-          <p className="mt-1 text-xs text-[var(--enver-text-muted)]">
+          <p className="mt-1 text-sm text-[var(--enver-text-muted)]">
             Дані з API `/api/tasks`. Швидке завершення — PATCH статусу DONE.
           </p>
-          <div className="mt-3 flex flex-wrap gap-2 text-xs">
+          <div className="mt-3 flex flex-wrap gap-2 text-sm">
             <Tooltip>
               <TooltipTrigger asChild>
                 <Link
@@ -202,7 +202,7 @@ export function TasksWorkspace({ pathname }: Props) {
             {items.map((t) => (
               <motion.li
                 key={t.id}
-                className="enver-panel enver-panel--interactive flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm"
+                className="enver-panel enver-panel--interactive flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 text-sm"
                 layout={false}
                 initial={reduceMotion ? false : { opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
