@@ -1,4 +1,8 @@
 import { extractFirstJsonObject } from "../../../lib/ai/extract-json";
+import {
+  isOpenAiTextError,
+  openAiChatCompletionText,
+} from "../../ai/core/openai-client";
 
 export type ReplyStyle =
   | "short"
@@ -24,13 +28,6 @@ export async function generateSuggestedReply(input: {
   style: ReplyStyle;
   stageHint?: string | null;
 }): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
-  const apiKey = process.env.AI_API_KEY?.trim();
-  const baseUrl = process.env.AI_BASE_URL ?? "https://api.openai.com/v1";
-  const model = process.env.AI_MODEL ?? "gpt-4.1-mini";
-  if (!apiKey) {
-    return { ok: false, error: "AI не налаштовано (AI_API_KEY)." };
-  }
-
   const system = `Ти менеджер з продажу корпусних меблів ENVER. Мова: українська.
 Поверни ЛИШЕ JSON: { "reply": "текст повідомлення клієнту" }.
 Не обіцяй конкретні суми/дати, якщо їх немає в контексті. Стиль: ${STYLE_UA[input.style]}.
@@ -39,31 +36,18 @@ export async function generateSuggestedReply(input: {
   const user = `Остання переписка:\n${input.transcript.slice(0, 24_000)}`;
 
   try {
-    const res = await fetch(`${baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        temperature: 0.45,
-        max_tokens: 900,
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: user },
-        ],
-      }),
+    const res = await openAiChatCompletionText({
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: user },
+      ],
+      temperature: 0.45,
+      maxTokens: 900,
     });
-    if (!res.ok) {
-      const t = await res.text();
-      return { ok: false, error: t.slice(0, 300) };
+    if (isOpenAiTextError(res)) {
+      return { ok: false, error: res.error };
     }
-    const raw = await res.text();
-    const data = JSON.parse(raw) as {
-      choices?: { message?: { content?: string | null } }[];
-    };
-    const content = data.choices?.[0]?.message?.content?.trim() ?? "";
+    const content = res.content;
     const j = extractFirstJsonObject(content) as { reply?: string };
     const text = typeof j.reply === "string" ? j.reply.trim() : "";
     if (!text) return { ok: false, error: "parse" };

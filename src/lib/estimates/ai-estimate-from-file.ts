@@ -8,6 +8,10 @@ import {
 import type { AiEstimateDraftResult, DraftLine } from "./ai-estimate-draft";
 import { parseEstimatePromptToDraft } from "./ai-estimate-draft";
 import { enrichDraftPricingFromText } from "./estimate-draft-pricing-enrich";
+import {
+  isOpenAiTextError,
+  openAiChatCompletionText,
+} from "../../features/ai/core/openai-client";
 
 function pricingContextText(args: {
   fileName: string;
@@ -100,8 +104,6 @@ export async function analyzeEstimateFromContent(args: {
   confidence: string | null;
 }> {
   const apiKey = process.env.AI_API_KEY?.trim();
-  const baseUrl = process.env.AI_BASE_URL ?? "https://api.openai.com/v1";
-  const model = process.env.AI_MODEL ?? "gpt-4.1-mini";
 
   const fallbackText = pricingContextText(args);
 
@@ -171,41 +173,31 @@ export async function analyzeEstimateFromContent(args: {
     });
   }
 
-  const res = await fetch(`${baseUrl}/chat/completions`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      temperature: 0.2,
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: userParts },
-      ],
-    }),
+  const res = await openAiChatCompletionText({
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: userParts },
+    ],
+    temperature: 0.2,
   });
 
-  if (!res.ok) {
-    const errText = await res.text().catch(() => "");
-     
-    console.error("[ai-estimate-from-file]", res.status, errText.slice(0, 500));
+  if (isOpenAiTextError(res)) {
+    console.error(
+      "[ai-estimate-from-file]",
+      res.httpStatus ?? 0,
+      res.error.slice(0, 500),
+    );
     const heuristic = parseEstimatePromptToDraft(fallbackText);
     return {
       configured: true,
       result: finalizeDraftResult(heuristic, fallbackText),
       isProjectDocument: heuristic.lines.length > 0,
       templateKey: null,
-      aiSummary: `Модель недоступна (${res.status}). Показано евристичну чернетку.`,
+      aiSummary: `Модель недоступна (${res.httpStatus ?? "n/a"}). Показано евристичну чернетку.`,
       confidence: "low",
     };
   }
-
-  const data = (await res.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-  const raw = data.choices?.[0]?.message?.content ?? "";
+  const raw = res.content;
   let parsed: AiFileJson;
   try {
     parsed = extractFirstJsonObject(raw) as AiFileJson;

@@ -185,6 +185,52 @@ export type DirectorAiBlock = {
   };
 };
 
+export type BehaviorScoreBreakdown = {
+  userId: string;
+  name: string;
+  firstContactDiscipline: number;
+  followUpDiscipline: number;
+  leadVelocity: number;
+  dealMovement: number;
+  managerResponsiveness: number;
+  conversionHygiene: number;
+  managerBehaviorScore: number;
+  signals: string[];
+};
+
+export type BehaviorEngineSnapshot = {
+  teamBehaviorScore: number;
+  managerScores: BehaviorScoreBreakdown[];
+  weakManagers: Array<{
+    userId: string;
+    name: string;
+    score: number;
+    primaryIssue: string;
+  }>;
+  alerts: Array<{
+    id: string;
+    severity: "high" | "medium";
+    label: string;
+    detail: string;
+    href: string;
+  }>;
+};
+
+export type DailyOperatingSnapshot = {
+  priorities: NextActionItem[];
+  workload: {
+    overdueTasks: number;
+    meetingsToday: number;
+    staleLeads: number;
+    delayedProduction: number;
+  };
+  weakManagers: Array<{
+    userId: string;
+    name: string;
+    score: number;
+  }>;
+};
+
 export type ExecutiveDashboardPayload = {
   layout: ExecutiveLayoutMode;
   query: ExecutiveDashboardQuery;
@@ -200,6 +246,8 @@ export type ExecutiveDashboardPayload = {
   procurement: ProcurementOverview | null;
   schedule: SchedulePreview | null;
   directorAi: DirectorAiBlock;
+  behavior: BehaviorEngineSnapshot;
+  daily: DailyOperatingSnapshot;
   /** Знімок для зворотної сумісності / уваги. */
   legacyAttentionCount: number;
   error?: string;

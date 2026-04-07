@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { postJson } from "@/lib/api/patch-json";
 import type { FinanceTransactionType } from "../types/models";
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
@@ -33,6 +34,12 @@ type Props = {
   expenseCategories: CatOpt[];
   accounts: AccOpt[];
   canSubmit: boolean;
+};
+
+type TransactionCreateResponse = {
+  ok?: boolean;
+  id?: string;
+  error?: string;
 };
 
 export function OperationalAccountingForm({
@@ -86,10 +93,9 @@ export function OperationalAccountingForm({
     setErr(null);
     setOkId(null);
     try {
-      const res = await fetch("/api/finance/transactions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const data = (await postJson(
+        "/api/finance/transactions",
+        {
           projectId,
           type,
           amount: amountNum,
@@ -102,10 +108,8 @@ export function OperationalAccountingForm({
           counterpartyNote: counterpartyNote || null,
           comment: comment || null,
           status: posting,
-        }),
-      });
-      const data = (await res.json()) as { ok?: boolean; id?: string; error?: string };
-      if (!res.ok) throw new Error(data.error ?? "Помилка збереження");
+        },
+      )) as TransactionCreateResponse;
       setOkId(typeof data.id === "string" ? data.id : "ok");
       setAmount("");
       setDocumentNumber("");

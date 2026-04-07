@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { patchJson } from "@/lib/api/patch-json";
+import { patchJson, postJson } from "@/lib/api/patch-json";
 
 type UserLite = { id: string; name: string | null; email: string };
 type ChannelHealth = {
@@ -39,6 +39,8 @@ type CheckPayload = {
   ok: true;
   checks: Record<string, { enabled: boolean; ready: boolean; missing: string[] }>;
 };
+
+type CheckResponse = CheckPayload & { error?: string };
 
 function dt(v?: string): string {
   if (!v) return "—";
@@ -124,13 +126,10 @@ export function CommunicationsHealthClient() {
     if (!selectedUserId) return;
     setChecking(true);
     try {
-      const r = await fetch("/api/settings/communications/health", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: selectedUserId }),
-      });
-      const j = (await r.json()) as CheckPayload & { error?: string };
-      if (!r.ok) throw new Error(j.error ?? "Помилка check");
+      const j = (await postJson(
+        "/api/settings/communications/health",
+        { userId: selectedUserId },
+      )) as CheckResponse;
       setChecks(j.checks);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Помилка check");
@@ -142,17 +141,14 @@ export function CommunicationsHealthClient() {
   const savePolicy = async () => {
     setSavingPolicy(true);
     try {
-      const r = await fetch("/api/settings/communications/health", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      await postJson(
+        "/api/settings/communications/health",
+        {
           action: "policy",
           deliveryFailAlertThreshold: policyDraft.deliveryFailAlertThreshold,
           outboundFailAlertThreshold: policyDraft.outboundFailAlertThreshold,
-        }),
-      });
-      const j = (await r.json()) as { ok?: boolean; error?: string };
-      if (!r.ok) throw new Error(j.error ?? "Помилка збереження policy");
+        },
+      );
       await load(selectedUserId);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Помилка policy");

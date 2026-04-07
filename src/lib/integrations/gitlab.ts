@@ -2,6 +2,7 @@
  * Перевірка з’єднання з GitLab REST API (серверні змінні оточення).
  * Документація: https://docs.gitlab.com/ee/api/
  */
+import { externalGetJson } from "../api/external-json";
 
 export type GitLabConnectionOk = {
   ok: true;
@@ -42,42 +43,37 @@ export async function testGitLabConnection(): Promise<GitLabConnectionResult> {
   }
 
   try {
-    const res = await fetch(`${baseUrl}/api/v4/user`, {
+    const commonInit: RequestInit = {
       headers: {
         "PRIVATE-TOKEN": token,
         Accept: "application/json",
       },
       cache: "no-store",
-    });
-
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      return {
-        ok: false,
-        status: res.status,
-        error:
-          res.status === 401
-            ? "Недійсний або прострочений токен (401)."
-            : `GitLab відповів ${res.status}${text ? `: ${text.slice(0, 200)}` : ""}`,
-      };
-    }
-
-    const user = (await res.json()) as {
+    };
+    const userRes = await externalGetJson<{
       id?: number;
       username?: string;
       name?: string;
-    };
-    const versionRes = await fetch(`${baseUrl}/api/v4/version`, {
-      headers: {
-        "PRIVATE-TOKEN": token,
-        Accept: "application/json",
-      },
-      cache: "no-store",
-    });
+    }>(`${baseUrl}/api/v4/user`, commonInit);
+
+    if (userRes.ok === false) {
+      return {
+        ok: false,
+        status: userRes.status,
+        error:
+          userRes.status === 401
+            ? "Недійсний або прострочений токен (401)."
+            : `GitLab відповів ${userRes.status}${userRes.text ? `: ${userRes.text.slice(0, 200)}` : ""}`,
+      };
+    }
+    const user = userRes.data;
+    const versionRes = await externalGetJson<{ version?: string }>(
+      `${baseUrl}/api/v4/version`,
+      commonInit,
+    );
     let gitlabVersion = "unknown";
-    if (versionRes.ok) {
-      const v = (await versionRes.json()) as { version?: string };
-      if (v.version) gitlabVersion = v.version;
+    if (versionRes.ok && versionRes.data?.version) {
+      gitlabVersion = versionRes.data.version;
     }
 
     return {

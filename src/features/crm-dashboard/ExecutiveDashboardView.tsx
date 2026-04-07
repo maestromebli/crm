@@ -20,6 +20,9 @@ import { ProductionOverviewCard } from "./components/production-overview-card";
 import { ProcurementOverviewCard } from "./components/procurement-overview-card";
 import { ScheduleWidget } from "./components/schedule-widget";
 import { DirectorAiPanel } from "./components/director-ai-panel";
+import { BehaviorEngineCard } from "./components/behavior-engine-card";
+import { DailyOperatingCard } from "./components/daily-operating-card";
+import { DashboardRealtimePill } from "../realtime/dashboard-realtime-pill";
 
 export type ExecutiveDashboardViewProps = {
   role: EffectiveRole;
@@ -100,6 +103,7 @@ export function ExecutiveDashboardView({
       controls={
         <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
           <FinanceRangeTabsSuspense />
+          <DashboardRealtimePill />
           <span className="hidden text-[11px] text-[var(--enver-muted)] sm:inline">
             {role}
           </span>
@@ -153,6 +157,8 @@ export function ExecutiveDashboardView({
 
         <div className="space-y-6 xl:col-span-5 2xl:col-span-4">
           <NextBestActionsCard items={data.nextActions} />
+          <DailyOperatingCard data={data.daily} />
+          <BehaviorEngineCard data={data.behavior} />
           {perms.dealsView ? <RiskCenterCard rows={data.risks} /> : null}
           {data.layout !== "sales" ? (
             <TeamPerformanceCard data={data.team} />

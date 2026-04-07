@@ -5,6 +5,7 @@ import { format } from "date-fns";
 import { uk } from "date-fns/locale";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { postJson } from "../../../../lib/api/patch-json";
 import type { LeadMetaInput } from "../../../../lib/leads/lead-row-meta";
 import { leadResponseStatus } from "../../../../lib/leads/lead-row-meta";
 import { cn } from "../../../../lib/utils";
@@ -27,6 +28,11 @@ type Props = {
   phone: string | null;
   createdAt: Date;
   stage: LeadMetaInput["stage"];
+};
+
+type LeadMessageUpsertResponse = {
+  error?: string;
+  message?: Msg;
 };
 
 const PRESETS: { label: string; body: string; kind: string }[] = [
@@ -97,13 +103,10 @@ export function LeadCommunicationCard({
     if (!text || !canUpdateLead) return;
     setBusy(true);
     try {
-      const r = await fetch(`/api/leads/${leadId}/messages`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ body: text, interactionKind }),
-      });
-      const j = (await r.json()) as { error?: string; message?: Msg };
-      if (!r.ok) throw new Error(j.error ?? "Помилка");
+      const j = (await postJson(
+        `/api/leads/${leadId}/messages`,
+        { body: text, interactionKind },
+      )) as LeadMessageUpsertResponse;
       setDraft("");
       if (j.message) {
         setMsgs((prev) => [

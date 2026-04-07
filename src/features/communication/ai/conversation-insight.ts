@@ -1,4 +1,8 @@
 import { extractFirstJsonObject } from "../../../lib/ai/extract-json";
+import {
+  isOpenAiTextError,
+  openAiChatCompletionText,
+} from "../../ai/core/openai-client";
 
 export type ConversationInsightPayload = {
   summaryShort: string;
@@ -44,41 +48,21 @@ export async function generateConversationInsight(input: {
   | { ok: true; data: ConversationInsightPayload }
   | { ok: false; error: string }
 > {
-  const apiKey = process.env.AI_API_KEY?.trim();
-  const baseUrl = process.env.AI_BASE_URL ?? "https://api.openai.com/v1";
-  const model = process.env.AI_MODEL ?? "gpt-4.1-mini";
-  if (!apiKey) {
-    return { ok: false, error: "AI не налаштовано (AI_API_KEY)." };
-  }
-
   const user = `Переписка (хронологічно):\n${input.transcript.slice(0, 28_000)}`;
 
   try {
-    const res = await fetch(`${baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        temperature: 0.25,
-        max_tokens: 2200,
-        messages: [
-          { role: "system", content: SYSTEM },
-          { role: "user", content: user },
-        ],
-      }),
+    const res = await openAiChatCompletionText({
+      messages: [
+        { role: "system", content: SYSTEM },
+        { role: "user", content: user },
+      ],
+      temperature: 0.25,
+      maxTokens: 2200,
     });
-    if (!res.ok) {
-      const t = await res.text();
-      return { ok: false, error: t.slice(0, 400) };
+    if (isOpenAiTextError(res)) {
+      return { ok: false, error: res.error };
     }
-    const raw = await res.text();
-    const data = JSON.parse(raw) as {
-      choices?: { message?: { content?: string | null } }[];
-    };
-    const content = data.choices?.[0]?.message?.content?.trim() ?? "";
+    const content = res.content;
     if (!content) return { ok: false, error: "empty" };
     const parsed = extractFirstJsonObject(content) as ConversationInsightPayload;
     return { ok: true, data: parsed };

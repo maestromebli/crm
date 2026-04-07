@@ -40,6 +40,7 @@ import {
   patchTaskById,
   patchWorkspaceMetaByDealId,
 } from "../../features/deal-workspace/use-deal-mutation-actions";
+import { postJson } from "../../lib/api/patch-json";
 import { SyncDealValueFromEstimateButton } from "./SyncDealValueFromEstimateButton";
 import { derivePaymentStripSummaryForPayload } from "../../features/deal-workspace/payment-aggregate";
 import { REALTIME_POLICY } from "../../config/realtime-policy";
@@ -1005,13 +1006,7 @@ function ContractTab({
             className={cn(btn, "mt-3")}
             onClick={() =>
               void run(async () => {
-                const r = await fetch(`/api/deals/${data.deal.id}/contract`, {
-                  method: "POST",
-                });
-                const j = (await r.json().catch(() => ({}))) as {
-                  error?: string;
-                };
-                if (!r.ok) throw new Error(j.error ?? "Не вдалося створити");
+                await postJson(`/api/deals/${data.deal.id}/contract`, {});
               })
             }
           >
@@ -2599,14 +2594,10 @@ function ProductionTab({
         className={cn(btn, "mt-3 block")}
         onClick={() =>
           void run(async () => {
-            const r = await fetch(`/api/deals/${data.deal.id}/production-launch`, {
-              method: "POST",
-            });
-            const j = (await r.json().catch(() => ({}))) as {
-              error?: string;
-              handoffImportedFileCount?: number | null;
-            };
-            if (!r.ok) throw new Error(j.error ?? "Не вдалося створити виробниче замовлення");
+            const j = (await postJson(
+              `/api/deals/${data.deal.id}/production-launch`,
+              {},
+            )) as ProductionLaunchResponse;
             const n = j.handoffImportedFileCount;
             showToast(
               typeof n === "number" && n > 0
@@ -2737,10 +2728,9 @@ function FilesTab({ data }: { data: DealWorkspacePayload }) {
         className={cn(btn, "mt-3")}
         onClick={() =>
           void run(async () => {
-            const r = await fetch(`/api/deals/${data.deal.id}/attachments`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
+            const j = (await postJson(
+              `/api/deals/${data.deal.id}/attachments`,
+              {
                 fileName: fileName.trim(),
                 fileUrl: fileUrl.trim(),
                 mimeType: "application/octet-stream",
@@ -2748,13 +2738,8 @@ function FilesTab({ data }: { data: DealWorkspacePayload }) {
                 ...(fileAssetId.trim()
                   ? { fileAssetId: fileAssetId.trim() }
                   : {}),
-              }),
-            });
-            const j = (await r.json().catch(() => ({}))) as {
-              error?: string;
-              fileAssetId?: string;
-            };
-            if (!r.ok) throw new Error(j.error ?? "Не вдалося додати");
+              },
+            )) as AttachmentCreateResponse;
             setFileName("");
             setFileUrl("");
             if (j.fileAssetId && !fileAssetId.trim()) {
@@ -2775,6 +2760,14 @@ type LogItem = {
   label: string;
   createdAt: string;
   actor: string | null;
+};
+
+type ProductionLaunchResponse = {
+  handoffImportedFileCount?: number | null;
+};
+
+type AttachmentCreateResponse = {
+  fileAssetId?: string;
 };
 
 function ActivityTab({ data }: { data: DealWorkspacePayload }) {

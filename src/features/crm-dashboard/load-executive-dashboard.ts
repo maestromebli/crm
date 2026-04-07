@@ -68,7 +68,9 @@ import { hasEffectivePermission, P } from "../../lib/authz/permissions";
 import type { ExecutiveDashboardPerms } from "../dashboard/queries";
 import { taskListWhereForUser } from "../../lib/tasks/prisma-scope";
 import type {
+  BehaviorEngineSnapshot,
   CashflowPreview,
+  DailyOperatingSnapshot,
   DirectorAiBlock,
   ExecutiveDashboardPayload,
   ExecutiveDashboardQuery,
@@ -86,6 +88,8 @@ import type {
   TeamPerformanceBlock,
   TrendPoint,
 } from "./executive-types";
+import { loadBehaviorSnapshot } from "../behavior-engine/load-behavior-snapshot";
+import { buildDailyOperatingSnapshot } from "../daily-operating-system/build-daily-operating-snapshot";
 
 function num(n: unknown): number {
   if (n == null) return 0;
@@ -188,6 +192,22 @@ export async function loadExecutiveDashboard(
     recommendations: [],
     forecast: { revenue: "—", risks: "—", bottlenecks: "—" },
   };
+  const emptyBehavior: BehaviorEngineSnapshot = {
+    teamBehaviorScore: 0,
+    managerScores: [],
+    weakManagers: [],
+    alerts: [],
+  };
+  const emptyDaily: DailyOperatingSnapshot = {
+    priorities: [],
+    workload: {
+      overdueTasks: 0,
+      meetingsToday: 0,
+      staleLeads: 0,
+      delayedProduction: 0,
+    },
+    weakManagers: [],
+  };
 
   if (!process.env.DATABASE_URL?.trim()) {
     return {
@@ -205,6 +225,8 @@ export async function loadExecutiveDashboard(
       procurement: null,
       schedule: null,
       directorAi: emptyAi,
+      behavior: emptyBehavior,
+      daily: emptyDaily,
       legacyAttentionCount: 0,
       error: "База даних не налаштована.",
     };
@@ -223,6 +245,9 @@ export async function loadExecutiveDashboard(
     permCtx,
   );
   const sessionUser = sessionUserFromAccess(access);
+  const taskScope = perms.tasksView
+    ? await taskListWhereForUser(prisma, sessionUser)
+    : null;
 
   const managerFilter = query.managerId
     ? { ownerId: query.managerId }
@@ -268,6 +293,8 @@ export async function loadExecutiveDashboard(
         procurement: null,
         schedule,
         directorAi: buildDirectorAiStub("measurer"),
+        behavior: emptyBehavior,
+        daily: emptyDaily,
         legacyAttentionCount: 0,
       };
     }
@@ -290,6 +317,8 @@ export async function loadExecutiveDashboard(
       riskRows,
       nextActions,
       teamBlock,
+      staleLeadsCount,
+      overdueTasksCount,
     ] = await Promise.all([
       perms.dealsView
         ? prisma.deal.aggregate({
@@ -425,6 +454,32 @@ export async function loadExecutiveDashboard(
       layout === "sales"
         ? Promise.resolve(null)
         : loadTeamPerformance(perms, sessionUser, dealWhere, now),
+      perms.leadsView
+        ? prisma.lead.count({
+            where: {
+              ...leadWhere,
+              stage: { isFinal: false },
+              OR: [
+                { lastActivityAt: null },
+                { lastActivityAt: { lt: subDays(now, 2) } },
+              ],
+            },
+          })
+        : Promise.resolve(0),
+      perms.tasksView
+      && taskScope
+        ? prisma.task.count({
+            where: {
+              AND: [
+                taskScope,
+                {
+                  status: { in: [TaskStatus.OPEN, TaskStatus.IN_PROGRESS] },
+                  dueAt: { not: null, lt: now },
+                },
+              ],
+            },
+          })
+        : Promise.resolve(0),
     ]);
 
     const revWork = num(revenueInWork._sum.value);
@@ -528,6 +583,24 @@ export async function loadExecutiveDashboard(
       production: productionBlock,
     });
 
+    const taskWhereForBehavior: Prisma.TaskWhereInput = perms.tasksView && taskScope
+      ? taskScope
+      : { id: { in: [] } };
+    const behavior = await loadBehaviorSnapshot({
+      now,
+      leadWhere,
+      dealWhere,
+      taskWhere: taskWhereForBehavior,
+    });
+    const daily = buildDailyOperatingSnapshot({
+      nextActions,
+      behavior,
+      overdueTasks: overdueTasksCount,
+      meetingsToday: schedule?.today.length ?? 0,
+      staleLeads: staleLeadsCount,
+      delayedProduction: productionBlock?.delayed ?? 0,
+    });
+
     return {
       layout,
       query,
@@ -543,6 +616,8 @@ export async function loadExecutiveDashboard(
       procurement: procurementBlock,
       schedule,
       directorAi,
+      behavior,
+      daily,
       legacyAttentionCount: 0,
     };
   } catch (e) {
@@ -569,6 +644,8 @@ export async function loadExecutiveDashboard(
         recommendations: [],
         forecast: { revenue: "—", risks: "—", bottlenecks: "—" },
       },
+      behavior: emptyBehavior,
+      daily: emptyDaily,
       legacyAttentionCount: 0,
       error: "Помилка завантаження даних.",
     };

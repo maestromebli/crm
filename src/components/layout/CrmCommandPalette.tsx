@@ -34,7 +34,7 @@ export type NavSearchItem = {
   id: string;
   label: string;
   href: string;
-  scope: "Розділ" | "Підрозділ";
+  scope: "Розділ" | "Підрозділ" | "Команда";
   searchableText: string;
   sectionId: string;
   Icon: ComponentType<{ className?: string }>;
@@ -62,6 +62,38 @@ const SYNONYMS_BY_SECTION: Record<string, string[]> = {
   settings: ["налаштування", "права", "ролі"],
 };
 
+const ACTION_COMMANDS: Array<{
+  id: string;
+  label: string;
+  href: string;
+  searchable: string;
+}> = [
+  {
+    id: "action:today-priorities",
+    label: "Команда · Мої пріоритети сьогодні",
+    href: "/tasks/today",
+    searchable: "today priorities задачі день пріоритети",
+  },
+  {
+    id: "action:followup",
+    label: "Команда · Потрібен follow-up",
+    href: "/leads",
+    searchable: "follow-up ліди контакт нагадування",
+  },
+  {
+    id: "action:risky-deals",
+    label: "Команда · Ризикові угоди",
+    href: "/crm/dashboard?view=issues",
+    searchable: "ризики угоди problems issues",
+  },
+  {
+    id: "action:calendar-measurements",
+    label: "Команда · Запланувати замір",
+    href: "/calendar/measurements",
+    searchable: "замір measurement календар schedule",
+  },
+];
+
 function buildNavIndex(): NavSearchItem[] {
   const items: NavSearchItem[] = [];
   for (const section of NAV_SECTIONS) {
@@ -86,6 +118,17 @@ function buildNavIndex(): NavSearchItem[] {
         Icon: section.icon,
       });
     }
+  }
+  for (const command of ACTION_COMMANDS) {
+    items.push({
+      id: command.id,
+      label: command.label,
+      href: command.href,
+      scope: "Команда",
+      searchableText: `${command.label} ${command.href} ${command.searchable}`.toLowerCase(),
+      sectionId: "actions",
+      Icon: Sparkles,
+    });
   }
   return items;
 }
@@ -203,6 +246,7 @@ export function CrmCommandPalette({ onOpenChange }: CrmCommandPaletteProps) {
     () => ({
       sections: filteredQuickLinks.filter((item) => item.scope === "Розділ"),
       subSections: filteredQuickLinks.filter((item) => item.scope === "Підрозділ"),
+      commands: filteredQuickLinks.filter((item) => item.scope === "Команда"),
     }),
     [filteredQuickLinks],
   );
@@ -613,7 +657,11 @@ type PaletteResultsProps = {
   listboxId: string;
   idSuffix: string;
   filteredQuickLinks: NavSearchItem[];
-  groupedQuickLinks: { sections: NavSearchItem[]; subSections: NavSearchItem[] };
+  groupedQuickLinks: {
+    sections: NavSearchItem[];
+    subSections: NavSearchItem[];
+    commands: NavSearchItem[];
+  };
   flatIndex: Map<string, number>;
   activeSearchIndex: number;
   setActiveSearchIndex: (n: number) => void;
@@ -636,6 +684,7 @@ const QUICK_FILTER_CHIPS: Array<{ label: string; q: string }> = [
 function scopeLabel(item: NavSearchItem): string {
   if (item.sectionId === "recent") return "Було недавно";
   if (item.sectionId === "popular") return "Часто треба";
+  if (item.scope === "Команда") return "Команда";
   return item.scope === "Розділ" ? "Розділ" : "Сторінка";
 }
 
@@ -748,6 +797,45 @@ function PaletteResults({
               Конкретні сторінки
             </p>
             {groupedQuickLinks.subSections.map((item) => {
+              const index = flatIndex.get(item.id) ?? 0;
+              const Icon = item.Icon;
+              return (
+                <Link
+                  key={item.id}
+                  id={`crm-search-result-${item.id}${idSuffix}`}
+                  role="option"
+                  aria-selected={index === activeSearchIndex}
+                  href={item.href}
+                  onMouseEnter={() => setActiveSearchIndex(index)}
+                  onClick={() => navigateTo(item)}
+                  className={cn(
+                    "flex items-center gap-2 rounded-xl px-2.5 py-2.5 text-xs transition-colors",
+                    variant === "modal" && "py-3 text-sm",
+                    index === activeSearchIndex
+                      ? "bg-[var(--enver-accent-soft)] text-[var(--enver-accent-hover)]"
+                      : pathname === item.href
+                        ? "bg-[var(--enver-accent-soft)]/60 text-[var(--enver-accent-hover)]"
+                        : "text-[var(--enver-text)] hover:bg-[var(--enver-hover)]",
+                  )}
+                >
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--enver-bg)] text-[var(--enver-accent)] ring-1 ring-[var(--enver-border)]">
+                    <Icon className="h-4 w-4" aria-hidden />
+                  </span>
+                  <span className="min-w-0 flex-1 truncate">
+                    {highlightMatch(item.label, pickBestHighlightQuery(item.label, searchQuery))}
+                  </span>
+                  <span className="shrink-0 text-[10px] text-[var(--enver-muted)]">{scopeLabel(item)}</span>
+                </Link>
+              );
+            })}
+          </>
+        ) : null}
+        {groupedQuickLinks.commands.length > 0 ? (
+          <>
+            <p className="px-2.5 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wide text-[var(--enver-muted)]">
+              Швидкі команди
+            </p>
+            {groupedQuickLinks.commands.map((item) => {
               const index = flatIndex.get(item.id) ?? 0;
               const Icon = item.Icon;
               return (

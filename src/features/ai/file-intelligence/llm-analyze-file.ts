@@ -1,4 +1,8 @@
 import { extractFirstJsonObject } from "../../../lib/ai/extract-json";
+import {
+  isOpenAiTextError,
+  openAiChatCompletionText,
+} from "../core/openai-client";
 import type { AiDetectedFileCategory } from "@prisma/client";
 
 export type LlmFileAnalysis = {
@@ -46,14 +50,6 @@ export async function analyzeFileWithLlm(args: {
   imageMime: string | null;
   heuristicCategory: AiDetectedFileCategory;
 }): Promise<{ ok: true; data: LlmFileAnalysis } | { ok: false; error: string }> {
-  const apiKey = process.env.AI_API_KEY?.trim();
-  const baseUrl = process.env.AI_BASE_URL ?? "https://api.openai.com/v1";
-  const model = process.env.AI_MODEL ?? "gpt-4.1-mini";
-
-  if (!apiKey) {
-    return { ok: false, error: "no_api_key" };
-  }
-
   const system = `Ти аналітик документів для меблевої CRM ENVER (Україна). 
 Проаналізуй файл і поверни ЛИШЕ один JSON без markdown. Мова полів українською.
 
@@ -106,33 +102,19 @@ export async function analyzeFileWithLlm(args: {
   }
 
   try {
-    const res = await fetch(`${baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        temperature: 0.25,
-        max_tokens: 2000,
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: userParts },
-        ],
-      }),
+    const res = await openAiChatCompletionText({
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: userParts },
+      ],
+      temperature: 0.25,
+      maxTokens: 2000,
     });
 
-    if (!res.ok) {
-      const errText = await res.text().catch(() => "");
-      return { ok: false, error: errText.slice(0, 200) };
+    if (isOpenAiTextError(res)) {
+      return { ok: false, error: res.error.slice(0, 200) };
     }
-
-    const raw = await res.text();
-    const data = JSON.parse(raw) as {
-      choices?: { message?: { content?: string | null } }[];
-    };
-    const content = data.choices?.[0]?.message?.content?.trim() ?? "";
+    const content = res.content;
     if (!content) return { ok: false, error: "empty_content" };
 
     let parsed: unknown;

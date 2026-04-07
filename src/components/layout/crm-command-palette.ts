@@ -59,7 +59,7 @@ export function scoreNavItem(
   item: {
     label: string;
     href: string;
-    scope: "Розділ" | "Підрозділ";
+    scope: "Розділ" | "Підрозділ" | "Команда";
     searchableText: string;
   },
   rawQuery: string,
@@ -81,6 +81,7 @@ export function scoreNavItem(
   }
 
   if (item.scope === "Розділ") score += 8;
+  if (item.scope === "Команда") score += 4;
   const pathDepth = (item.href.match(/\//g) ?? []).length;
   score += Math.max(0, 12 - pathDepth * 2);
   return score;
