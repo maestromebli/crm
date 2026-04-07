@@ -33,6 +33,7 @@ import {
   type EstimateWorkspaceSettingsV2,
 } from "../../features/estimate/utils/settings-json";
 import { mapEstimateToQuotePayload } from "../../features/estimate/mappers/quote-payload";
+import { patchDealEstimateById } from "./deal-estimate-api";
 
 export type { LineModel, SectionModel };
 
@@ -296,28 +297,22 @@ export function useDealEstimateWorkspace(dealId: string) {
     setError(null);
     try {
       const linePayload = buildLinePayload(cur.lines);
-      const r = await fetch(`/api/deals/${dealId}/estimates/${activeId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: cur.name,
-          notes: cur.notes,
-          changeSummary: cur.changeSummary,
-          discountAmount: cur.discountAmount,
-          deliveryCost: cur.deliveryCost,
-          installationCost: cur.installationCost,
-          settingsJson: cur.settings,
-          sections: cur.sections.map((s) => ({
-            id: s.id,
-            title: s.title,
-            sortOrder: s.sortOrder,
-            key: s.key,
-          })),
-          lineItems: linePayload,
-        }),
+      await patchDealEstimateById<Record<string, unknown>>(dealId, activeId, {
+        name: cur.name,
+        notes: cur.notes,
+        changeSummary: cur.changeSummary,
+        discountAmount: cur.discountAmount,
+        deliveryCost: cur.deliveryCost,
+        installationCost: cur.installationCost,
+        settingsJson: cur.settings,
+        sections: cur.sections.map((s) => ({
+          id: s.id,
+          title: s.title,
+          sortOrder: s.sortOrder,
+          key: s.key,
+        })),
+        lineItems: linePayload,
       });
-      const j = (await r.json()) as { error?: string };
-      if (!r.ok) throw new Error(j.error ?? "Збереження не вдалося");
       setSaveState("saved");
       void loadList();
     } catch (e) {
@@ -392,13 +387,9 @@ export function useDealEstimateWorkspace(dealId: string) {
   const setActiveVersion = useCallback(async () => {
     if (!activeId) return;
     try {
-      const r = await fetch(`/api/deals/${dealId}/estimates/${activeId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ setActive: true }),
+      await patchDealEstimateById<Record<string, unknown>>(dealId, activeId, {
+        setActive: true,
       });
-      const j = (await r.json()) as { error?: string };
-      if (!r.ok) throw new Error(j.error ?? "Помилка");
       await loadList();
       await loadDetail(activeId);
     } catch (e) {
