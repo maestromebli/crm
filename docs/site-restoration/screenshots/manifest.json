@@ -1,5 +1,5 @@
 {
-  "capturedAt": "2026-04-07T18:26:03.665Z",
+  "capturedAt": "2026-04-13T14:10:37.388Z",
   "baseURL": "http://127.0.0.1:3000",
   "files": [
     {
@@ -69,641 +69,561 @@
       "group": "nav:leads"
     },
     {
-      "file": "012_leads__converted.png",
+      "file": "012_leads__closed.png",
+      "href": "/leads/closed",
+      "label": "Ліди → Закриті",
+      "group": "nav:leads"
+    },
+    {
+      "file": "013_leads__converted.png",
       "href": "/leads/converted",
       "label": "Ліди → Конвертовані",
       "group": "nav:leads"
     },
     {
-      "file": "013_leads__unassigned.png",
+      "file": "014_leads__unassigned.png",
       "href": "/leads/unassigned",
       "label": "Ліди → На розподіл",
       "group": "nav:leads"
     },
     {
-      "file": "014_leads__qualified.png",
+      "file": "015_leads__qualified.png",
       "href": "/leads/qualified",
       "label": "Ліди → Кваліфіковані",
       "group": "nav:leads"
     },
     {
-      "file": "015_leads__lost.png",
+      "file": "016_leads__lost.png",
       "href": "/leads/lost",
-      "label": "Ліди → Закриті / архів",
+      "label": "Ліди → Втрачені",
       "group": "nav:leads"
     },
     {
-      "file": "016_leads__sources.png",
+      "file": "017_leads__archived.png",
+      "href": "/leads/archived",
+      "label": "Ліди → Архів",
+      "group": "nav:leads"
+    },
+    {
+      "file": "018_leads__sources.png",
       "href": "/leads/sources",
       "label": "Ліди → Джерела",
       "group": "nav:leads"
     },
     {
-      "file": "017_leads__pipeline.png",
+      "file": "019_leads__pipeline.png",
       "href": "/leads/pipeline",
       "label": "Ліди → Воронка лідів",
       "group": "nav:leads"
     },
     {
-      "file": "018_contacts.png",
+      "file": "020_contacts.png",
       "href": "/contacts",
       "label": "Контакти (корінь розділу)",
       "group": "nav:contacts"
     },
     {
-      "file": "019_contacts__clients.png",
+      "file": "021_contacts__clients.png",
       "href": "/contacts/clients",
       "label": "Контакти → Клієнти",
       "group": "nav:contacts"
     },
     {
-      "file": "020_contacts__partners.png",
+      "file": "022_contacts__partners.png",
       "href": "/contacts/partners",
       "label": "Контакти → Дизайнери / партнери",
       "group": "nav:contacts"
     },
     {
-      "file": "021_contacts__repeat.png",
+      "file": "023_contacts__repeat.png",
       "href": "/contacts/repeat",
       "label": "Контакти → Повторні клієнти",
       "group": "nav:contacts"
     },
     {
-      "file": "022_contacts__segments.png",
+      "file": "024_contacts__segments.png",
       "href": "/contacts/segments",
       "label": "Контакти → Сегменти",
       "group": "nav:contacts"
     },
     {
-      "file": "023_contacts__activity.png",
+      "file": "025_contacts__activity.png",
       "href": "/contacts/activity",
       "label": "Контакти → Активність",
       "group": "nav:contacts"
     },
     {
-      "file": "024_deals.png",
+      "file": "026_deals.png",
       "href": "/deals",
       "label": "Угоди (корінь розділу)",
       "group": "nav:deals"
     },
     {
-      "file": "025_deals__pipeline.png",
+      "file": "027_deals__pipeline.png",
       "href": "/deals/pipeline",
       "label": "Угоди → Дошка воронки",
       "group": "nav:deals"
     },
     {
-      "file": "026_deals__active.png",
+      "file": "028_deals__active.png",
       "href": "/deals/active",
       "label": "Угоди → Активні проєкти",
       "group": "nav:deals"
     },
     {
-      "file": "027_deals__waiting-measure.png",
+      "file": "029_deals__waiting-measure.png",
       "href": "/deals/waiting-measure",
       "label": "Угоди → Очікують заміру",
       "group": "nav:deals"
     },
     {
-      "file": "028_deals__proposal.png",
+      "file": "030_deals__proposal.png",
       "href": "/deals/proposal",
       "label": "Угоди → КП надіслано",
       "group": "nav:deals"
     },
     {
-      "file": "029_deals__negotiation.png",
+      "file": "031_deals__negotiation.png",
       "href": "/deals/negotiation",
       "label": "Угоди → Переговори",
       "group": "nav:deals"
     },
     {
-      "file": "030_deals__won.png",
+      "file": "032_deals__won.png",
       "href": "/deals/won",
       "label": "Угоди → Успішні",
       "group": "nav:deals"
     },
     {
-      "file": "031_deals__lost.png",
+      "file": "033_deals__lost.png",
       "href": "/deals/lost",
       "label": "Угоди → Втрачені",
       "group": "nav:deals"
     },
     {
-      "file": "032_deals__archived.png",
+      "file": "034_deals__archived.png",
       "href": "/deals/archived",
       "label": "Угоди → Архів",
       "group": "nav:deals"
     },
     {
-      "file": "033_calendar.png",
+      "file": "035_calendar.png",
       "href": "/calendar",
       "label": "Календар (корінь розділу)",
       "group": "nav:calendar"
     },
     {
-      "file": "034_calendar__team.png",
+      "file": "036_calendar__team.png",
       "href": "/calendar/team",
       "label": "Календар → Календар команди",
       "group": "nav:calendar"
     },
     {
-      "file": "035_calendar__measurements.png",
+      "file": "037_calendar__measurements.png",
       "href": "/calendar/measurements",
       "label": "Календар → Заміри",
       "group": "nav:calendar"
     },
     {
-      "file": "036_calendar__meetings.png",
+      "file": "038_calendar__meetings.png",
       "href": "/calendar/meetings",
       "label": "Календар → Зустрічі",
       "group": "nav:calendar"
     },
     {
-      "file": "037_calendar__installations.png",
+      "file": "039_calendar__installations.png",
       "href": "/calendar/installations",
       "label": "Календар → Монтажі",
       "group": "nav:calendar"
     },
     {
-      "file": "038_calendar__production.png",
+      "file": "040_calendar__production.png",
       "href": "/calendar/production",
       "label": "Календар → Виробництво",
       "group": "nav:calendar"
     },
     {
-      "file": "039_calendar__agenda.png",
+      "file": "041_calendar__agenda.png",
       "href": "/calendar/agenda",
       "label": "Календар → Порядок дня",
       "group": "nav:calendar"
     },
     {
-      "file": "040_inbox.png",
+      "file": "042_inbox.png",
       "href": "/inbox",
       "label": "Вхідні (корінь розділу)",
       "group": "nav:inbox"
     },
     {
-      "file": "041_inbox__unread.png",
+      "file": "043_inbox__unread.png",
       "href": "/inbox/unread",
       "label": "Вхідні → Непрочитані",
       "group": "nav:inbox"
     },
     {
-      "file": "042_inbox__unanswered.png",
+      "file": "044_inbox__unanswered.png",
       "href": "/inbox/unanswered",
       "label": "Вхідні → Без відповіді",
       "group": "nav:inbox"
     },
     {
-      "file": "043_inbox__overdue.png",
+      "file": "045_inbox__overdue.png",
       "href": "/inbox/overdue",
       "label": "Вхідні → Прострочені",
       "group": "nav:inbox"
     },
     {
-      "file": "044_inbox__mine.png",
+      "file": "046_inbox__mine.png",
       "href": "/inbox/mine",
       "label": "Вхідні → Призначені мені",
       "group": "nav:inbox"
     },
     {
-      "file": "045_inbox__unlinked.png",
+      "file": "047_inbox__unlinked.png",
       "href": "/inbox/unlinked",
       "label": "Вхідні → Без CRM‑звʼязку",
       "group": "nav:inbox"
     },
     {
-      "file": "046_inbox__telegram.png",
+      "file": "048_inbox__telegram.png",
       "href": "/inbox/telegram",
       "label": "Вхідні → Telegram",
       "group": "nav:inbox"
     },
     {
-      "file": "047_crm__finance.png",
+      "file": "049_crm__finance.png",
       "href": "/crm/finance",
       "label": "Фінанси (корінь розділу)",
       "group": "nav:finance"
     },
     {
-      "file": "048_crm__finance__journal.png",
+      "file": "050_crm__finance__journal.png",
       "href": "/crm/finance/journal",
       "label": "Фінанси → Журнал проводок",
       "group": "nav:finance"
     },
     {
-      "file": "049_crm__finance__registry.png",
+      "file": "051_crm__finance__registry.png",
       "href": "/crm/finance/registry",
       "label": "Фінанси → Реєстр",
       "group": "nav:finance"
     },
     {
-      "file": "050_crm__finance__payroll.png",
+      "file": "052_crm__finance__payroll.png",
       "href": "/crm/finance/payroll",
       "label": "Фінанси → Зарплата",
       "group": "nav:finance"
     },
     {
-      "file": "051_crm__finance__banking.png",
+      "file": "053_crm__finance__banking.png",
       "href": "/crm/finance/banking",
       "label": "Фінанси → Банки",
       "group": "nav:finance"
     },
     {
-      "file": "052_warehouse.png",
+      "file": "054_warehouse.png",
       "href": "/warehouse",
       "label": "Фінанси → Склад (запаси)",
       "group": "nav:finance"
     },
     {
-      "file": "053_crm__procurement.png",
+      "file": "055_crm__procurement.png",
       "href": "/crm/procurement",
       "label": "Закупівлі (корінь розділу)",
       "group": "nav:procurement"
     },
     {
-      "file": "054_crm__procurement_view_hub.png",
+      "file": "056_crm__procurement_view_hub.png",
       "href": "/crm/procurement?view=hub",
-      "label": "Закупівлі → Операційний hub",
+      "label": "Закупівлі → Операційний хаб",
       "group": "nav:procurement"
     },
     {
-      "file": "055_warehouse__stock.png",
+      "file": "057_warehouse__stock.png",
       "href": "/warehouse/stock",
       "label": "Склад → Залишки",
       "group": "nav:warehouse"
     },
     {
-      "file": "056_warehouse__movements.png",
+      "file": "058_warehouse__movements.png",
       "href": "/warehouse/movements",
       "label": "Склад → Рух",
       "group": "nav:warehouse"
     },
     {
-      "file": "057_warehouse__reservations.png",
+      "file": "059_warehouse__reservations.png",
       "href": "/warehouse/reservations",
       "label": "Склад → Резерви",
       "group": "nav:warehouse"
     },
     {
-      "file": "058_warehouse__zones.png",
+      "file": "060_warehouse__zones.png",
       "href": "/warehouse/zones",
       "label": "Склад → Зони",
       "group": "nav:warehouse"
     },
     {
-      "file": "059_crm__production.png",
+      "file": "061_crm__production.png",
       "href": "/crm/production",
       "label": "Виробництво (корінь розділу)",
       "group": "nav:production"
     },
     {
-      "file": "060_crm__production__workshop.png",
+      "file": "062_crm__production__workshop.png",
       "href": "/crm/production/workshop",
       "label": "Виробництво → Цеховий Kanban",
       "group": "nav:production"
     },
     {
-      "file": "061_crm__production__workshop__cutting.png",
+      "file": "063_crm__production__workshop__cutting.png",
       "href": "/crm/production/workshop/cutting",
       "label": "Виробництво → Міні-штаб: порізка",
       "group": "nav:production"
     },
     {
-      "file": "062_crm__production__workshop__edging.png",
+      "file": "064_crm__production__workshop__edging.png",
       "href": "/crm/production/workshop/edging",
       "label": "Виробництво → Міні-штаб: поклейка",
       "group": "nav:production"
     },
     {
-      "file": "063_crm__production__workshop__drilling.png",
+      "file": "065_crm__production__workshop__drilling.png",
       "href": "/crm/production/workshop/drilling",
       "label": "Виробництво → Міні-штаб: присадка",
       "group": "nav:production"
     },
     {
-      "file": "064_crm__production__workshop__assembly.png",
+      "file": "066_crm__production__workshop__assembly.png",
       "href": "/crm/production/workshop/assembly",
       "label": "Виробництво → Міні-штаб: збірка",
       "group": "nav:production"
-    },
-    {
-      "file": "065_production__in-progress.png",
-      "href": "/production/in-progress",
-      "label": "Виробництво → Угоди на лінії (класичний)",
-      "group": "nav:production"
-    },
-    {
-      "file": "066_production__delays.png",
-      "href": "/production/delays",
-      "label": "Виробництво → Затримки",
-      "group": "nav:production"
-    },
-    {
-      "file": "067_production__ready-install.png",
-      "href": "/production/ready-install",
-      "label": "Виробництво → Готові до монтажу",
-      "group": "nav:production"
-    },
-    {
-      "file": "068_production__installation-schedule.png",
-      "href": "/production/installation-schedule",
-      "label": "Виробництво → Графік монтажу",
-      "group": "nav:production"
-    },
-    {
-      "file": "069_handoff.png",
-      "href": "/handoff",
-      "label": "Передача (корінь розділу)",
-      "group": "nav:handoff"
-    },
-    {
-      "file": "070_handoff__need-completion.png",
-      "href": "/handoff/need-completion",
-      "label": "Передача → Потребують доповнення",
-      "group": "nav:handoff"
-    },
-    {
-      "file": "071_handoff__ready.png",
-      "href": "/handoff/ready",
-      "label": "Передача → Готові до прийняття",
-      "group": "nav:handoff"
-    },
-    {
-      "file": "072_handoff__accepted.png",
-      "href": "/handoff/accepted",
-      "label": "Передача → Прийняті",
-      "group": "nav:handoff"
-    },
-    {
-      "file": "073_handoff__returned.png",
-      "href": "/handoff/returned",
-      "label": "Передача → Повернуті на доопрацювання",
-      "group": "nav:handoff"
-    },
-    {
-      "file": "074_handoff__checklists.png",
-      "href": "/handoff/checklists",
-      "label": "Передача → Чек-листи",
-      "group": "nav:handoff"
-    },
-    {
-      "file": "075_tasks.png",
-      "href": "/tasks",
-      "label": "Задачі (корінь розділу)",
-      "group": "nav:tasks"
-    },
-    {
-      "file": "076_today.png",
-      "href": "/today",
-      "label": "Задачі → Мій день",
-      "group": "nav:tasks"
-    },
-    {
-      "file": "077_tasks__team.png",
-      "href": "/tasks/team",
-      "label": "Задачі → Задачі команди",
-      "group": "nav:tasks"
-    },
-    {
-      "file": "078_tasks__today.png",
-      "href": "/tasks/today",
-      "label": "Задачі → Сьогодні (список)",
-      "group": "nav:tasks"
-    },
-    {
-      "file": "079_tasks__overdue.png",
-      "href": "/tasks/overdue",
-      "label": "Задачі → Прострочені",
-      "group": "nav:tasks"
-    },
-    {
-      "file": "080_tasks__by-entity.png",
-      "href": "/tasks/by-entity",
-      "label": "Задачі → За сутністю",
-      "group": "nav:tasks"
-    },
-    {
-      "file": "081_tasks__by-assignee.png",
-      "href": "/tasks/by-assignee",
-      "label": "Задачі → За виконавцем",
-      "group": "nav:tasks"
-    },
-    {
-      "file": "082_tasks__completed.png",
-      "href": "/tasks/completed",
-      "label": "Задачі → Виконані",
-      "group": "nav:tasks"
-    },
-    {
-      "file": "083_files.png",
-      "href": "/files",
-      "label": "Файли (корінь розділу)",
-      "group": "nav:files"
-    },
-    {
-      "file": "084_files__by-deal.png",
-      "href": "/files/by-deal",
-      "label": "Файли → За угодою",
-      "group": "nav:files"
-    },
-    {
-      "file": "085_files__by-lead.png",
-      "href": "/files/by-lead",
-      "label": "Файли → За лідами",
-      "group": "nav:files"
-    },
-    {
-      "file": "086_files__by-handoff.png",
-      "href": "/files/by-handoff",
-      "label": "Файли → За передачею",
-      "group": "nav:files"
-    },
-    {
-      "file": "087_files__missing.png",
-      "href": "/files/missing",
-      "label": "Файли → Відсутні обовʼязкові",
-      "group": "nav:files"
-    },
-    {
-      "file": "088_files__recent.png",
-      "href": "/files/recent",
-      "label": "Файли → Останні завантаження",
-      "group": "nav:files"
-    },
-    {
-      "file": "089_files__templates.png",
-      "href": "/files/templates",
-      "label": "Файли → Шаблони / документи",
-      "group": "nav:files"
-    },
-    {
-      "file": "090_reports.png",
-      "href": "/reports",
-      "label": "Звіти (корінь розділу)",
-      "group": "nav:reports"
-    },
-    {
-      "file": "091_reports__sales.png",
-      "href": "/reports/sales",
-      "label": "Звіти → Продажі",
-      "group": "nav:reports"
-    },
-    {
-      "file": "092_reports__conversion.png",
-      "href": "/reports/conversion",
-      "label": "Звіти → Конверсія лідів",
-      "group": "nav:reports"
-    },
-    {
-      "file": "093_reports__team.png",
-      "href": "/reports/team",
-      "label": "Звіти → Команда",
-      "group": "nav:reports"
-    },
-    {
-      "file": "094_reports__load.png",
-      "href": "/reports/load",
-      "label": "Звіти → Навантаження виробництва",
-      "group": "nav:reports"
-    },
-    {
-      "file": "095_reports__installations.png",
-      "href": "/reports/installations",
-      "label": "Звіти → Монтажі",
-      "group": "nav:reports"
-    },
-    {
-      "file": "096_reports__sla.png",
-      "href": "/reports/sla",
-      "label": "Звіти → SLA відповіді",
-      "group": "nav:reports"
-    },
-    {
-      "file": "097_reports__files.png",
-      "href": "/reports/files",
-      "label": "Звіти → Заповненість файлів",
-      "group": "nav:reports"
-    },
-    {
-      "file": "098_reports__custom.png",
-      "href": "/reports/custom",
-      "label": "Звіти → Кастомні звіти",
-      "group": "nav:reports"
-    },
-    {
-      "file": "099_settings.png",
-      "href": "/settings",
-      "label": "Налаштування (корінь розділу)",
-      "group": "nav:settings"
-    },
-    {
-      "file": "100_settings__users.png",
-      "href": "/settings/users",
-      "label": "Налаштування → Користувачі та ролі",
-      "group": "nav:settings"
-    },
-    {
-      "file": "101_settings__permissions.png",
-      "href": "/settings/permissions",
-      "label": "Налаштування → Права доступу",
-      "group": "nav:settings"
-    },
-    {
-      "file": "102_settings__pipelines.png",
-      "href": "/settings/pipelines",
-      "label": "Налаштування → Воронки та стадії",
-      "group": "nav:settings"
-    },
-    {
-      "file": "103_settings__custom-fields.png",
-      "href": "/settings/custom-fields",
-      "label": "Налаштування → Кастомні поля",
-      "group": "nav:settings"
-    },
-    {
-      "file": "104_settings__file-categories.png",
-      "href": "/settings/file-categories",
-      "label": "Налаштування → Категорії файлів",
-      "group": "nav:settings"
-    },
-    {
-      "file": "105_settings__checklists.png",
-      "href": "/settings/checklists",
-      "label": "Налаштування → Шаблони чек-листів",
-      "group": "nav:settings"
-    },
-    {
-      "file": "106_settings__notifications.png",
-      "href": "/settings/notifications",
-      "label": "Налаштування → Сповіщення",
-      "group": "nav:settings"
-    },
-    {
-      "file": "107_settings__calendar.png",
-      "href": "/settings/calendar",
-      "label": "Налаштування → Календар",
-      "group": "nav:settings"
-    },
-    {
-      "file": "108_settings__inbox.png",
-      "href": "/settings/inbox",
-      "label": "Налаштування → Вхідні / Telegram",
-      "group": "nav:settings"
-    },
-    {
-      "file": "109_settings__ai.png",
-      "href": "/settings/ai",
-      "label": "Налаштування → AI‑налаштування",
-      "group": "nav:settings"
-    },
-    {
-      "file": "110_settings__branding.png",
-      "href": "/settings/branding",
-      "label": "Налаштування → Брендинг / UI",
-      "group": "nav:settings"
-    },
-    {
-      "file": "111_settings__integrations.png",
-      "href": "/settings/integrations",
-      "label": "Налаштування → Інтеграції",
-      "group": "nav:settings"
-    },
-    {
-      "file": "112_settings__access-hierarchy.png",
-      "href": "/settings/access-hierarchy",
-      "label": "Налаштування → Ієрархія менеджерів",
-      "group": "settings"
-    },
-    {
-      "file": "113_settings__communications.png",
-      "href": "/settings/communications",
-      "label": "Налаштування → Месенджери та телефонія",
-      "group": "settings"
-    },
-    {
-      "file": "114_settings__communications__me.png",
-      "href": "/settings/communications/me",
-      "label": "Налаштування → Мої підключення",
-      "group": "settings"
-    },
-    {
-      "file": "115_settings__communications__users.png",
-      "href": "/settings/communications/users",
-      "label": "Налаштування → Підключення співробітників",
-      "group": "settings"
-    },
-    {
-      "file": "116_settings__communications__health.png",
-      "href": "/settings/communications/health",
-      "label": "Налаштування → Health каналів",
-      "group": "settings"
-    },
-    {
-      "file": "117_settings__integrations__meta-target.png",
-      "href": "/settings/integrations/meta-target",
-      "label": "Налаштування → Instagram / Meta таргет",
-      "group": "settings"
     }
   ],
-  "errors": []
+  "errors": [
+    {
+      "href": "/production/in-progress",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/production/delays",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/production/ready-install",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/production/installation-schedule",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/handoff",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/handoff/need-completion",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/handoff/ready",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/handoff/accepted",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/handoff/returned",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/handoff/checklists",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/tasks",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/today",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/tasks/team",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/tasks/today",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/tasks/overdue",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/tasks/by-entity",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/tasks/by-assignee",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/tasks/completed",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/files",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/files/by-deal",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/files/by-lead",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/files/by-handoff",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/files/missing",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/files/recent",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/files/templates",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/reports",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/reports/sales",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/reports/conversion",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/reports/team",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/reports/load",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/reports/installations",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/reports/sla",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/reports/files",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/reports/custom",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/settings",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/settings/users",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/settings/permissions",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/settings/pipelines",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/settings/custom-fields",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/settings/file-categories",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/settings/checklists",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/settings/notifications",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/settings/calendar",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/settings/inbox",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/settings/ai",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/settings/ai/admin",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/settings/branding",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/settings/integrations",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/settings/access-hierarchy",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/settings/communications",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/settings/communications/me",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/settings/communications/users",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/settings/communications/health",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/settings/materials",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/settings/suppliers",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    },
+    {
+      "href": "/settings/integrations/meta-target",
+      "message": "page.waitForTimeout: Target page, context or browser has been closed"
+    }
+  ],
+  "buttonErrors": []
 }

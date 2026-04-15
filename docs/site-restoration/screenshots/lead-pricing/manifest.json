@@ -1,0 +1,20 @@
+{
+  "capturedAt": "2026-04-10T13:47:40.528Z",
+  "files": [
+    {
+      "file": "001_lead_overview.png",
+      "href": "/leads/no-next-step",
+      "note": "lead_overview"
+    },
+    {
+      "file": "002_lead_pricing.png",
+      "href": "/leads/no-next-step/pricing",
+      "note": "lead_pricing"
+    },
+    {
+      "file": "003_lead_kp.png",
+      "href": "/leads/no-next-step/kp",
+      "note": "lead_kp"
+    }
+  ]
+}
