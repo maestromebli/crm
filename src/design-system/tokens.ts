@@ -28,6 +28,7 @@ export const enverCssVar = {
   radius: "var(--enver-radius)",
   shadow: "var(--enver-shadow)",
   shadowLg: "var(--enver-shadow-lg)",
+  accentRing: "var(--enver-accent-ring)",
   transition: "var(--enver-transition)",
 } as const;
 

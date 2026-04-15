@@ -13,7 +13,10 @@ import {
   generateSuggestedReply,
   type ReplyStyle,
 } from "../../../../../features/communication/ai/suggested-reply";
-import { logAiEvent } from "../../../../../lib/ai/log-ai-event";
+import {
+  buildContinuousLearningBlock,
+  recordContinuousLearningEvent,
+} from "../../../../../lib/ai/continuous-learning";
 
 export const runtime = "nodejs";
 
@@ -88,8 +91,17 @@ export async function POST(request: Request) {
       );
     }
 
+    const memory = await buildContinuousLearningBlock({
+      userId: user.id,
+      entityType: "LEAD",
+      entityId: leadId,
+      take: 10,
+    });
+    const transcriptForAi = memory
+      ? `${memory}\n\nConversation transcript:\n${transcript}`
+      : transcript;
     const gen = await generateSuggestedReply({
-      transcript,
+      transcript: transcriptForAi,
       style,
       stageHint: lead.stage?.name ?? null,
     });
@@ -97,13 +109,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: gen.error }, { status: 503 });
     }
 
-    await logAiEvent({
+    await recordContinuousLearningEvent({
       userId: user.id,
       action: "comm_suggested_reply",
+      stage: "communication_reply",
       entityType: "LEAD",
       entityId: leadId,
       ok: true,
-      metadata: { style },
+      metadata: { style, usedLearningMemory: Boolean(memory) },
     });
 
     return NextResponse.json({ ok: true, text: gen.text });
@@ -131,8 +144,17 @@ export async function POST(request: Request) {
     );
   }
 
+  const memory = await buildContinuousLearningBlock({
+    userId: user.id,
+    entityType: "DEAL",
+    entityId: dealId!,
+    take: 10,
+  });
+  const transcriptForAi = memory
+    ? `${memory}\n\nConversation transcript:\n${transcript}`
+    : transcript;
   const gen = await generateSuggestedReply({
-    transcript,
+    transcript: transcriptForAi,
     style,
     stageHint: deal.stage?.name ?? null,
   });
@@ -140,13 +162,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: gen.error }, { status: 503 });
   }
 
-  await logAiEvent({
+  await recordContinuousLearningEvent({
     userId: user.id,
     action: "comm_suggested_reply",
+    stage: "communication_reply",
     entityType: "DEAL",
     entityId: dealId!,
     ok: true,
-    metadata: { style },
+    metadata: { style, usedLearningMemory: Boolean(memory) },
   });
 
   return NextResponse.json({ ok: true, text: gen.text });

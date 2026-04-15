@@ -19,7 +19,7 @@ export function LeadHubSummaryStrip({ lead }: Props) {
       : "—";
 
   return (
-    <div className="border-b border-[var(--enver-border)] px-3 py-3">
+    <div className="border-b border-[var(--enver-border)]/80 bg-gradient-to-br from-[var(--enver-card)] to-[var(--enver-surface)] px-3 py-3">
       <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--enver-muted)]">
         Поточний лід
       </p>

@@ -32,10 +32,10 @@ export function ErpCommandCenterClient() {
   return (
     <main className="space-y-5 p-4">
       <section className="rounded-3xl border border-slate-200 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-800 p-5 text-slate-100 shadow-xl">
-        <p className="text-xs uppercase tracking-[0.2em] text-cyan-300">ENVER · SaaS ERP · Command</p>
-        <h1 className="mt-2 text-2xl font-semibold">Global ERP Command Center</h1>
+        <p className="text-xs uppercase tracking-[0.2em] text-cyan-300">ENVER · SaaS ERP · Командний центр</p>
+        <h1 className="mt-2 text-2xl font-semibold">Глобальний командний центр ERP</h1>
         <p className="mt-1 text-sm text-slate-300">
-          Наскрізний контроль виробництва, закупівлі та фінансів з централізованим approval trail.
+          Наскрізний контроль виробництва, закупівель і фінансів із централізованим ланцюжком погоджень.
         </p>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <KpiTile
@@ -49,7 +49,7 @@ export function ErpCommandCenterClient() {
             hint="Замовлення з готовністю ≥90%"
           />
           <KpiTile
-            label="Approval pending"
+            label="Очікують погодження"
             value={`${kpi.approvalsPending}`}
             hint="Нові заявки закупівлі + чернетки фіндокументів"
           />
@@ -63,7 +63,7 @@ export function ErpCommandCenterClient() {
 
       <section className="grid gap-4 xl:grid-cols-[1.2fr_1fr]">
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h2 className="text-sm font-semibold text-slate-900">Approval Center</h2>
+          <h2 className="text-sm font-semibold text-slate-900">Центр погоджень</h2>
 
           <h3 className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
             Закупівельні заявки
@@ -82,22 +82,22 @@ export function ErpCommandCenterClient() {
                       {request.productionOrder} · {request.materialCode}
                     </p>
                     <p className="text-xs text-slate-600">
-                      {request.qty} од. · {request.priority} · due {request.requiredDate || "—"}
+                      {request.qty} од. · {request.priority} · строк {request.requiredDate || "—"}
                     </p>
                     <p className="text-xs text-slate-500">
-                      status: {request.status}
-                      {request.approvedBy ? ` · approved by ${request.approvedBy}` : ""}
+                      статус: {request.status}
+                      {request.approvedBy ? ` · погодив ${request.approvedBy}` : ""}
                     </p>
                   </div>
                   <div className="flex gap-1">
                     {request.status === "NEW" ? (
                       <ActionButton onClick={() => approvePurchaseRequest(request.id, "ERP Manager")}>
-                        Approve
+                        Погодити
                       </ActionButton>
                     ) : null}
                     {request.status !== "DONE" ? (
                       <ActionButton onClick={() => setPurchaseRequestStatus(request.id, "DONE", "ERP Manager")}>
-                        Done
+                        Готово
                       </ActionButton>
                     ) : null}
                   </div>
@@ -127,16 +127,16 @@ export function ErpCommandCenterClient() {
                       {doc.entity} · {doc.productionOrder || "без замовлення"}
                     </p>
                     <p className="text-xs text-slate-500">
-                      status: {doc.status}
-                      {doc.approvedBy ? ` · approved by ${doc.approvedBy}` : ""}
+                      статус: {doc.status}
+                      {doc.approvedBy ? ` · погодив ${doc.approvedBy}` : ""}
                     </p>
                   </div>
                   <div className="flex gap-1">
                     {doc.status === "DRAFT" ? (
-                      <ActionButton onClick={() => approveFinanceDocument(doc.id, "CFO")}>Approve</ActionButton>
+                      <ActionButton onClick={() => approveFinanceDocument(doc.id, "CFO")}>Погодити</ActionButton>
                     ) : null}
                     {doc.status === "APPROVED" ? (
-                      <ActionButton onClick={() => markFinanceDocumentPaid(doc.id, "Treasury")}>Mark paid</ActionButton>
+                      <ActionButton onClick={() => markFinanceDocumentPaid(doc.id, "Treasury")}>Позначити оплаченим</ActionButton>
                     ) : null}
                   </div>
                 </div>
@@ -150,7 +150,7 @@ export function ErpCommandCenterClient() {
 
         <div className="space-y-4">
           <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <h2 className="text-sm font-semibold text-slate-900">ERP Timeline</h2>
+            <h2 className="text-sm font-semibold text-slate-900">Стрічка ERP</h2>
             <ul className="mt-3 space-y-2 text-xs">
               {events.map((event) => (
                 <li key={event.id} className="rounded border border-slate-200 bg-slate-50 px-2 py-1.5">
@@ -169,11 +169,11 @@ export function ErpCommandCenterClient() {
           </section>
 
           <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <h2 className="text-sm font-semibold text-slate-900">Risk Radar</h2>
+            <h2 className="text-sm font-semibold text-slate-900">Радар ризиків</h2>
             <div className="mt-2 space-y-2">
-              <Bar label="High risk orders" value={kpi.highRisk} max={Math.max(1, productionOrders.length)} />
+              <Bar label="Замовлення з високим ризиком" value={kpi.highRisk} max={Math.max(1, productionOrders.length)} />
               <Bar
-                label="Pending approvals"
+                label="Очікують погодження"
                 value={kpi.approvalsPending}
                 max={Math.max(1, purchaseRequests.length + financeDocuments.length)}
               />
@@ -181,9 +181,9 @@ export function ErpCommandCenterClient() {
           </section>
 
           <section className="grid gap-2">
-            <QuickLink href="/crm/production" title="Production cockpit" subtitle="операції і статуси замовлень" />
-            <QuickLink href="/crm/procurement" title="Procurement contour" subtitle="заявки, PO, постачальники" />
-            <QuickLink href="/crm/finance" title="Finance contour" subtitle="cash-flow і документи" />
+            <QuickLink href="/crm/production" title="Штаб виробництва" subtitle="операції та статуси замовлень" />
+            <QuickLink href="/crm/procurement" title="Контур закупівель" subtitle="заявки, PO, постачальники" />
+            <QuickLink href="/crm/finance" title="Фінансовий контур" subtitle="грошовий потік і документи" />
           </section>
         </div>
       </section>

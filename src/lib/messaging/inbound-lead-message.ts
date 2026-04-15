@@ -61,9 +61,29 @@ async function findLeadByPhone(
   return lead ? { leadId: lead.id, ownerId: lead.ownerId, contactId: lead.contactId } : null;
 }
 
+async function findLeadByInstagram(
+  handleOrId: string,
+  ownerId?: string | null,
+): Promise<LeadTarget | null> {
+  const value = handleOrId.replace(/^@/, "").trim();
+  if (!value) return null;
+  const lead = await prisma.lead.findFirst({
+    where: {
+      ...(ownerId?.trim() ? { ownerId: ownerId.trim() } : {}),
+      contact: {
+        instagramHandle: { equals: value, mode: "insensitive" },
+      },
+    },
+    orderBy: { updatedAt: "desc" },
+    select: { id: true, ownerId: true, contactId: true },
+  });
+  return lead ? { leadId: lead.id, ownerId: lead.ownerId, contactId: lead.contactId } : null;
+}
+
 export async function resolveLeadTarget(args: {
   telegramUsername?: string | null;
   phone?: string | null;
+  instagramHandle?: string | null;
   ownerId?: string | null;
 }): Promise<LeadTarget | null> {
   if (args.telegramUsername?.trim()) {
@@ -74,6 +94,10 @@ export async function resolveLeadTarget(args: {
     const byPhone = await findLeadByPhone(args.phone, args.ownerId);
     if (byPhone) return byPhone;
   }
+  if (args.instagramHandle?.trim()) {
+    const byInstagram = await findLeadByInstagram(args.instagramHandle, args.ownerId);
+    if (byInstagram) return byInstagram;
+  }
   return null;
 }
 
@@ -81,7 +105,7 @@ export async function storeInboundLeadMessage(args: {
   leadId: string;
   ownerId: string;
   contactId?: string | null;
-  channel: "TELEGRAM" | "WHATSAPP" | "VIBER";
+  channel: "TELEGRAM" | "WHATSAPP" | "VIBER" | "INSTAGRAM";
   text: string;
   externalId: string;
   occurredAt?: Date;
@@ -125,7 +149,7 @@ export async function storeInboundLeadMessage(args: {
 
 export async function markLeadMessageDeliveryStatus(args: {
   leadId: string;
-  channel: "TELEGRAM" | "WHATSAPP" | "VIBER";
+  channel: "TELEGRAM" | "WHATSAPP" | "VIBER" | "INSTAGRAM";
   externalId: string;
   status: "sent" | "delivered" | "read" | "failed";
 }): Promise<boolean> {

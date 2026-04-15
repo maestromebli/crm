@@ -19,16 +19,30 @@ export default function SettingsIntegrationsPage() {
       >
         <ul className="space-y-2 text-[11px] text-slate-600">
           <li className="flex items-center justify-between rounded-lg border border-slate-200 bg-[var(--enver-card)] px-2 py-2">
-            <span>Google Calendar</span>
+            <span>Google Календар</span>
             <span className="text-amber-700">Не підключено</span>
           </li>
           <li className="flex items-center justify-between rounded-lg border border-slate-200 bg-[var(--enver-card)] px-2 py-2">
-            <span>Telegram Bot</span>
-            <span className="text-slate-500">Див. Inbox / Telegram</span>
+            <span>Telegram-бот</span>
+            <span className="text-slate-500">Див. Вхідні / Telegram</span>
           </li>
           <li className="flex items-center justify-between rounded-lg border border-slate-200 bg-[var(--enver-card)] px-2 py-2">
-            <span>Instagram Direct</span>
-            <span className="text-slate-500">Див. Вхідні → Instagram</span>
+            <span>Директ Instagram</span>
+            <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-slate-500">
+              <Link
+                className="text-slate-600 underline underline-offset-2 hover:text-[var(--enver-text)]"
+                href="/settings/communications"
+              >
+                Загальна сторінка
+              </Link>
+              <span className="text-slate-300">·</span>
+              <Link
+                className="text-slate-600 underline underline-offset-2 hover:text-[var(--enver-text)]"
+                href="/settings/communications/users"
+              >
+                По співробітниках
+              </Link>
+            </span>
           </li>
           <li className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-[var(--enver-card)] px-2 py-2">
             <span>GitLab</span>

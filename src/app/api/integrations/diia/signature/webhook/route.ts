@@ -28,7 +28,7 @@ function verifyWebhookSecret(req: Request): NextResponse | null {
   const configuredSecret = process.env.DIIA_WEBHOOK_SECRET?.trim();
   const incomingSecret = req.headers.get("x-diia-webhook-secret")?.trim() ?? "";
   if (configuredSecret && incomingSecret !== configuredSecret) {
-    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    return NextResponse.json({ error: "Заборонено" }, { status: 403 });
   }
   return null;
 }
@@ -67,7 +67,7 @@ export async function GET(req: Request) {
   const dealId = (url.searchParams.get("dealId") ?? "").trim();
   if (!sessionId && !dealId) {
     return NextResponse.json(
-      { error: "sessionId or dealId is required" },
+      { error: "Потрібно передати sessionId або dealId" },
       { status: 400 },
     );
   }
@@ -84,7 +84,7 @@ export async function GET(req: Request) {
     },
   });
   if (!contract) {
-    return NextResponse.json({ error: "Contract not found by sessionId" }, { status: 404 });
+    return NextResponse.json({ error: "Договір за sessionId не знайдено" }, { status: 404 });
   }
 
   const events = readDiiaEvents(contract.content).sort(
@@ -155,7 +155,7 @@ export async function POST(req: Request) {
 
   const sessionId = (body.sessionId ?? "").trim();
   if (!sessionId) {
-    return NextResponse.json({ error: "sessionId is required" }, { status: 400 });
+    return NextResponse.json({ error: "Потрібно передати sessionId" }, { status: 400 });
   }
 
   const nextStatus = resolveStatus(body);
@@ -168,7 +168,7 @@ export async function POST(req: Request) {
     select: { id: true, dealId: true, status: true, content: true },
   });
   if (!contract) {
-    return NextResponse.json({ error: "Contract not found by sessionId" }, { status: 404 });
+    return NextResponse.json({ error: "Договір за sessionId не знайдено" }, { status: 404 });
   }
 
   let finalStatus = nextStatus;
@@ -183,7 +183,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       ok: true,
       ignored: true,
-      reason: `transition ${contract.status} -> ${finalStatus} not allowed`,
+      reason: `Перехід ${contract.status} -> ${finalStatus} заборонено`,
     });
   }
 

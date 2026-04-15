@@ -46,9 +46,9 @@ export function FilterBar() {
             key={v.id}
             href={href({ view: v.id })}
             className={cn(
-              "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+              "rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors",
               view === v.id
-                ? "bg-[var(--enver-text)] text-white shadow-sm"
+                ? "bg-white !text-slate-900 shadow-sm ring-1 ring-black/10"
                 : "bg-[var(--enver-surface)] text-[var(--enver-text-muted)] hover:bg-[var(--enver-hover)]",
             )}
           >

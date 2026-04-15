@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../../../lib/auth/options";
+import { canAssignSuperAdminRole } from "../../../../lib/authz/permissions";
 import { prisma } from "../../../../lib/prisma";
 
 /**
@@ -19,7 +20,11 @@ export async function GET() {
     return NextResponse.json({ error: "Потрібна авторизація" }, { status: 401 });
   }
 
-  if (session.user.realRole !== "SUPER_ADMIN") {
+  if (
+    !canAssignSuperAdminRole({
+      realRole: session.user.realRole,
+    })
+  ) {
     return NextResponse.json({ error: "Недостатньо прав" }, { status: 403 });
   }
 

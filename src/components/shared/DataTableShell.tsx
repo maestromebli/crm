@@ -7,9 +7,9 @@ type DataTableShellProps = {
 
 export function DataTableShell({ columns, children }: DataTableShellProps) {
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200 bg-[var(--enver-card)] shadow-sm">
+    <div className="enver-card-appear enver-panel overflow-hidden">
       <table className="w-full text-left text-sm">
-        <thead className="bg-slate-50 text-slate-600">
+        <thead className="bg-[var(--enver-surface)] text-[var(--enver-text-muted)]">
           <tr>
             {columns.map((c) => (
               <th
@@ -21,7 +21,7 @@ export function DataTableShell({ columns, children }: DataTableShellProps) {
             ))}
           </tr>
         </thead>
-        <tbody className="[&_td]:px-3 [&_td]:py-2.5 [&_td]:align-top [&_tr]:border-t [&_tr]:border-slate-100">
+        <tbody className="[&_td]:px-3 [&_td]:py-2.5 [&_td]:align-top [&_tr]:border-t [&_tr]:border-[var(--enver-border)] [&_tr]:enver-row-hover [&_tr]:enver-table-row-state">
           {children}
         </tbody>
       </table>

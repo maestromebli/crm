@@ -1,0 +1,67 @@
+name: E2E Contracts Portal Public
+
+on:
+  schedule:
+    - cron: "30 4 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-contracts-portal-public-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  contracts-portal-public:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Check required portal E2E secret
+        id: preflight
+        shell: bash
+        env:
+          SCREENSHOT_BASE_URL: ${{ secrets.SCREENSHOT_BASE_URL }}
+        run: |
+          if [ -z "${SCREENSHOT_BASE_URL}" ]; then
+            echo "::warning::Missing secret: SCREENSHOT_BASE_URL"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install Playwright browser
+        if: steps.preflight.outputs.ready == 'true'
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run public Contracts Portal E2E
+        if: steps.preflight.outputs.ready == 'true'
+        run: pnpm exec playwright test tests/e2e/contracts-portal-public-token-guard.spec.ts --reporter=github,html --trace=retain-on-failure --video=retain-on-failure --screenshot=only-on-failure
+        env:
+          SCREENSHOT_SKIP_SERVER: "1"
+          SCREENSHOT_BASE_URL: ${{ secrets.SCREENSHOT_BASE_URL }}
+
+      - name: Upload Playwright report and artifacts
+        if: always() && steps.preflight.outputs.ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: contracts-portal-public-playwright-${{ github.run_id }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Skip notice
+        if: steps.preflight.outputs.ready != 'true'
+        run: echo "Contracts portal public E2E skipped because SCREENSHOT_BASE_URL is not configured."

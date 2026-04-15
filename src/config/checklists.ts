@@ -19,7 +19,7 @@ export const CHECKLIST_TEMPLATES: ChecklistTemplate[] = [
   {
     id: "handoff-default",
     type: "handoff",
-    label: "Handoff → Виробництво",
+    label: "Передача → Виробництво",
     blocksTransition: true,
     items: [
       {

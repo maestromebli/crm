@@ -1,4 +1,4 @@
-import { P, hasAnyPermission } from "@/lib/authz/permissions";
+import { P, hasAnyPermission, isAdminLikeScope } from "@/lib/authz/permissions";
 
 type ProductionAuthActor = {
   dbRole: string;
@@ -7,7 +7,13 @@ type ProductionAuthActor = {
 };
 
 function hasRoleAccess(user: ProductionAuthActor): boolean {
-  return user.realRole === "SUPER_ADMIN" || user.dbRole === "ADMIN" || user.dbRole === "DIRECTOR";
+  if (user.realRole === "DIRECTOR_PRODUCTION" || user.dbRole === "DIRECTOR_PRODUCTION") {
+    return true;
+  }
+  return isAdminLikeScope({
+    realRole: user.realRole,
+    dbRole: user.dbRole,
+  });
 }
 
 export function canViewProduction(user: ProductionAuthActor): boolean {

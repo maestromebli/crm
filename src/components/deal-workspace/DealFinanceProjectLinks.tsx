@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { dealQueryKeys } from "../../features/deal-workspace/deal-query-keys";
 import type { DealWorkspacePayload } from "../../features/deal-workspace/types";
 import { useDealMutationActions } from "../../features/deal-workspace/use-deal-mutation-actions";
@@ -18,7 +18,10 @@ export function DealFinanceProjectLinks({ data }: Props) {
   const queryClient = useQueryClient();
   const dealActions = useDealMutationActions(data.deal.id);
   const dealId = data.deal.id;
-  const rowsFromServer = data.linkedFinanceProjects ?? [];
+  const rowsFromServer = useMemo(
+    () => data.linkedFinanceProjects ?? [],
+    [data.linkedFinanceProjects],
+  );
   const canManage = data.canManageFinanceProjectLink ?? false;
 
   const [rows, setRows] = useState(rowsFromServer);

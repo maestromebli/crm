@@ -8,7 +8,7 @@ type Props = { params: Promise<{ token: string }> };
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
-    title: "Client Portal · ENVER",
+    title: "Клієнтський портал · ENVER",
     robots: { index: false, follow: false },
   };
 }

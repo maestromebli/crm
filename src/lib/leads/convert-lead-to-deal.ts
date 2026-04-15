@@ -19,6 +19,58 @@ export type {
 } from "./convert-lead-to-deal.shared";
 export { DEFAULT_CONVERT_LEAD_TRANSFER } from "./convert-lead-to-deal.shared";
 
+async function safeUpdateContactClientId(
+  tx: Prisma.TransactionClient,
+  contactId: string,
+  clientId: string,
+): Promise<void> {
+  try {
+    await tx.$executeRawUnsafe(
+      `UPDATE "Contact" SET "clientId" = $1 WHERE "id" = $2`,
+      clientId,
+      contactId,
+    );
+  } catch (error) {
+    const maybePrisma = error as { code?: string } | null;
+    if (maybePrisma?.code !== "P2022") throw error;
+    // Legacy DB schema: не блокуємо конверсію через контактні поля.
+  }
+}
+
+async function canUsePrismaContactWrites(
+  tx: Prisma.TransactionClient,
+): Promise<boolean> {
+  try {
+    const rows = await tx.$queryRaw<Array<{ column_name: string }>>`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = current_schema()
+        AND table_name IN ('Contact', 'contact')
+    `;
+    const names = new Set(rows.map((r) => r.column_name));
+    return names.has("category");
+  } catch {
+    return false;
+  }
+}
+
+async function getDealColumnNames(
+  tx: Prisma.TransactionClient,
+): Promise<Set<string>> {
+  try {
+    const rows = await tx.$queryRaw<Array<{ column_name: string }>>`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = current_schema()
+        AND table_name IN ('Deal', 'deal')
+    `;
+    return new Set(rows.map((r) => r.column_name));
+  } catch {
+    // Якщо introspection недоступний, покладаємось на актуальну Prisma-схему.
+    return new Set<string>();
+  }
+}
+
 function mergeTransfer(
   partial?: Partial<ConvertLeadTransferInput>,
 ): ConvertLeadTransferInput {
@@ -111,6 +163,8 @@ export async function convertLeadToDeal(
     dealStage: DefaultStage;
   },
 ): Promise<ConvertLeadToDealTxResult> {
+  const prismaContactWritesEnabled = await canUsePrismaContactWrites(tx);
+  const dealColumnNames = await getDealColumnNames(tx);
   const transfer = mergeTransfer(args.input.transfer);
   const setup = args.input.dealSetup ?? {};
   const dealTitle =
@@ -153,10 +207,7 @@ export async function convertLeadToDeal(
     clientId = c.id;
 
     if (primaryContactId && args.lead.contact) {
-      await tx.contact.update({
-        where: { id: primaryContactId },
-        data: { clientId: c.id },
-      });
+      await safeUpdateContactClientId(tx, primaryContactId, c.id);
       await tx.client.update({
         where: { id: c.id },
         data: { primaryContactId },
@@ -203,10 +254,7 @@ export async function convertLeadToDeal(
       });
     }
   } else if (args.lead.contact && !args.lead.contact.clientId) {
-    await tx.contact.update({
-      where: { id: primaryContactId },
-      data: { clientId },
-    });
+    await safeUpdateContactClientId(tx, primaryContactId, clientId);
     const cli = await tx.client.findUnique({
       where: { id: clientId },
       select: { primaryContactId: true },
@@ -235,10 +283,7 @@ export async function convertLeadToDeal(
   }
 
   for (const cid of selectedContactIds) {
-    await tx.contact.update({
-      where: { id: cid },
-      data: { clientId },
-    });
+    await safeUpdateContactClientId(tx, cid, clientId);
   }
 
   if (primaryContactId && !selectedContactIds.includes(primaryContactId)) {
@@ -247,7 +292,9 @@ export async function convertLeadToDeal(
     primaryContactId = selectedContactIds[0]!;
   }
 
-  if (primaryContactId) {
+  // У legacy-схемі Contact Prisma update може падати через відсутні колонки.
+  // Не блокуємо конверсію ліда в угоду через синхронізацію додаткових полів контакту.
+  if (primaryContactId && prismaContactWritesEnabled) {
     await syncContactFromLead(tx, args.lead, primaryContactId);
   }
 
@@ -262,22 +309,31 @@ export async function convertLeadToDeal(
     installationValid ? installationValid.toISOString() : null,
   );
 
-  const deal = await tx.deal.create({
-    data: {
-      title: dealTitle,
-      description: args.lead.note?.trim() || null,
-      status: "OPEN",
-      pipelineId: args.dealStage.pipelineId,
-      stageId: args.dealStage.stageId,
-      leadId: args.lead.id,
-      clientId: clientId!,
-      primaryContactId,
-      ownerId,
-      productionManagerId,
-      installationDate: installationValid,
-      workspaceMeta: meta,
-    },
-  });
+  const supportsColumn = (name: string): boolean =>
+    dealColumnNames.size === 0 || dealColumnNames.has(name);
+
+  const dealCreateData: Prisma.DealCreateInput = {
+    title: dealTitle,
+    description: args.lead.note?.trim() || null,
+    status: "OPEN",
+    pipeline: { connect: { id: args.dealStage.pipelineId } },
+    stage: { connect: { id: args.dealStage.stageId } },
+    lead: { connect: { id: args.lead.id } },
+    client: { connect: { id: clientId! } },
+    ...(primaryContactId
+      ? { primaryContact: { connect: { id: primaryContactId } } }
+      : {}),
+    owner: { connect: { id: ownerId } },
+    ...(supportsColumn("productionManagerId") && productionManagerId
+      ? { productionManager: { connect: { id: productionManagerId } } }
+      : {}),
+    ...(supportsColumn("installationDate") && installationValid
+      ? { installationDate: installationValid }
+      : {}),
+    ...(supportsColumn("workspaceMeta") ? { workspaceMeta: meta } : {}),
+  };
+
+  const deal = await tx.deal.create({ data: dealCreateData });
 
   await applyCommercialSnapshotFromApprovedProposal(tx, {
     dealId: deal.id,
@@ -299,7 +355,16 @@ export async function convertLeadToDeal(
     where: { pipelineId: args.leadPipelineId, slug: "archived" },
     select: { id: true },
   });
-  const lostFallback = archiveStage
+  const approvedFallback = archiveStage
+    ? null
+    : await tx.pipelineStage.findFirst({
+        where: {
+          pipelineId: args.leadPipelineId,
+          slug: "approved",
+        },
+        select: { id: true },
+      });
+  const lostFallback = archiveStage || approvedFallback
     ? null
     : await tx.pipelineStage.findFirst({
         where: {
@@ -309,7 +374,8 @@ export async function convertLeadToDeal(
         },
         select: { id: true },
       });
-  const archiveStageId = archiveStage?.id ?? lostFallback?.id;
+  const archiveStageId =
+    archiveStage?.id ?? approvedFallback?.id ?? lostFallback?.id;
 
   await tx.lead.update({
     where: { id: args.lead.id },
@@ -366,6 +432,11 @@ export async function convertLeadToDeal(
       checklistSnapshot: transfer as unknown as Prisma.InputJsonValue,
       warningsAtConversion: {
         communication: transfer.communication,
+        migrationResult: {
+          filesMigrated,
+          estimatesMoved,
+          contactsLinked: selectedContactIds.length,
+        },
       } as unknown as Prisma.InputJsonValue,
     },
     update: {
@@ -379,6 +450,11 @@ export async function convertLeadToDeal(
       checklistSnapshot: transfer as unknown as Prisma.InputJsonValue,
       warningsAtConversion: {
         communication: transfer.communication,
+        migrationResult: {
+          filesMigrated,
+          estimatesMoved,
+          contactsLinked: selectedContactIds.length,
+        },
       } as unknown as Prisma.InputJsonValue,
     },
   });

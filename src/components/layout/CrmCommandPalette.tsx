@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import type { ComponentType } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -14,8 +15,8 @@ import {
 } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Clock, Maximize2, Search, Sparkles, X } from "lucide-react";
-import { NAV_SECTIONS } from "@/config/navigation";
 import { cn } from "@/lib/utils";
+import { getVisibleNavSections } from "@/lib/navigation-visible";
 import { getFocusableElements } from "./crm-focus-trap";
 import {
   POPULAR_NAV_PRESETS,
@@ -67,36 +68,42 @@ const ACTION_COMMANDS: Array<{
   label: string;
   href: string;
   searchable: string;
+  requiredSectionId?: string;
 }> = [
   {
     id: "action:today-priorities",
     label: "Команда · Мої пріоритети сьогодні",
     href: "/tasks/today",
     searchable: "today priorities задачі день пріоритети",
+    requiredSectionId: "tasks",
   },
   {
     id: "action:followup",
-    label: "Команда · Потрібен follow-up",
+    label: "Команда · Потрібен повторний контакт",
     href: "/leads",
-    searchable: "follow-up ліди контакт нагадування",
+    searchable: "повторний контакт follow-up ліди контакт нагадування",
+    requiredSectionId: "leads",
   },
   {
     id: "action:risky-deals",
     label: "Команда · Ризикові угоди",
     href: "/crm/dashboard?view=issues",
     searchable: "ризики угоди problems issues",
+    requiredSectionId: "dashboard",
   },
   {
     id: "action:calendar-measurements",
     label: "Команда · Запланувати замір",
     href: "/calendar/measurements",
     searchable: "замір measurement календар schedule",
+    requiredSectionId: "calendar",
   },
 ];
 
-function buildNavIndex(): NavSearchItem[] {
+function buildNavIndex(sections: ReturnType<typeof getVisibleNavSections>): NavSearchItem[] {
   const items: NavSearchItem[] = [];
-  for (const section of NAV_SECTIONS) {
+  const visibleSectionIds = new Set(sections.map((section) => section.id));
+  for (const section of sections) {
     const sectionSyn = SYNONYMS_BY_SECTION[section.id]?.join(" ") ?? "";
     items.push({
       id: section.id,
@@ -120,6 +127,12 @@ function buildNavIndex(): NavSearchItem[] {
     }
   }
   for (const command of ACTION_COMMANDS) {
+    if (
+      command.requiredSectionId &&
+      !visibleSectionIds.has(command.requiredSectionId)
+    ) {
+      continue;
+    }
     items.push({
       id: command.id,
       label: command.label,
@@ -211,7 +224,22 @@ function closeAll(
 export function CrmCommandPalette({ onOpenChange }: CrmCommandPaletteProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const navIndex = useMemo(() => buildNavIndex(), []);
+  const { data } = useSession();
+  const keys = useMemo(() => data?.user?.permissionKeys ?? [], [data?.user?.permissionKeys]);
+  const realRole = data?.user?.realRole;
+  const impersonatorId = data?.user?.impersonatorId;
+  const menuAccess = data?.user?.menuAccess ?? null;
+  const visibleSections = useMemo(
+    () =>
+      getVisibleNavSections({
+        permissionKeys: keys,
+        realRole,
+        impersonatorId,
+        menuAccess,
+      }),
+    [impersonatorId, keys, menuAccess, realRole],
+  );
+  const navIndex = useMemo(() => buildNavIndex(visibleSections), [visibleSections]);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -224,7 +252,8 @@ export function CrmCommandPalette({ onOpenChange }: CrmCommandPaletteProps) {
   const reduceMotion = useReducedMotion();
 
   useEffect(() => {
-    setMounted(true);
+    const timer = window.setTimeout(() => setMounted(true), 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   /** Після закриття модалки повертаємо фокус на кнопку «повний екран» (a11y). */
@@ -264,15 +293,19 @@ export function CrmCommandPalette({ onOpenChange }: CrmCommandPaletteProps) {
   }, [overlayActive, onOpenChange]);
 
   useEffect(() => {
-    setActiveSearchIndex((prev) => {
-      const max = Math.max(filteredQuickLinks.length - 1, 0);
-      if (filteredQuickLinks.length === 0) return 0;
-      return Math.min(prev, max);
-    });
+    const timer = window.setTimeout(() => {
+      setActiveSearchIndex((prev) => {
+        const max = Math.max(filteredQuickLinks.length - 1, 0);
+        if (filteredQuickLinks.length === 0) return 0;
+        return Math.min(prev, max);
+      });
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [filteredQuickLinks]);
 
   useEffect(() => {
-    setActiveSearchIndex(0);
+    const timer = window.setTimeout(() => setActiveSearchIndex(0), 0);
+    return () => window.clearTimeout(timer);
   }, [searchQuery, searchOpen, expanded]);
 
   useEffect(() => {
@@ -337,7 +370,8 @@ export function CrmCommandPalette({ onOpenChange }: CrmCommandPaletteProps) {
   }, [activeSearchIndex, filteredQuickLinks, searchOpen, expanded]);
 
   useEffect(() => {
-    setRecentTick((n) => n + 1);
+    const timer = window.setTimeout(() => setRecentTick((n) => n + 1), 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -466,7 +500,7 @@ export function CrmCommandPalette({ onOpenChange }: CrmCommandPaletteProps) {
                 className="pointer-events-none fixed inset-0 z-[110] flex items-start justify-center overflow-y-auto px-4 pb-10 pt-[min(12vh,6rem)]"
                 role="dialog"
                 aria-modal="true"
-                aria-label="Command palette — повноекранний режим"
+                aria-label="Палітра команд — повноекранний режим"
               >
                 <motion.div
                   ref={modalPanelRef}
@@ -520,7 +554,6 @@ export function CrmCommandPalette({ onOpenChange }: CrmCommandPaletteProps) {
                           className="h-11 w-full rounded-xl border border-[var(--enver-border)] bg-[var(--enver-bg)] pl-10 pr-3 text-sm text-[var(--enver-text)] shadow-inner outline-none transition focus:border-[var(--enver-accent)] focus:ring-2 focus:ring-[var(--enver-accent-ring)]"
                           aria-label="Пошук у повноекранній палітрі"
                           aria-describedby="crm-search-modal-hint"
-                          aria-expanded
                           aria-controls={LISTBOX_MODAL_ID}
                           aria-activedescendant={activeDescId}
                           autoComplete="off"
@@ -590,7 +623,6 @@ export function CrmCommandPalette({ onOpenChange }: CrmCommandPaletteProps) {
           className="h-9 w-full rounded-full border border-[var(--enver-border)] bg-[var(--enver-bg)] pl-9 pr-[6.5rem] text-[11px] text-[var(--enver-text)] shadow-[var(--enver-shadow)] outline-none ring-0 transition focus:border-[var(--enver-accent)] focus:ring-2 focus:ring-[var(--enver-accent-ring)] md:pr-[9.5rem] md:text-xs lg:pr-[11rem]"
           aria-label="Швидкий перехід: введіть назву розділу або оберіть зі списку"
           aria-describedby="crm-inline-search-hint"
-          aria-expanded={showInlineDropdown}
           aria-controls={LISTBOX_ID}
           aria-activedescendant={!expanded ? activeDescId : undefined}
           autoComplete="off"

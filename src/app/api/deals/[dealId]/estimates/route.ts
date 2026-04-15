@@ -1,6 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
-import type { EstimateLineType, EstimateStatus } from "@prisma/client";
+import type { EstimateLineType } from "@prisma/client";
 import { prisma } from "../../../../../lib/prisma";
 import {
   forbidUnlessDealAccess,
@@ -8,76 +8,12 @@ import {
 } from "../../../../../lib/authz/api-guard";
 import { P } from "../../../../../lib/authz/permissions";
 import { newEstimateStableLineId } from "../../../../../lib/estimates/new-stable-line-id";
-import { recalculateEstimateTotals } from "../../../../../lib/estimates/recalculate";
+import { calculateEstimateTotalsFromLines } from "../../../../../features/estimate-core";
+import { estimateApiRowToJson } from "../../../../../lib/estimates/estimate-api-json";
+import { recordEstimateLearningSnapshot } from "../../../../../lib/estimates/estimate-learning";
 import { serializeEstimateForClient } from "../../../../../lib/estimates/serialize";
 
 type Ctx = { params: Promise<{ dealId: string }> };
-
-function estimateToJson(
-  e: {
-    id: string;
-    dealId: string;
-    version: number;
-    status: EstimateStatus;
-    totalPrice: number | null;
-    totalCost: number | null;
-    grossMargin: number | null;
-    discountAmount: number | null;
-    deliveryCost: number | null;
-    installationCost: number | null;
-    notes: string | null;
-    createdById: string;
-    approvedById: string | null;
-    createdAt: Date;
-    updatedAt: Date;
-    lineItems?: Array<{
-      id: string;
-      type: EstimateLineType;
-      category: string | null;
-      productName: string;
-      qty: number;
-      unit: string;
-      salePrice: number;
-      costPrice: number | null;
-      amountSale: number;
-      amountCost: number | null;
-      margin: number | null;
-      metadataJson: unknown;
-    }>;
-  },
-) {
-  return {
-    id: e.id,
-    dealId: e.dealId,
-    version: e.version,
-    status: e.status,
-    totalPrice: e.totalPrice,
-    totalCost: e.totalCost,
-    grossMargin: e.grossMargin,
-    discountAmount: e.discountAmount,
-    deliveryCost: e.deliveryCost,
-    installationCost: e.installationCost,
-    notes: e.notes,
-    createdById: e.createdById,
-    approvedById: e.approvedById,
-    createdAt: e.createdAt.toISOString(),
-    updatedAt: e.updatedAt.toISOString(),
-    lineItems: (e.lineItems ?? []).map((li) => ({
-      id: li.id,
-      type: li.type,
-      category: li.category,
-      productName: li.productName,
-      qty: li.qty,
-      unit: li.unit,
-      salePrice: li.salePrice,
-      costPrice: li.costPrice,
-      amountSale: li.amountSale,
-      amountCost: li.amountCost,
-      margin: li.margin,
-      metadataJson: li.metadataJson,
-    })),
-  };
-}
 
 export async function GET(_req: Request, ctx: Ctx) {
   if (!process.env.DATABASE_URL?.trim()) {
@@ -114,7 +50,7 @@ export async function GET(_req: Request, ctx: Ctx) {
     };
     const items = rows.map((r) =>
       serializeEstimateForClient(
-        estimateToJson(r) as Record<string, unknown>,
+        estimateApiRowToJson(r) as Record<string, unknown>,
         user.permissionKeys,
         authz,
       ),
@@ -122,7 +58,6 @@ export async function GET(_req: Request, ctx: Ctx) {
 
     return NextResponse.json({ items });
   } catch (e) {
-    // eslint-disable-next-line no-console
     console.error("[GET estimates]", e);
     return NextResponse.json(
       { error: "Помилка завантаження смет" },
@@ -213,7 +148,7 @@ export async function POST(req: Request, ctx: Ctx) {
     const discountAmount = 0;
     const deliveryCost = 0;
     const installationCost = 0;
-    const totals = recalculateEstimateTotals(
+    const totals = calculateEstimateTotalsFromLines(
       lineData.map((l) => ({
         amountSale: l.amountSale,
         amountCost: l.amountCost,
@@ -268,11 +203,23 @@ export async function POST(req: Request, ctx: Ctx) {
     });
 
     revalidatePath(`/deals/${dealId}/workspace`);
+    await recordEstimateLearningSnapshot({
+      userId: user.id,
+      dealId,
+      estimateId: created.id,
+      lineItems: created.lineItems.map((li) => ({
+        productName: li.productName,
+        salePrice: li.salePrice,
+        qty: li.qty,
+        amountSale: li.amountSale,
+      })),
+      totalPrice: created.totalPrice,
+    });
 
     return NextResponse.json({
       ok: true,
       estimate: serializeEstimateForClient(
-        estimateToJson(created) as Record<string, unknown>,
+        estimateApiRowToJson(created) as Record<string, unknown>,
         user.permissionKeys,
         {
           realRole: user.realRole,
@@ -281,7 +228,6 @@ export async function POST(req: Request, ctx: Ctx) {
       ),
     });
   } catch (e) {
-    // eslint-disable-next-line no-console
     console.error("[POST estimates]", e);
     return NextResponse.json(
       { error: "Помилка створення смети" },

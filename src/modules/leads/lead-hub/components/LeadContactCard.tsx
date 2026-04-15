@@ -95,7 +95,7 @@ export function LeadContactCard({
           </dd>
         </div>
         <div>
-          <dt className="text-[10px] uppercase text-slate-400">Email</dt>
+          <dt className="text-[10px] uppercase text-slate-400">Е-пошта</dt>
           <dd className="break-all text-slate-800">{email ?? "—"}</dd>
         </div>
       </dl>

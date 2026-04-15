@@ -271,7 +271,7 @@ export async function loadDealFinancialBreakdown(
         date: tx.date.toISOString(),
         status: tx.status,
         category: tx.category,
-        title: "Finance transaction",
+        title: "Фінансова транзакція",
       })),
       ...operatingExpenses.map((exp) => ({
         id: exp.id,

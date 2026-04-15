@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { buildProcurementHubHref, buildProcurementHubNewRequestHref } from "@/features/procurement/lib/quick-actions";
 
 type Props = {
   dealId: string;
@@ -24,7 +25,7 @@ export function DealProcurementLink({ dealId }: Props) {
           ·
         </span>
         <Link
-          href={`/crm/procurement?newRequest=1&dealId=${encodeURIComponent(dealId)}`}
+          href={buildProcurementHubNewRequestHref(dealId)}
           className="text-emerald-900/95 underline decoration-emerald-300/80 underline-offset-2 hover:text-emerald-950"
         >
           Нова заявка
@@ -33,7 +34,7 @@ export function DealProcurementLink({ dealId }: Props) {
           ·
         </span>
         <Link
-          href="/crm/procurement?view=hub"
+          href={buildProcurementHubHref()}
           className="text-emerald-800/90 underline decoration-emerald-300/60 underline-offset-2 hover:text-emerald-950"
         >
           Операційний hub

@@ -463,15 +463,19 @@ export function ConstructorsBoardClient({
                     </td>
                     <td className="px-4 py-3 text-slate-700">{statusUa}</td>
                     <td className="px-4 py-3">
-                      {cr?.publicToken ? (
-                        <CopyConstructorLinkButton
-                          publicToken={cr.publicToken}
-                        />
-                      ) : (
-                        <span className="text-slate-400">
-                          Створіть у вкладці угоди
-                        </span>
-                      )}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <a
+                          href={`/crm/production/constructor/${row.id}`}
+                          className="text-indigo-700 underline"
+                        >
+                          Hub
+                        </a>
+                        {cr?.publicToken ? (
+                          <CopyConstructorLinkButton publicToken={cr.publicToken} />
+                        ) : (
+                          <span className="text-slate-400">Створіть у вкладці угоди</span>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );

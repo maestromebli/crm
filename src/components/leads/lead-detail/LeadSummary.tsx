@@ -44,6 +44,11 @@ export function LeadSummary({
   const [converting, setConverting] = useState(false);
   const [quickStageId, setQuickStageId] = useState(lead.stageId);
   const patchBusy = leadActions.isPending;
+  const archivedStage = lead.pipelineStages.find((s) => s.slug === "archived");
+  const canArchiveLead =
+    canUpdateLead &&
+    archivedStage != null &&
+    archivedStage.id !== lead.stageId;
 
   useEffect(() => {
     setQuickStageId(lead.stageId);
@@ -107,6 +112,18 @@ export function LeadSummary({
     }
   };
 
+  const moveToArchive = async () => {
+    if (!canArchiveLead || !archivedStage) return;
+    setErr(null);
+    try {
+      await leadActions.updateStage(archivedStage.id);
+      setQuickStageId(archivedStage.id);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Не вдалося архівувати лід");
+      setQuickStageId(lead.stageId);
+    }
+  };
+
   const phone =
     lead.contact?.phone?.trim() || lead.phone?.trim() || null;
   const tel = telHref(phone);
@@ -150,8 +167,11 @@ export function LeadSummary({
           lead={lead}
           tel={tel}
           canConvertToDeal={canConvertToDeal}
+          canArchiveLead={canArchiveLead}
+          archiving={patchBusy}
           converting={converting}
           onConvert={() => void convertToDeal()}
+          onArchive={() => void moveToArchive()}
           onCallNavigate={() => void recordCall()}
         />
       </div>

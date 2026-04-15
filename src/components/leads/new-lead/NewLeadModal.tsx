@@ -4,19 +4,48 @@ import type { AttachmentCategory } from "@prisma/client";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { postFormData, postJson } from "../../../lib/api/patch-json";
 import { LEAD_CREATE_FILE_WARNINGS_KEY } from "../../../lib/leads/lead-file-warnings-storage";
 import { normalizePhoneDigits } from "../../../lib/leads/phone-normalize";
+import { CONTACT_CATEGORY_OPTIONS } from "../../../lib/contacts/contact-categories";
 import { cn } from "../../../lib/utils";
 import { DuplicateWarning, type DuplicateMatches } from "./DuplicateWarning";
 import { ExpandedLeadForm } from "./ExpandedLeadForm";
-import { QuickLeadForm, type Assignee } from "./QuickLeadForm";
+import {
+  QuickLeadForm,
+  type Assignee,
+  type CompanyContactDraft,
+  type DesignerOption,
+  type ReferralType,
+} from "./QuickLeadForm";
 
 export type NewLeadModalProps = {
   open: boolean;
   onClose: () => void;
   canUploadFiles?: boolean;
 };
+
+const DESIGNER_SOURCE_VALUE = "Дизайнер";
+const LEAD_SOURCE_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: "Сайт", label: "Сайт" },
+  { value: "Instagram", label: "Instagram" },
+  { value: "Facebook", label: "Facebook" },
+  { value: "Google Ads", label: "Google Ads" },
+  { value: "Рекомендація", label: "Рекомендація" },
+  { value: "Дизайнер", label: "Дизайнер" },
+  { value: "Інше", label: "Інше" },
+];
+
+function makeCompanyContactDraft(): CompanyContactDraft {
+  return {
+    id: crypto.randomUUID(),
+    fullName: "",
+    phone: "",
+    email: "",
+    category: "OTHER",
+  };
+}
 
 function telFromPhone(raw: string): string | null {
   const t = raw.trim();
@@ -38,7 +67,21 @@ export function NewLeadModal({
   const [err, setErr] = useState<string | null>(null);
   const [assignees, setAssignees] = useState<Assignee[]>([]);
   const [assigneesLoading, setAssigneesLoading] = useState(false);
+  const [designers, setDesigners] = useState<DesignerOption[]>([]);
+  const [designersLoading, setDesignersLoading] = useState(false);
   const [ownerId, setOwnerId] = useState("");
+  const [designerId, setDesignerId] = useState("");
+  const [customerType, setCustomerType] = useState<"PERSON" | "COMPANY">(
+    "PERSON",
+  );
+  const [companyName, setCompanyName] = useState("");
+  const [companyContacts, setCompanyContacts] = useState<CompanyContactDraft[]>([
+    makeCompanyContactDraft(),
+  ]);
+  const [referralType, setReferralType] = useState<ReferralType>("PERSON");
+  const [referralName, setReferralName] = useState("");
+  const [referralPhone, setReferralPhone] = useState("");
+  const [referralEmail, setReferralEmail] = useState("");
 
   const [contactName, setContactName] = useState("");
   const [phone, setPhone] = useState("");
@@ -59,6 +102,11 @@ export function NewLeadModal({
   const [dupMatches, setDupMatches] = useState<DuplicateMatches | null>(null);
   const [dupLoading, setDupLoading] = useState(false);
   const dupTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [portalReady, setPortalReady] = useState(false);
+
+  useEffect(() => {
+    setPortalReady(true);
+  }, []);
 
   const resetForm = () => {
     setContactName("");
@@ -66,6 +114,14 @@ export function NewLeadModal({
     setSource("");
     setComment("");
     setOwnerId("");
+    setDesignerId("");
+    setCustomerType("PERSON");
+    setCompanyName("");
+    setCompanyContacts([makeCompanyContactDraft()]);
+    setReferralType("PERSON");
+    setReferralName("");
+    setReferralPhone("");
+    setReferralEmail("");
     setEmail("");
     setCity("");
     setTitle("");
@@ -88,36 +144,53 @@ export function NewLeadModal({
     if (!open) return;
     let cancelled = false;
     setAssigneesLoading(true);
+    setDesignersLoading(true);
     void (async () => {
       try {
-        const r = await fetch("/api/leads/assignees");
-        const j = (await r.json()) as {
+        const [assigneesRes, designersRes] = await Promise.all([
+          fetch("/api/leads/assignees"),
+          fetch("/api/leads/designers"),
+        ]);
+        const assigneesJson = (await assigneesRes.json()) as {
           assignees?: Assignee[];
           error?: string;
         };
+        const designersJson = (await designersRes.json()) as {
+          designers?: DesignerOption[];
+          error?: string;
+        };
         if (cancelled) return;
-        if (!r.ok) {
+        if (!assigneesRes.ok) {
           setAssignees([]);
           if (session?.user?.id) setOwnerId(session.user.id);
-          return;
+        } else {
+          const list = assigneesJson.assignees ?? [];
+          setAssignees(list);
+          const sid = session?.user?.id;
+          if (sid && list.some((a) => a.id === sid)) {
+            setOwnerId(sid);
+          } else if (list[0]) {
+            setOwnerId(list[0].id);
+          } else if (sid) {
+            setOwnerId(sid);
+          }
         }
-        const list = j.assignees ?? [];
-        setAssignees(list);
-        const sid = session?.user?.id;
-        if (sid && list.some((a) => a.id === sid)) {
-          setOwnerId(sid);
-        } else if (list[0]) {
-          setOwnerId(list[0].id);
-        } else if (sid) {
-          setOwnerId(sid);
+        if (!designersRes.ok) {
+          setDesigners([]);
+        } else {
+          setDesigners(designersJson.designers ?? []);
         }
       } catch {
         if (!cancelled) {
           setAssignees([]);
+          setDesigners([]);
           if (session?.user?.id) setOwnerId(session.user.id);
         }
       } finally {
-        if (!cancelled) setAssigneesLoading(false);
+        if (!cancelled) {
+          setAssigneesLoading(false);
+          setDesignersLoading(false);
+        }
       }
     })();
     return () => {
@@ -163,12 +236,51 @@ export function NewLeadModal({
     };
   }, [open, phone, runPhoneCheck]);
 
-  if (!open) return null;
+  if (!open || !portalReady) return null;
+
+  const patchCompanyContact = (
+    id: string,
+    field: "fullName" | "phone" | "email" | "category",
+    value: string,
+  ) => {
+    setCompanyContacts((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, [field]: value } : item)),
+    );
+  };
+
+  const addCompanyContact = () => {
+    setCompanyContacts((prev) => [...prev, makeCompanyContactDraft()]);
+  };
+
+  const removeCompanyContact = (id: string) => {
+    setCompanyContacts((prev) => {
+      const next = prev.filter((item) => item.id !== id);
+      return next.length ? next : [makeCompanyContactDraft()];
+    });
+  };
 
   const buildPayload = () => {
     const name = contactName.trim();
     const ph = phone.trim();
-    if (!name && !ph) {
+    const normalizedCompanyName = companyName.trim();
+    if (customerType === "COMPANY" && !normalizedCompanyName) {
+      return { error: "Для компанії вкажіть назву." as const };
+    }
+
+    const preparedCompanyContacts = companyContacts
+      .map((item) => ({
+        fullName: item.fullName.trim(),
+        phone: item.phone.trim() || null,
+        email: item.email.trim() || null,
+        category: item.category.trim() || "OTHER",
+      }))
+      .filter((item) => item.fullName || item.phone || item.email);
+    if (customerType === "COMPANY" && preparedCompanyContacts.length === 0) {
+      return {
+        error: "Додайте хоча б одну контактну особу компанії." as const,
+      };
+    }
+    if (!name && !ph && !(customerType === "COMPANY" && preparedCompanyContacts.length > 0)) {
       return { error: "Вкажіть імʼя або телефон." as const };
     }
 
@@ -179,10 +291,28 @@ export function NewLeadModal({
     if (comment.trim()) noteParts.push(comment.trim());
     const note = noteParts.length ? noteParts.join("\n") : null;
 
-    const src = source.trim() || "Вручну";
+    const src = source.trim();
+    if (!src) {
+      return { error: "Оберіть джерело зі списку." as const };
+    }
+    const did = designerId.trim();
+    const normalizedReferralName = referralName.trim();
+    const normalizedReferralPhone = referralPhone.trim();
+    const normalizedReferralEmail = referralEmail.trim();
+    const needsReferral = src === "Рекомендація" || src === DESIGNER_SOURCE_VALUE;
+    if (src === DESIGNER_SOURCE_VALUE && !did && !normalizedReferralName) {
+      return {
+        error:
+          "Оберіть дизайнера зі списку або вкажіть імʼя дизайнера вручну." as const,
+      };
+    }
+    if (needsReferral && !did && !normalizedReferralName) {
+      return { error: "Вкажіть, хто привів замовника." as const };
+    }
     let leadTitle = title.trim();
     if (!leadTitle) {
-      leadTitle = [objectType.trim(), name || ph].filter(Boolean).join(" · ");
+      const titleContact = customerType === "COMPANY" ? normalizedCompanyName : name;
+      leadTitle = [objectType.trim(), titleContact || ph].filter(Boolean).join(" · ");
       if (!leadTitle) leadTitle = ph || name || "Новий лід";
     }
 
@@ -201,6 +331,14 @@ export function NewLeadModal({
       note,
       oid,
       email: email.trim(),
+      designerId: did || null,
+      customerType,
+      companyName: normalizedCompanyName || null,
+      companyContacts: preparedCompanyContacts,
+      referralType,
+      referralName: normalizedReferralName || null,
+      referralPhone: normalizedReferralPhone || null,
+      referralEmail: normalizedReferralEmail || null,
       useMultipart: canUploadFiles && pendingFiles.length > 0,
     };
   };
@@ -225,6 +363,16 @@ export function NewLeadModal({
         fd.append("source", p.src);
         if (p.note) fd.append("note", p.note);
         fd.append("ownerId", p.oid);
+        if (p.designerId) fd.append("designerUserId", p.designerId);
+        fd.append("customerType", p.customerType);
+        if (p.companyName) fd.append("companyName", p.companyName);
+        if (p.companyContacts.length) {
+          fd.append("companyContactsJson", JSON.stringify(p.companyContacts));
+        }
+        fd.append("referralType", p.referralType);
+        if (p.referralName) fd.append("referralName", p.referralName);
+        if (p.referralPhone) fd.append("referralPhone", p.referralPhone);
+        if (p.referralEmail) fd.append("referralEmail", p.referralEmail);
         fd.append("fileCategory", fileCategory);
         for (const f of pendingFiles) {
           fd.append("files", f);
@@ -245,6 +393,14 @@ export function NewLeadModal({
             source: p.src,
             note: p.note,
             ownerId: p.oid,
+            designerUserId: p.designerId,
+            customerType: p.customerType,
+            companyName: p.companyName,
+            companyContacts: p.companyContacts,
+            referralType: p.referralType,
+            referralName: p.referralName,
+            referralPhone: p.referralPhone,
+            referralEmail: p.referralEmail,
           },
         );
       }
@@ -292,7 +448,7 @@ export function NewLeadModal({
   const input =
     "w-full rounded-md border border-slate-200 bg-[var(--enver-card)] px-2 py-1 text-xs outline-none focus:border-slate-900";
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-40 flex justify-end bg-slate-900/40 backdrop-blur-[2px]"
       role="dialog"
@@ -309,7 +465,7 @@ export function NewLeadModal({
               Новий лід
             </p>
             <p className="mt-1 text-xs leading-relaxed text-slate-500">
-              Мінімум полів зараз — решту в картці Hub після збереження.
+              Мінімум полів зараз — решту в картці хаба після збереження.
             </p>
           </div>
           <button
@@ -330,15 +486,38 @@ export function NewLeadModal({
 
           <QuickLeadForm
             inputClass={input}
+            customerType={customerType}
+            onCustomerTypeChange={setCustomerType}
+            companyName={companyName}
+            onCompanyNameChange={setCompanyName}
             contactName={contactName}
             onContactNameChange={setContactName}
             phone={phone}
             onPhoneChange={setPhone}
+            companyContacts={companyContacts}
+            onCompanyContactChange={patchCompanyContact}
+            onAddCompanyContact={addCompanyContact}
+            onRemoveCompanyContact={removeCompanyContact}
+            contactCategoryOptions={CONTACT_CATEGORY_OPTIONS}
             duplicateSlot={
               <DuplicateWarning loading={dupLoading} matches={dupMatches} />
             }
             source={source}
             onSourceChange={setSource}
+            sourceOptions={LEAD_SOURCE_OPTIONS}
+            designerSourceValue={DESIGNER_SOURCE_VALUE}
+            designersLoading={designersLoading}
+            designers={designers}
+            designerId={designerId}
+            onDesignerIdChange={setDesignerId}
+            referralType={referralType}
+            onReferralTypeChange={setReferralType}
+            referralName={referralName}
+            onReferralNameChange={setReferralName}
+            referralPhone={referralPhone}
+            onReferralPhoneChange={setReferralPhone}
+            referralEmail={referralEmail}
+            onReferralEmailChange={setReferralEmail}
             comment={comment}
             onCommentChange={setComment}
             assigneesLoading={assigneesLoading}
@@ -394,7 +573,7 @@ export function NewLeadModal({
                 saving && "opacity-70",
               )}
             >
-              {saving ? "Зберігаю…" : "Створити й відкрити Hub"}
+              {saving ? "Зберігаю…" : "Створити й відкрити хаб"}
             </button>
             <div className="flex gap-2">
               <button
@@ -424,6 +603,7 @@ export function NewLeadModal({
           </button>
         </footer>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

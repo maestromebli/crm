@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { Metadata } from "next";
 import { DashboardShell } from "../../components/layout/DashboardShell";
+import { NewAssistantWidget } from "../../components/layout/NewAssistantWidget";
 import { requireSessionForAppLayout } from "../../lib/authz/page-auth";
 
 export const metadata: Metadata = {
@@ -14,6 +15,11 @@ export default async function DashboardLayout({
 }) {
   await requireSessionForAppLayout();
 
-  return <DashboardShell>{children}</DashboardShell>;
+  return (
+    <>
+      <DashboardShell>{children}</DashboardShell>
+      <NewAssistantWidget />
+    </>
+  );
 }
 

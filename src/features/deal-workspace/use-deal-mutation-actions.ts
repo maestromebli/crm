@@ -18,6 +18,24 @@ type NextStageResult = {
   message?: string;
 };
 
+export type FinancialWorkflowStep = {
+  key: "recalc_estimate" | "sync_deal_value" | "create_doc" | "advance_stage" | "notify";
+  status: "success" | "failed" | "skipped";
+  message: string;
+  details?: Record<string, unknown>;
+};
+
+export type FinancialWorkflowResult = {
+  ok: boolean;
+  mode: "best-effort";
+  summary: {
+    success: number;
+    failed: number;
+    skipped: number;
+  };
+  steps: FinancialWorkflowStep[];
+};
+
 export type DealMutationActions = {
   isPending: boolean;
   isStagePending: boolean;
@@ -29,6 +47,7 @@ export type DealMutationActions = {
   patchWorkspaceMeta: (patch: Partial<DealWorkspaceMeta>) => Promise<void>;
   attachFinanceProject: (projectId: string) => Promise<void>;
   unlinkFinanceProject: (projectId: string) => Promise<void>;
+  runFinancialWorkflow: () => Promise<FinancialWorkflowResult>;
 };
 
 export async function patchDealById(
@@ -247,6 +266,17 @@ export function useDealMutationActions(dealId: string): DealMutationActions {
     });
   }, [dealId, queryClient]);
 
+  const runFinancialWorkflow = useCallback(async () => {
+    const result = await postJson<FinancialWorkflowResult>(
+      `/api/deals/${dealId}/financial-workflow`,
+      {},
+    );
+    await queryClient.invalidateQueries({
+      queryKey: dealQueryKeys.workspace(dealId),
+    });
+    return result;
+  }, [dealId, queryClient]);
+
   return {
     isPending: stageMutation.isPending || statusMutation.isPending,
     isStagePending: stageMutation.isPending,
@@ -258,5 +288,6 @@ export function useDealMutationActions(dealId: string): DealMutationActions {
     patchWorkspaceMeta,
     attachFinanceProject,
     unlinkFinanceProject,
+    runFinancialWorkflow,
   };
 }

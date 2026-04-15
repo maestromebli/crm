@@ -24,7 +24,7 @@ export default function SettingsPage() {
           </div>
           <div className="space-y-1.5">
             <label className="text-[11px] text-slate-600">
-              Контактний email
+              Контактна е-пошта
             </label>
             <input className="w-full rounded-md border border-slate-200 bg-[var(--enver-card)] px-2 py-1 text-xs outline-none focus:border-slate-900" />
           </div>

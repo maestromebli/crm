@@ -3,6 +3,7 @@ import { BookUser } from "lucide-react";
 import type { ContactListView } from "../../lib/contacts-route";
 import type { ContactListRow } from "../../features/contacts/queries";
 import { ContactsList } from "./ContactsList";
+import { ContactsSegmentsWorkspace } from "./ContactsSegmentsWorkspace";
 
 export type ContactsPageProps = {
   title: string;
@@ -13,13 +14,9 @@ export type ContactsPageProps = {
 };
 
 const PLACEHOLDER_COPY: Record<
-  "segments" | "activity",
+  "activity",
   { title: string; body: string }
 > = {
-  segments: {
-    title: "Сегменти аудиторії",
-    body: "Тут зʼявиться конструктор сегментів (за джерелом, стадією, LTV, тегами). Поки що використовуйте фільтри «Клієнти», «Партнери» або пошук у картці ліда.",
-  },
   activity: {
     title: "Зведена активність",
     body: "Ми додамо узагальнений таймлайн дзвінків, листів і змін по всіх контактах. Зараз історія доступна в картці конкретного контакта на вкладці «Активність».",
@@ -33,15 +30,16 @@ export function ContactsPage({
   rows,
   hint,
 }: ContactsPageProps) {
-  const isPlaceholder = view === "segments" || view === "activity";
-  const ph = isPlaceholder ? PLACEHOLDER_COPY[view] : null;
+  const isSegments = view === "segments";
+  const isPlaceholder = view === "activity";
+  const ph = isPlaceholder ? PLACEHOLDER_COPY.activity : null;
 
   return (
-    <div className="flex min-h-[calc(100vh-56px)] flex-col bg-slate-50 px-3 py-3 md:px-6 md:py-4">
+    <div className="flex min-h-[calc(100vh-56px)] flex-col bg-[var(--enver-bg)] px-3 py-3 md:px-6 md:py-4">
       <div className="mx-auto w-full max-w-6xl flex-1 space-y-4">
-        <header className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50/90 px-4 py-4 shadow-sm md:flex-row md:items-center md:justify-between md:px-5">
+        <header className="flex flex-col gap-4 rounded-2xl border border-[var(--enver-border)] bg-[var(--enver-card)] px-4 py-4 md:flex-row md:items-center md:justify-between md:px-5">
           <div className="flex gap-3">
-            <div className="hidden h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white sm:flex">
+            <div className="hidden h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[var(--enver-surface)] text-[var(--enver-text-muted)] sm:flex">
               <BookUser className="h-6 w-6" strokeWidth={1.75} aria-hidden />
             </div>
             <div>
@@ -78,7 +76,7 @@ export function ContactsPage({
           </div>
         ) : null}
 
-        {!isPlaceholder && rows.length === 0 && !hint ? (
+        {!isPlaceholder && !isSegments && rows.length === 0 && !hint ? (
           <div className="rounded-2xl border border-dashed border-slate-200 bg-[var(--enver-card)] px-4 py-12 text-center shadow-sm">
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-500">
               <BookUser className="h-7 w-7" strokeWidth={1.5} aria-hidden />
@@ -93,7 +91,10 @@ export function ContactsPage({
           </div>
         ) : null}
 
-        {!isPlaceholder && rows.length > 0 ? <ContactsList rows={rows} /> : null}
+        {isSegments ? <ContactsSegmentsWorkspace rows={rows} /> : null}
+        {!isPlaceholder && !isSegments && rows.length > 0 ? (
+          <ContactsList rows={rows} />
+        ) : null}
       </div>
     </div>
   );

@@ -38,21 +38,21 @@ export function LeadRow({ lead, duplicatePhone }: LeadRowProps) {
     lead.contact?.phone?.trim() || lead.phone?.trim() || null;
 
   return (
-    <tr className="transition-colors hover:bg-sky-50/40">
+    <tr className="transition-colors hover:bg-[var(--enver-hover)]/70">
       <td className="px-3 py-3 align-top">
         <div className="flex flex-wrap items-center gap-1.5">
           <Link
             href={`/leads/${lead.id}`}
-            className="font-semibold text-[var(--enver-text)] hover:text-sky-800 hover:underline"
+            className="font-semibold text-[var(--enver-text)] hover:text-[var(--enver-accent-hover)] hover:underline"
           >
             {lead.title}
           </Link>
           {level === "critical" ? (
-            <span className="rounded-full bg-rose-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-rose-800">
+            <span className="rounded-full border border-rose-200/70 bg-rose-50 px-1.5 py-0.5 text-[9px] font-medium uppercase text-rose-800">
               Критично
             </span>
           ) : level === "warning" ? (
-            <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-amber-900">
+            <span className="rounded-full border border-amber-200/70 bg-amber-50 px-1.5 py-0.5 text-[9px] font-medium uppercase text-amber-900">
               Увага
             </span>
           ) : null}
@@ -99,14 +99,14 @@ export function LeadRow({ lead, duplicatePhone }: LeadRowProps) {
       <td className="px-3 py-2.5 align-top">
         <span
           className={cn(
-            "inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium",
+            "inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium",
             rs.key === "OVERDUE_TOUCH"
-              ? "bg-rose-100 text-rose-900"
+              ? "border-rose-200/70 bg-rose-50 text-rose-900"
               : rs.key === "SCHEDULED"
-                ? "bg-sky-100 text-sky-900"
+                ? "border-sky-200/70 bg-sky-50 text-sky-900"
                 : rs.key === "CLOSED"
-                  ? "bg-slate-100 text-slate-700"
-                  : "bg-slate-100 text-slate-700",
+                  ? "border-[var(--enver-border)] bg-[var(--enver-surface)] text-slate-700"
+                  : "border-[var(--enver-border)] bg-[var(--enver-surface)] text-slate-700",
           )}
         >
           {rs.label}
@@ -118,18 +118,23 @@ export function LeadRow({ lead, duplicatePhone }: LeadRowProps) {
             <a
               href={tel}
               title="Дзвінок"
+              aria-label={`Подзвонити клієнту по лідy ${lead.title}`}
               className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-700 hover:bg-[var(--enver-hover)]"
             >
               <Phone className="h-3.5 w-3.5" strokeWidth={2} />
             </a>
           ) : (
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-dashed border-slate-100 text-slate-300">
+            <span
+              aria-hidden
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-dashed border-slate-100 text-slate-300"
+            >
               <Phone className="h-3.5 w-3.5" strokeWidth={2} />
             </span>
           )}
           <Link
             href={`/leads/${lead.id}/messages`}
             title="Діалог"
+            aria-label={`Відкрити повідомлення для ліда ${lead.title}`}
             className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-700 hover:bg-[var(--enver-hover)]"
           >
             <MessageSquare className="h-3.5 w-3.5" strokeWidth={2} />
@@ -137,6 +142,7 @@ export function LeadRow({ lead, duplicatePhone }: LeadRowProps) {
           <Link
             href={`/leads/${lead.id}/tasks?new=1`}
             title="Задача"
+            aria-label={`Створити задачу для ліда ${lead.title}`}
             className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-700 hover:bg-[var(--enver-hover)]"
           >
             <CheckSquare className="h-3.5 w-3.5" strokeWidth={2} />
@@ -144,6 +150,7 @@ export function LeadRow({ lead, duplicatePhone }: LeadRowProps) {
           <Link
             href={`/leads/${lead.id}#lead-convert`}
             title="У угоду"
+            aria-label={`Конвертувати лід ${lead.title} в угоду`}
             className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-700 hover:bg-[var(--enver-hover)]"
           >
             <KanbanSquare className="h-3.5 w-3.5" strokeWidth={2} />

@@ -33,8 +33,13 @@
     "backup:gpt:lead-pricing": "node scripts/gpt-lead-pricing-bundle.mjs",
     "backup:gpt:finance-procurement": "node scripts/gpt-finance-procurement-bundle.mjs",
     "core:v2:verify": "node scripts/core-v2-verify.mjs",
+    "arch:boundaries": "node scripts/check-domain-boundaries.mjs",
     "screenshots:install": "playwright install chromium",
     "screenshots:site": "playwright test tests/e2e/site-screenshots.spec.ts",
+    "e2e:lead-hub:critical": "playwright test tests/e2e/lead-hub-notes-stage-transition.spec.ts tests/e2e/lead-hub-notes-rbac.spec.ts tests/e2e/lead-hub-notes-rbac-api.spec.ts",
+    "e2e:contracts:portal-public": "playwright test tests/e2e/contracts-portal-public-token-guard.spec.ts",
+    "e2e:contracts:portal-happy": "playwright test tests/e2e/contracts-portal-signing-happy-path.spec.ts tests/e2e/contracts-portal-status-transitions.spec.ts tests/e2e/contracts-portal-manager-sync.spec.ts tests/e2e/contracts-manager-document-generation.spec.ts",
+    "e2e:nightly:critical": "playwright test tests/e2e/lead-hub-notes-stage-transition.spec.ts tests/e2e/lead-hub-notes-rbac.spec.ts tests/e2e/lead-hub-notes-rbac-api.spec.ts tests/e2e/contracts-portal-public-token-guard.spec.ts tests/e2e/contracts-portal-signing-happy-path.spec.ts tests/e2e/contracts-portal-status-transitions.spec.ts tests/e2e/contracts-portal-manager-sync.spec.ts tests/e2e/contracts-manager-document-generation.spec.ts",
     "assistant:process-face": "node scripts/process-assistant-face.mjs"
   },
   "dependencies": {
@@ -66,6 +71,8 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-hook-form": "^7.71.2",
+    "recharts": "^3.8.1",
+    "three": "^0.183.2",
     "xlsx": "^0.18.5",
     "zod": "^4.3.6",
     "zustand": "^5.0.12"

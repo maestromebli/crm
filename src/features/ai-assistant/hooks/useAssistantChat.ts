@@ -23,14 +23,20 @@ const MAX_MESSAGES = 40;
 type UseAssistantChatOptions = {
   /** Якщо задано — історія діалогу зберігається в sessionStorage на сесію браузера */
   persistUserId?: string | null;
+  /** API endpoint для чату; за замовчуванням загальний асистент */
+  endpoint?: string;
+  /** Префікс ключа сховища, щоб розділяти різні чати */
+  storagePrefix?: string;
 };
 
 export function useAssistantChat(options?: UseAssistantChatOptions) {
   const persistUserId = options?.persistUserId ?? null;
+  const endpoint = options?.endpoint ?? "/api/ai/chat";
+  const storagePrefix = options?.storagePrefix ?? "enver_assistant_chat_v1";
   const storageKey = useMemo(
     () =>
-      persistUserId ? `enver_assistant_chat_v1_${persistUserId}` : null,
-    [persistUserId],
+      persistUserId ? `${storagePrefix}_${persistUserId}` : null,
+    [persistUserId, storagePrefix],
   );
 
   const [messages, setMessages] = useState<AssistantChatMessage[]>([]);
@@ -115,7 +121,7 @@ export function useAssistantChat(options?: UseAssistantChatOptions) {
           text?: string;
           error?: string;
           toolsUsed?: string[];
-        }>("/api/ai/chat", {
+        }>(endpoint, {
           messages: history.map((m) => ({
             role: m.role,
             content: m.content,
@@ -141,7 +147,7 @@ export function useAssistantChat(options?: UseAssistantChatOptions) {
         onComplete?.();
       }
     },
-    [loading, messages],
+    [endpoint, loading, messages],
   );
 
   return {

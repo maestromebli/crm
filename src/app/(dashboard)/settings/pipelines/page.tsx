@@ -10,7 +10,7 @@ export default function SettingsPipelinesPage() {
   return (
     <SettingsShell
       title="Воронки та стадії"
-      description="Налаштуйте воронки продажів, виробництва та handoff, а також їхні стадії."
+      description="Налаштуйте воронки продажів, виробництва та передачі у виробництво, а також їхні стадії."
     >
       <SettingsCard
         title="Воронка продажів"
@@ -22,7 +22,7 @@ export default function SettingsPipelinesPage() {
           <li>КП надіслано</li>
           <li>Переговори</li>
           <li>Договір / передоплата</li>
-          <li>Handoff → виробництво</li>
+          <li>Передача → виробництво</li>
           <li>Монтаж</li>
           <li>Закрито / успішно</li>
         </ol>
@@ -43,9 +43,9 @@ export default function SettingsPipelinesPage() {
             Тип сутності
           </label>
           <select className="w-full rounded-md border border-slate-200 bg-[var(--enver-card)] px-2 py-1 text-xs outline-none focus:border-slate-900">
-            <option>Deals</option>
-            <option>Production</option>
-            <option>Handoff</option>
+            <option>Угоди</option>
+            <option>Виробництво</option>
+            <option>Передача</option>
           </select>
         </div>
       </SettingsCard>

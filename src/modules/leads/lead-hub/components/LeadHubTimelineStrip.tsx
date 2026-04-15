@@ -69,7 +69,7 @@ export function LeadHubTimelineStrip({ leadId, className }: Props) {
   return (
     <section
       className={cn(
-        "rounded-[12px] border border-[var(--enver-border)] bg-[var(--enver-card)] p-3 shadow-[var(--enver-shadow)]",
+        "rounded-[14px] border border-[var(--enver-border)]/80 bg-gradient-to-br from-[var(--enver-card)] to-[var(--enver-surface)] p-3 shadow-[0_10px_24px_rgba(15,23,42,0.08)]",
         className,
       )}
       aria-label="Останні події"

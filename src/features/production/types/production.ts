@@ -124,10 +124,35 @@ export type ProductionCommandCenterView = {
       flowId: string;
       flowNumber: string;
       title: string;
+        status: ProductionTaskStatus;
       priority: "LOW" | "NORMAL" | "HIGH" | "URGENT";
       dueDate: string | null;
       assigneeUserId: string | null;
       assigneeName: string | null;
+        miniHqLifecycle: {
+          state: "IDLE" | "RUNNING" | "PAUSED" | "DONE";
+          startedAt: string | null;
+          completedAt: string | null;
+          lastResumedAt: string | null;
+          lastPausedAt: string | null;
+          activeSeconds: number;
+          pauseReasonCode: string | null;
+          pauseComment: string | null;
+        };
+        miniHqProgress: {
+          percent: number;
+          source: "gitlab" | "manual" | "none";
+          stageMetricKey: string | null;
+          stageMetricActual: number | null;
+          stageMetricPlan: number | null;
+          lastSyncedAt: string | null;
+          lastError: string | null;
+        };
+        miniHqGitLab: {
+          projectId: string | null;
+          ref: string | null;
+          path: string | null;
+        };
       materialsChecklist: Array<{ id: string; label: string; done: boolean; scope?: string }>;
     }>;
   }>;

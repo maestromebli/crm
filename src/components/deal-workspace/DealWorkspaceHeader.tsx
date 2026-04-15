@@ -7,7 +7,10 @@ import { useCallback, useEffect, useState } from "react";
 import type { DealWorkspaceMeta } from "../../features/deal-workspace/types";
 import type { DealWorkspacePayload } from "../../features/deal-workspace/types";
 import { deriveNextStepSeverity } from "../../features/deal-workspace/insights";
-import { useDealMutationActions } from "../../features/deal-workspace/use-deal-mutation-actions";
+import {
+  useDealMutationActions,
+  type FinancialWorkflowResult,
+} from "../../features/deal-workspace/use-deal-mutation-actions";
 import {
   derivePaymentMoneySummaryForPayload,
   derivePaymentStripSummaryForPayload,
@@ -73,6 +76,11 @@ export function DealWorkspaceHeader({
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [workflowBusy, setWorkflowBusy] = useState(false);
+  const [workflowErr, setWorkflowErr] = useState<string | null>(null);
+  const [workflowResult, setWorkflowResult] = useState<FinancialWorkflowResult | null>(
+    null,
+  );
 
   const [title, setTitle] = useState(deal.title);
   const [description, setDescription] = useState(deal.description ?? "");
@@ -200,6 +208,21 @@ export function DealWorkspaceHeader({
     value,
   ]);
 
+  const runFinancialOneClick = useCallback(async () => {
+    setWorkflowBusy(true);
+    setWorkflowErr(null);
+    try {
+      const result = await dealActions.runFinancialWorkflow();
+      setWorkflowResult(result);
+    } catch (e) {
+      setWorkflowErr(
+        e instanceof Error ? e.message : "Помилка виконання one-click сценарію",
+      );
+    } finally {
+      setWorkflowBusy(false);
+    }
+  }, [dealActions]);
+
   const payVariantClass =
     paymentStrip.variant === "complete"
       ? "text-emerald-800"
@@ -210,7 +233,7 @@ export function DealWorkspaceHeader({
           : "text-slate-500";
 
   return (
-    <header className="rounded-2xl border border-slate-200 bg-[var(--enver-card)]/95 px-4 py-3 shadow-sm shadow-slate-900/5">
+    <header className="rounded-2xl border border-[var(--enver-border)] bg-[var(--enver-card)] px-4 py-3">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 space-y-1">
           <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
@@ -237,7 +260,7 @@ export function DealWorkspaceHeader({
             {data.leadId ? (
               <Link
                 href={`/leads/${data.leadId}`}
-                className="rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-0.5 text-[11px] font-medium text-indigo-900 hover:bg-indigo-100"
+                className="rounded-full border border-[var(--enver-border)] bg-[var(--enver-surface)] px-2.5 py-0.5 text-[11px] font-medium text-[var(--enver-text-muted)] hover:bg-[var(--enver-hover)]"
               >
                 Вихідний лід
               </Link>
@@ -288,6 +311,46 @@ export function DealWorkspaceHeader({
               label="short"
               className="mt-1.5 items-end"
             />
+            <button
+              type="button"
+              disabled={workflowBusy}
+              onClick={() => void runFinancialOneClick()}
+              className={cn(
+                "mt-1.5 rounded-md border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-[11px] font-semibold text-indigo-900 transition hover:bg-indigo-100",
+                workflowBusy && "cursor-wait opacity-60",
+              )}
+            >
+              {workflowBusy ? "Виконання…" : "Фінанси в один клік"}
+            </button>
+            {workflowErr ? (
+              <p className="mt-1.5 max-w-[260px] rounded-md bg-rose-50 px-2 py-1 text-[10px] text-rose-800">
+                {workflowErr}
+              </p>
+            ) : null}
+            {workflowResult ? (
+              <div className="mt-1.5 max-w-[260px] rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] text-slate-700">
+                <p className="font-semibold">
+                  {workflowResult.ok ? "Сценарій виконано" : "Сценарій виконано частково"}
+                </p>
+                <p>
+                  Успіх: {workflowResult.summary.success} · Помилки:{" "}
+                  {workflowResult.summary.failed} · Пропущено:{" "}
+                  {workflowResult.summary.skipped}
+                </p>
+                <ul className="mt-1 space-y-0.5 border-t border-slate-200 pt-1">
+                  {workflowResult.steps.map((step) => (
+                    <li key={step.key}>
+                      {step.status === "success"
+                        ? "ОК"
+                        : step.status === "failed"
+                          ? "ПОМИЛКА"
+                          : "ПРОПУСК"}{" "}
+                      {step.message}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
@@ -346,7 +409,7 @@ export function DealWorkspaceHeader({
 
       <div
         id="deal-next-step-block"
-        className="mt-3 rounded-xl border border-slate-200 bg-slate-50/90 px-3 py-2.5"
+        className="mt-3 rounded-xl border border-[var(--enver-border)] bg-[var(--enver-surface)] px-3 py-2.5"
       >
         <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
           Наступний крок

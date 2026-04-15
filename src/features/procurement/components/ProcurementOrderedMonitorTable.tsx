@@ -195,15 +195,18 @@ export function ProcurementOrderedMonitorTable({
 
   useEffect(() => {
     if (!persistPrefs) {
-      setPrefsHydrated(true);
-      return;
+      const timer = window.setTimeout(() => setPrefsHydrated(true), 0);
+      return () => window.clearTimeout(timer);
     }
-    const p = readMonitorPrefs(storageScope);
-    setQ(p.q);
-    setSortMode(p.sortMode);
-    setSortDir(p.sortDir);
-    setQuickFilter(p.quickFilter);
-    setPrefsHydrated(true);
+    const timer = window.setTimeout(() => {
+      const p = readMonitorPrefs(storageScope);
+      setQ(p.q);
+      setSortMode(p.sortMode);
+      setSortDir(p.sortDir);
+      setQuickFilter(p.quickFilter);
+      setPrefsHydrated(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [persistPrefs, storageScope]);
 
   useEffect(() => {

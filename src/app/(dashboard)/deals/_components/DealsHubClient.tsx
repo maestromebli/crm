@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { format } from "date-fns";
 import { uk } from "date-fns/locale";
 import {
@@ -13,7 +14,7 @@ import {
   Table2,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type {
   DealHubFilters,
@@ -29,9 +30,17 @@ import type { DealBoardStage } from "../../../../features/deal-workspace/queries
 import type { DealHubRow } from "./deal-hub-row";
 import { DealsKpiStrip } from "./DealsKpiStrip";
 import { DealsSavedViewsBar } from "./DealsSavedViewsBar";
-import { DealsSmartInsights } from "./DealsSmartInsights";
 
 export type { DealHubRow } from "./deal-hub-row";
+
+const DealsSmartInsights = dynamic(
+  () => import("./DealsSmartInsights").then((m) => m.DealsSmartInsights),
+  {
+    loading: () => (
+      <div className="h-24 animate-pulse rounded-2xl bg-[var(--enver-surface)]" />
+    ),
+  },
+);
 
 const VIEWS: Array<{ id: SavedViewChipId; label: string }> = [
   { id: "all_open", label: "Мої активні" },
@@ -53,6 +62,11 @@ const SORT_OPTIONS: Array<{ id: DealHubSortKey; label: string }> = [
   { id: "client_asc", label: "Клієнт А→Я" },
   { id: "stage_asc", label: "Стадія А→Я" },
 ];
+const INITIAL_TABLE_ROWS = 60;
+const TABLE_ROWS_STEP = 40;
+const INITIAL_BOARD_ROWS = 24;
+const BOARD_ROWS_STEP = 16;
+const BOARD_SCROLL_STORAGE_KEY = "enver:deals-board-scroll";
 
 function filterRows(view: SavedViewChipId, rows: DealHubRow[]): DealHubRow[] {
   const now = Date.now();
@@ -220,12 +234,58 @@ export function DealsHubClient({
     "comfortable",
   );
   const [showInsights, setShowInsights] = useState(true);
+  const [visibleTableRows, setVisibleTableRows] = useState(INITIAL_TABLE_ROWS);
+  const [visibleBoardRows, setVisibleBoardRows] = useState<
+    Record<string, number>
+  >({});
+  const boardScrollByStageRef = useRef<Record<string, number>>({});
+
+  const persistBoardScrollSnapshot = useCallback(() => {
+    try {
+      window.sessionStorage.setItem(
+        BOARD_SCROLL_STORAGE_KEY,
+        JSON.stringify(boardScrollByStageRef.current),
+      );
+    } catch {
+      // sessionStorage can be unavailable in strict privacy mode.
+    }
+  }, []);
+
+  const updateBoardScroll = useCallback(
+    (stageId: string, scrollTop: number) => {
+      boardScrollByStageRef.current = {
+        ...boardScrollByStageRef.current,
+        [stageId]: scrollTop,
+      };
+      persistBoardScrollSnapshot();
+    },
+    [persistBoardScrollSnapshot],
+  );
+
+  const restoreBoardScroll = useCallback((stageId: string, node: HTMLUListElement) => {
+    const top = boardScrollByStageRef.current[stageId] ?? 0;
+    if (top > 0) {
+      node.scrollTop = top;
+    }
+  }, []);
 
   const [savedViews, setSavedViews] =
     useState<DealHubSavedViewDTO[]>(savedViewsInitial);
   useEffect(() => {
     setSavedViews(savedViewsInitial);
   }, [savedViewsInitial]);
+
+  useEffect(() => {
+    try {
+      const raw = window.sessionStorage.getItem(BOARD_SCROLL_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as Record<string, number>;
+      if (!parsed || typeof parsed !== "object") return;
+      boardScrollByStageRef.current = parsed;
+    } catch {
+      boardScrollByStageRef.current = {};
+    }
+  }, []);
 
   /** Локальне оновлення стадії після успішного drag-and-drop до приходу refresh. */
   const [stageOverrides, setStageOverrides] = useState<
@@ -330,6 +390,20 @@ export function DealsHubClient({
         rows: v.list,
       }));
   }, [displayRows, boardStages]);
+
+  useEffect(() => {
+    setVisibleTableRows(INITIAL_TABLE_ROWS);
+  }, [search, sortKey, ownerFilter, savedView, serverFiltered, rows]);
+
+  useEffect(() => {
+    setVisibleBoardRows((prev) => {
+      const next: Record<string, number> = {};
+      for (const group of boardGroups) {
+        next[group.stageId] = prev[group.stageId] ?? INITIAL_BOARD_ROWS;
+      }
+      return next;
+    });
+  }, [boardGroups]);
 
   const showPipelineOnBoard = useMemo(() => {
     const ids = new Set(boardGroups.map((g) => g.pipelineId).filter(Boolean));
@@ -440,7 +514,7 @@ export function DealsHubClient({
     <div className="space-y-4">
       {showInsights ? <DealsSmartInsights rows={displayRows} /> : null}
 
-      <div className="flex flex-col gap-3 rounded-2xl border border-[var(--enver-border)] bg-[var(--enver-card)]/95 px-3 py-3 shadow-sm shadow-[var(--enver-shadow)]">
+      <div className="flex flex-col gap-3 rounded-2xl border border-[var(--enver-border)] bg-[var(--enver-card)] px-3 py-3">
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex flex-wrap gap-1">
             <Tooltip>
@@ -451,7 +525,7 @@ export function DealsHubClient({
                   className={cn(
                     "inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold",
                     layout === "table"
-                      ? "bg-[var(--enver-accent)] text-white shadow-md shadow-[var(--enver-accent)]/20"
+                      ? "bg-[var(--enver-accent)] text-white"
                       : "text-[var(--enver-text-muted)] hover:bg-[var(--enver-hover)]",
                   )}
                 >
@@ -471,7 +545,7 @@ export function DealsHubClient({
                   className={cn(
                     "inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold",
                     layout === "board"
-                      ? "bg-[var(--enver-accent)] text-white shadow-md shadow-[var(--enver-accent)]/20"
+                      ? "bg-[var(--enver-accent)] text-white"
                       : "text-[var(--enver-text-muted)] hover:bg-[var(--enver-hover)]",
                   )}
                 >
@@ -663,8 +737,19 @@ export function DealsHubClient({
       ) : null}
 
       {layout === "table" ? (
-        <div className="overflow-hidden rounded-xl border border-[var(--enver-border)] bg-[var(--enver-card)] shadow-sm shadow-[var(--enver-shadow)]">
-          <div className="max-h-[min(70vh,1200px)] overflow-auto">
+        <div className="overflow-hidden rounded-xl border border-[var(--enver-border)] bg-[var(--enver-card)]">
+          <div
+            className="max-h-[min(70vh,1200px)] overflow-auto"
+            onScroll={(event) => {
+              const el = event.currentTarget;
+              const nearBottom =
+                el.scrollTop + el.clientHeight >= el.scrollHeight - 220;
+              if (!nearBottom) return;
+              setVisibleTableRows((prev) =>
+                Math.min(displayRows.length, prev + TABLE_ROWS_STEP),
+              );
+            }}
+          >
             <table className="w-full min-w-[920px] text-left text-xs">
               <thead className="sticky top-0 z-10 border-b border-[var(--enver-border)] bg-[var(--enver-surface)]/95 text-[10px] font-semibold uppercase tracking-wide text-[var(--enver-muted)] backdrop-blur-sm">
                 <tr>
@@ -685,7 +770,7 @@ export function DealsHubClient({
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--enver-border)]">
-                {displayRows.map((r) => (
+                {displayRows.slice(0, visibleTableRows).map((r) => (
                   <tr
                     key={r.id}
                     role="button"
@@ -697,7 +782,7 @@ export function DealsHubClient({
                         openWorkspace(r.id);
                       }
                     }}
-                    className="cursor-pointer hover:bg-[var(--enver-accent-soft)]/40 odd:bg-[var(--enver-hover)]/35"
+                    className="cursor-pointer hover:bg-[var(--enver-hover)]/85"
                   >
                     {showPipelineColumn ? (
                       <td
@@ -754,11 +839,11 @@ export function DealsHubClient({
                     </td>
                     <td className={cn("px-3", cellY)}>
                       {r.warningBadge === "critical" ? (
-                        <span className="rounded-full border border-[var(--enver-danger)]/35 bg-[var(--enver-danger-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--enver-danger)]">
+                        <span className="rounded-full border border-[var(--enver-danger)]/30 bg-[var(--enver-danger-soft)]/80 px-2 py-0.5 text-[10px] font-medium text-[var(--enver-danger)]">
                           Критично
                         </span>
                       ) : r.warningBadge === "warning" ? (
-                        <span className="rounded-full border border-[var(--enver-warning)]/35 bg-[var(--enver-warning-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--enver-warning)]">
+                        <span className="rounded-full border border-[var(--enver-warning)]/30 bg-[var(--enver-warning-soft)]/80 px-2 py-0.5 text-[10px] font-medium text-[var(--enver-warning)]">
                           Увага
                         </span>
                       ) : (
@@ -772,7 +857,7 @@ export function DealsHubClient({
                       <div className="flex flex-wrap justify-end gap-1">
                         <Link
                           href={`/deals/${r.id}/workspace`}
-                          className="rounded-full bg-[var(--enver-accent)] px-2.5 py-1 text-[10px] font-semibold text-white shadow-sm hover:brightness-110"
+                          className="rounded-full border border-[var(--enver-accent)]/30 bg-[var(--enver-accent-soft)] px-2.5 py-1 text-[10px] font-semibold text-[var(--enver-accent-hover)] hover:bg-[var(--enver-hover)]"
                         >
                           Відкрити
                         </Link>
@@ -789,6 +874,17 @@ export function DealsHubClient({
                     </td>
                   </tr>
                 ))}
+                {displayRows.length > visibleTableRows ? (
+                  <tr>
+                    <td
+                      colSpan={showPipelineColumn ? 12 : 11}
+                      className="px-3 py-2 text-center text-[11px] text-[var(--enver-muted)]"
+                    >
+                      Показано {visibleTableRows} з {displayRows.length}. Прокрутіть
+                      нижче для підвантаження.
+                    </td>
+                  </tr>
+                ) : null}
               </tbody>
             </table>
           </div>
@@ -847,7 +943,7 @@ export function DealsHubClient({
                       });
                     }}
                     className={cn(
-                      "w-72 shrink-0 rounded-2xl border bg-gradient-to-b from-[var(--enver-surface)] to-[var(--enver-card)] p-2 shadow-[var(--enver-shadow)] transition-colors",
+                      "w-72 shrink-0 rounded-2xl border bg-[var(--enver-card)] p-2 transition-colors",
                       dragOverStageId === stageId
                         ? "border-[var(--enver-accent)] ring-2 ring-[var(--enver-accent-ring)]"
                         : "border-[var(--enver-border)]",
@@ -871,7 +967,31 @@ export function DealsHubClient({
                         {list.length}
                       </span>
                     </div>
-                    <ul className="min-h-[120px] space-y-2">
+                    <ul
+                      className="min-h-[120px] max-h-[62vh] space-y-2 overflow-y-auto pr-1"
+                      ref={(node) => {
+                        if (!node) return;
+                        restoreBoardScroll(stageId, node);
+                      }}
+                      onScroll={(event) => {
+                        const el = event.currentTarget;
+                        updateBoardScroll(stageId, el.scrollTop);
+                        const nearBottom =
+                          el.scrollTop + el.clientHeight >= el.scrollHeight - 180;
+                        if (!nearBottom) return;
+                        setVisibleBoardRows((prev) => {
+                          const current = prev[stageId] ?? INITIAL_BOARD_ROWS;
+                          if (current >= list.length) return prev;
+                          return {
+                            ...prev,
+                            [stageId]: Math.min(
+                              list.length,
+                              current + BOARD_ROWS_STEP,
+                            ),
+                          };
+                        });
+                      }}
+                    >
                       {list.length === 0 ? (
                         <li>
                           <KanbanEmptyColumn
@@ -880,7 +1000,9 @@ export function DealsHubClient({
                           />
                         </li>
                       ) : null}
-                      {list.map((r) => {
+                      {list
+                        .slice(0, visibleBoardRows[stageId] ?? INITIAL_BOARD_ROWS)
+                        .map((r) => {
                         const canDrag = r.status === "OPEN";
                         const busy = movingDealId === r.id;
                         return (
@@ -942,7 +1064,7 @@ export function DealsHubClient({
                                   {r.title}
                                 </p>
                                 {r.value != null ? (
-                                  <p className="mt-1 text-[10px] font-medium text-[var(--enver-success)]">
+                                  <p className="mt-1 text-[10px] font-medium text-[var(--enver-text-muted)]">
                                     {r.value.toLocaleString("uk-UA")}{" "}
                                     {r.currency ?? ""}
                                   </p>
@@ -959,6 +1081,12 @@ export function DealsHubClient({
                           </li>
                         );
                       })}
+                      {list.length > (visibleBoardRows[stageId] ?? INITIAL_BOARD_ROWS) ? (
+                        <li className="px-1 pb-1 text-center text-[10px] text-[var(--enver-muted)]">
+                          Показано {visibleBoardRows[stageId] ?? INITIAL_BOARD_ROWS} з{" "}
+                          {list.length}. Прокрутіть нижче для підвантаження.
+                        </li>
+                      ) : null}
                     </ul>
                   </div>
                 ),

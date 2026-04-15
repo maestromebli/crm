@@ -108,6 +108,27 @@ export default async function ContactsRoutePage({ params }: PageProps) {
     P.FILES_VIEW,
     permCtx,
   );
+  const canViewTasks = hasEffectivePermission(
+    access.permissionKeys,
+    P.TASKS_VIEW,
+    permCtx,
+  );
+  const canViewMessages = hasEffectivePermission(
+    access.permissionKeys,
+    P.NOTIFICATIONS_VIEW,
+    permCtx,
+  );
+  const allowedTabs = new Set<string>([
+    "overview",
+    "deals",
+    "activity",
+    ...(canViewMessages ? ["conversations"] : []),
+    ...(canViewFiles ? ["files"] : []),
+    ...(canViewTasks ? ["tasks"] : []),
+  ]);
+  if (tab && !allowedTabs.has(tab)) {
+    redirect(`/contacts/${contact.id}`);
+  }
 
   const [messages, tasks, attachments] = await Promise.all([
     getContactLeadMessages(contact.id, access.ctx),
@@ -123,6 +144,8 @@ export default async function ContactsRoutePage({ params }: PageProps) {
       tasks={tasks}
       attachments={attachments}
       canUpdateContact={canUpdateContact}
+      canViewMessages={canViewMessages}
+      canViewTasks={canViewTasks}
       canViewFiles={canViewFiles}
     />
   );

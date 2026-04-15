@@ -7,6 +7,7 @@ import type {
 } from "../../types/production";
 import { getDemoCommandCenterView } from "../demo/production-demo";
 import { normalizeMaterialsChecklist } from "../../workshop-materials";
+import { normalizeMiniHqTaskState } from "../../workshop-mini-hq";
 import { WORKSHOP_KANBAN_COLUMNS, WORKSHOP_STATION_LABEL_BY_KEY } from "../../workshop-stages";
 
 /** БД без застосованих міграцій виробництва (немає таблиць ProductionRisk тощо). */
@@ -186,6 +187,10 @@ async function loadCommandCenterFromDatabase(
       .map((task) => {
         const meta = (task.metadataJson ?? {}) as { materialsChecklist?: unknown };
         const materialsChecklist = normalizeMaterialsChecklist(meta.materialsChecklist);
+        const miniHq = normalizeMiniHqTaskState(
+          (task.metadataJson as Record<string, unknown> | null)?.miniHq,
+          task.status,
+        );
         const assignee = task.assigneeUser;
         const assigneeName = assignee
           ? (assignee.name?.trim() || assignee.email?.trim() || null)
@@ -195,10 +200,14 @@ async function loadCommandCenterFromDatabase(
           flowId: task.flowId,
           flowNumber: task.flow.number,
           title: task.title,
+          status: task.status,
           priority: task.flow.priority,
           dueDate: task.dueDate?.toISOString() ?? task.flow.dueDate?.toISOString() ?? null,
           assigneeUserId: task.assigneeUserId ?? null,
           assigneeName,
+          miniHqLifecycle: miniHq.lifecycle,
+          miniHqProgress: miniHq.progress,
+          miniHqGitLab: miniHq.gitlab,
           materialsChecklist,
         };
       });

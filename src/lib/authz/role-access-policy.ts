@@ -179,9 +179,10 @@ const adminExcludedSet = new Set(OPERATIONAL_ADMIN_EXCLUDED_KEYS);
 export type DefaultPermissionMode = "ALL" | PermissionKey[];
 
 export function getDefaultPermissionKeysForRole(role: Role): DefaultPermissionMode {
-  switch (role) {
+  switch (role as string) {
     case "SUPER_ADMIN":
     case "DIRECTOR":
+    case "DIRECTOR_PRODUCTION":
       return "ALL";
     case "HEAD_MANAGER":
     case "MANAGER":
@@ -224,11 +225,13 @@ export function getDefaultPermissionKeysForRole(role: Role): DefaultPermissionMo
 }
 
 /** Короткі описи для UI (налаштування користувачів, довідка). */
-export const ROLE_POLICY_SUMMARY_UK: Partial<Record<Role, string>> = {
+export const ROLE_POLICY_SUMMARY_UK: Record<string, string> = {
   SUPER_ADMIN:
     "Повний доступ до системи та всіх прав; обхід перевірок прав у сесії (окрім імпersonації).",
   DIRECTOR:
     "Усі права в БД як у адміністратора, звичайні перевірки JWT; зазвичай — керівник компанії.",
+  DIRECTOR_PRODUCTION:
+    "Керівник виробництва: повний доступ до модулів якості, планування, цеху та інтеграцій.",
   ADMIN:
     "Допомога команді: користувачі, налаштування, угоди, виробництво; без зміни ROLES_MANAGE.",
   HEAD_MANAGER:

@@ -6,7 +6,7 @@ const MAX_ITEMS = 300;
 
 export type UnlinkedInboundItem = {
   id: string;
-  channel: "telegram" | "whatsapp" | "viber";
+  channel: "telegram" | "whatsapp" | "viber" | "instagram";
   text: string;
   externalId: string;
   from: string;
@@ -21,7 +21,10 @@ function parseItems(raw: unknown): UnlinkedInboundItem[] {
     .map((x) => x as Record<string, unknown>)
     .map((x) => ({
       id: String(x.id ?? ""),
-      channel: (x.channel === "telegram" || x.channel === "whatsapp" || x.channel === "viber"
+      channel: (x.channel === "telegram" ||
+      x.channel === "whatsapp" ||
+      x.channel === "viber" ||
+      x.channel === "instagram"
         ? x.channel
         : "telegram") as UnlinkedInboundItem["channel"],
       text: String(x.text ?? ""),

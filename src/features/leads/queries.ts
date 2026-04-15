@@ -223,6 +223,27 @@ export type LeadDetailRow = LeadListRow & {
   leadContacts: LeadContactLinkRow[];
   /** Події календаря, привʼязані до ліда (getLeadById). */
   calendarEvents: LeadCalendarEventSummary[];
+  /** Зведення комунікацій по ліду (чат/нотатки/дзвінки). */
+  communication: {
+    messageCount: number;
+    lastMessageAt: Date | null;
+  };
+  sourceDesigner: {
+    userId: string | null;
+    name: string | null;
+    email: string | null;
+  } | null;
+  referral: {
+    type: "DESIGNER" | "CONSTRUCTION_COMPANY" | "PERSON";
+    name: string | null;
+    phone: string | null;
+    email: string | null;
+  } | null;
+  customerProfile: {
+    type: "COMPANY" | "PERSON";
+    name: string | null;
+    contactsCount: number | null;
+  } | null;
   /** Підтвердження умов до угоди (для конверсії / CRM Core). */
   projectAgreed?: boolean;
 };
@@ -320,10 +341,7 @@ export async function getLeadKpiCounts(
         where:
           mergeLeadWhere(
             {
-              OR: [
-                { stage: { slug: "lost" } },
-                { stage: { slug: "archived" } },
-              ],
+              stage: { slug: "lost" },
             },
             scope,
           ) ?? {},
@@ -359,6 +377,17 @@ export async function listLeadsByView(
   try {
     const orderBy = { updatedAt: "desc" as const };
     const scope = leadScopeWhere(ctx);
+    const scopeWithoutArchived = mergeLeadWhere(
+      { stage: { slug: { not: "archived" } } },
+      scope,
+    );
+    const scopeActive = mergeLeadWhere(
+      {
+        stage: { slug: { not: "archived" } },
+        NOT: [{ stage: { isFinal: true } }, { dealId: { not: null } }],
+      },
+      scope,
+    );
     const qBase = { include: leadInclude, orderBy };
     const slaCutoff = subMinutes(new Date(), leadFirstTouchSlaMinutes());
     const now = new Date();
@@ -368,7 +397,7 @@ export async function listLeadsByView(
         return {
           rows: (await prisma.lead.findMany({
             ...qBase,
-            ...(scope ? { where: scope } : {}),
+            ...(scopeActive ? { where: scopeActive } : {}),
           })) as LeadListRow[],
           error: null,
         };
@@ -437,7 +466,7 @@ export async function listLeadsByView(
       case "duplicates": {
         const all = (await prisma.lead.findMany({
           ...qBase,
-          ...(scope ? { where: scope } : {}),
+          ...(scopeActive ? { where: scopeActive } : {}),
         })) as LeadListRow[];
         const dupIds = duplicateLeadIdsByPhone(all);
         return {
@@ -463,7 +492,21 @@ export async function listLeadsByView(
         return {
           rows: (await prisma.lead.findMany({
             ...qBase,
-            where: mergeLeadWhere({ dealId: { not: null } }, scope),
+            where: mergeLeadWhere({ dealId: { not: null } }, scopeWithoutArchived),
+          })) as LeadListRow[],
+          error: null,
+        };
+      case "closed":
+        return {
+          rows: (await prisma.lead.findMany({
+            ...qBase,
+            where: mergeLeadWhere(
+              {
+                stage: { slug: { not: "archived" } },
+                OR: [{ stage: { isFinal: true } }, { dealId: { not: null } }],
+              },
+              scope,
+            ),
           })) as LeadListRow[],
           error: null,
         };
@@ -489,7 +532,7 @@ export async function listLeadsByView(
         return {
           rows: (await prisma.lead.findMany({
             ...qBase,
-            where: mergeLeadWhere({ ownerId: oid }, scope),
+            where: mergeLeadWhere({ ownerId: oid }, scopeActive),
           })) as LeadListRow[],
           error: null,
         };
@@ -508,10 +551,18 @@ export async function listLeadsByView(
             ...qBase,
             where: mergeLeadWhere(
               {
-                stage: { slug: { in: ["lost", "archived"] } },
+                stage: { slug: "lost" },
               },
               scope,
             ),
+          })) as LeadListRow[],
+          error: null,
+        };
+      case "archived":
+        return {
+          rows: (await prisma.lead.findMany({
+            ...qBase,
+            where: mergeLeadWhere({ stage: { slug: "archived" } }, scope),
           })) as LeadListRow[],
           error: null,
         };
@@ -521,7 +572,7 @@ export async function listLeadsByView(
         return {
           rows: (await prisma.lead.findMany({
             ...qBase,
-            ...(scope ? { where: scope } : {}),
+            ...(scopeActive ? { where: scopeActive } : {}),
           })) as LeadListRow[],
           error: null,
         };
@@ -529,7 +580,7 @@ export async function listLeadsByView(
         return {
           rows: (await prisma.lead.findMany({
             ...qBase,
-            ...(scope ? { where: scope } : {}),
+            ...(scopeActive ? { where: scopeActive } : {}),
           })) as LeadListRow[],
           error: null,
         };
@@ -721,6 +772,16 @@ export async function getLeadById(
       endAt: e.endAt.toISOString(),
     }));
 
+    const [messageCount, lastMessage] = await Promise.all([
+      prisma.leadMessage.count({ where: { leadId: id } }),
+      prisma.leadMessage.findFirst({
+        where: { leadId: id },
+        orderBy: [{ occurredAt: "desc" }, { createdAt: "desc" }],
+        select: { occurredAt: true, createdAt: true },
+      }),
+    ]);
+    const lastMessageAt = lastMessage?.occurredAt ?? lastMessage?.createdAt ?? null;
+
     let contactOut: LeadListRow["contact"] = row.contact;
     if (row.contact) {
       const lc = await fetchContactLifecycleById(prisma, row.contact.id);
@@ -738,6 +799,70 @@ export async function getLeadById(
         role: lc.role,
       }),
     );
+
+    const hubMetaRaw =
+      row.hubMeta && typeof row.hubMeta === "object" && !Array.isArray(row.hubMeta)
+        ? (row.hubMeta as Record<string, unknown>)
+        : null;
+    const sourceDesignerRaw =
+      hubMetaRaw?.sourceDesigner &&
+      typeof hubMetaRaw.sourceDesigner === "object" &&
+      !Array.isArray(hubMetaRaw.sourceDesigner)
+        ? (hubMetaRaw.sourceDesigner as Record<string, unknown>)
+        : null;
+    const sourceDesigner = sourceDesignerRaw
+      ? {
+          userId:
+            typeof sourceDesignerRaw.userId === "string"
+              ? sourceDesignerRaw.userId
+              : null,
+          name:
+            typeof sourceDesignerRaw.name === "string"
+              ? sourceDesignerRaw.name
+              : null,
+          email:
+            typeof sourceDesignerRaw.email === "string"
+              ? sourceDesignerRaw.email
+              : null,
+        }
+      : null;
+    const referralRaw =
+      hubMetaRaw?.referral &&
+      typeof hubMetaRaw.referral === "object" &&
+      !Array.isArray(hubMetaRaw.referral)
+        ? (hubMetaRaw.referral as Record<string, unknown>)
+        : null;
+    const referralTypeRaw =
+      typeof referralRaw?.type === "string" ? referralRaw.type : "PERSON";
+    const referral: LeadDetailRow["referral"] = referralRaw
+      ? {
+          type:
+            referralTypeRaw === "DESIGNER" ||
+            referralTypeRaw === "CONSTRUCTION_COMPANY" ||
+            referralTypeRaw === "PERSON"
+              ? referralTypeRaw
+              : "PERSON",
+          name: typeof referralRaw.name === "string" ? referralRaw.name : null,
+          phone: typeof referralRaw.phone === "string" ? referralRaw.phone : null,
+          email: typeof referralRaw.email === "string" ? referralRaw.email : null,
+        }
+      : null;
+    const customerRaw =
+      hubMetaRaw?.customer &&
+      typeof hubMetaRaw.customer === "object" &&
+      !Array.isArray(hubMetaRaw.customer)
+        ? (hubMetaRaw.customer as Record<string, unknown>)
+        : null;
+    const customerProfile: LeadDetailRow["customerProfile"] = customerRaw
+      ? {
+          type: customerRaw.type === "COMPANY" ? "COMPANY" : "PERSON",
+          name: typeof customerRaw.name === "string" ? customerRaw.name : null,
+          contactsCount:
+            typeof customerRaw.contactsCount === "number"
+              ? customerRaw.contactsCount
+              : null,
+        }
+      : null;
 
     return {
       id: row.id,
@@ -773,6 +898,13 @@ export async function getLeadById(
       proposals,
       leadContacts,
       calendarEvents,
+      communication: {
+        messageCount,
+        lastMessageAt,
+      },
+      sourceDesigner,
+      referral,
+      customerProfile,
       projectAgreed: row.projectAgreed,
     };
   } catch (e) {

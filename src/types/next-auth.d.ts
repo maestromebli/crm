@@ -8,6 +8,10 @@ declare module "next-auth" {
       id: string;
       role: Role;
       permissionKeys: string[];
+      /** UNIX-час (сек) моменту останнього входу. */
+      authenticatedAt?: number;
+      /** UNIX-час (сек) останньої зафіксованої активності. */
+      lastActivityAt?: number;
       /** Обмеження пунктів меню (null = усі підпункти дозволені). */
       menuAccess: MenuAccessState | null;
       /** Роль акаунта, під яким виконано вхід (не змінюється при імпersonації). */
@@ -27,6 +31,9 @@ declare module "next-auth/jwt" {
   interface JWT {
     role?: Role;
     permissionKeys?: string[];
+    authenticatedAt?: number;
+    lastActivityAt?: number;
+    sessionExpiredAt?: number;
     impersonateUserId?: string;
     effectiveRole?: Role;
     effectivePermissionKeys?: string[];

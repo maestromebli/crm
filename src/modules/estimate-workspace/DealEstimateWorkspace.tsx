@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import type { DealWorkspacePayload } from "../../features/deal-workspace/types";
 import { canSyncDealValueFromLatestEstimate } from "../../features/deal-workspace/deal-workspace-warnings";
 import { SyncDealValueFromEstimateButton } from "../../components/deal-workspace/SyncDealValueFromEstimateButton";
@@ -23,6 +24,7 @@ import type { EstimateVisibility } from "../../components/deal-workspace/tabs/Es
 import { MaterialSupplierPicker } from "../../features/estimate/components/MaterialSupplierPicker";
 import type { CatalogItemRecord } from "../../features/estimate/services/material-provider-types";
 import type { CompareEstimateVersionsResult } from "../../lib/estimates/compare-estimate-versions";
+import { CalculationImportModal } from "@/features/calculation-import/ui/CalculationImportModal";
 
 const bg = "bg-[#FAFAFA]";
 const card = "rounded-[12px] border border-[#E5E7EB] bg-white shadow-sm";
@@ -132,12 +134,14 @@ export function DealEstimateWorkspace({
   estimateVisibility,
   workspacePayload,
 }: DealEstimateWorkspaceProps) {
+  const reduceMotion = useReducedMotion();
   const router = useRouter();
   const ws = useDealEstimateWorkspace(dealId);
   const [compareOpen, setCompareOpen] = useState(false);
   const [compareOther, setCompareOther] = useState<string | null>(null);
   const [quoteOpen, setQuoteOpen] = useState(false);
   const [formulaLine, setFormulaLine] = useState<string | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
   const [quickOpen, setQuickOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [viewMode, setViewMode] = useState<EstimateViewMode>("base");
@@ -239,11 +243,17 @@ export function DealEstimateWorkspace({
     workspacePayload &&
     ws.list.length > 0 &&
     canSyncDealValueFromLatestEstimate(workspacePayload);
+  const saveStateClass =
+    ws.saveState === "saving"
+      ? "text-[#2563EB] animate-pulse"
+      : ws.saveState === "dirty"
+        ? "text-amber-700"
+        : muted;
 
   return (
     <div className={cn("flex min-h-[calc(100vh-180px)] flex-col", bg)}>
       {showDealValueSync ? (
-        <div className="mx-4 mt-2 shrink-0 rounded-xl border border-amber-200 bg-amber-50/95 px-3 py-2.5 shadow-sm">
+        <div className="enver-card-appear mx-4 mt-2 shrink-0 rounded-xl border border-amber-200 bg-amber-50/95 px-3 py-2.5 shadow-sm">
           <p className="text-[11px] leading-relaxed text-amber-950">
             <span className="font-semibold">Сума в шапці угоди</span> не збігається з
             останньою сметою (або не задана). Підставте для договору, КП та
@@ -257,7 +267,7 @@ export function DealEstimateWorkspace({
         </div>
       ) : null}
       {/* Sticky top bar */}
-      <header className="sticky top-0 z-30 border-b border-[#E5E7EB] bg-[#FAFAFA]/95 px-4 py-3 backdrop-blur">
+      <header className="enver-card-appear sticky top-0 z-30 border-b border-[#E5E7EB] bg-[#FAFAFA]/95 px-4 py-3 backdrop-blur">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
@@ -292,7 +302,7 @@ export function DealEstimateWorkspace({
                 </span>
               ) : null}
             </div>
-            <p className={cn("mt-1 text-[12px]", muted)}>
+            <p className={cn("mt-1 text-[12px] transition-colors", saveStateClass)}>
               {ws.saveState === "saving"
                 ? "Збереження…"
                 : ws.saveState === "dirty"
@@ -346,6 +356,13 @@ export function DealEstimateWorkspace({
             <button
               type="button"
               className={btnSecondary}
+              onClick={() => setImportOpen(true)}
+            >
+              Імпорт з Excel
+            </button>
+            <button
+              type="button"
+              className={btnSecondary}
               onClick={() => void ws.duplicateVersion()}
             >
               Дублювати
@@ -368,17 +385,29 @@ export function DealEstimateWorkspace({
         </div>
 
         <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-[12px] border border-[#E5E7EB] bg-white px-3 py-2">
+          <motion.div
+            className="rounded-[12px] border border-[#E5E7EB] bg-white px-3 py-2"
+            whileHover={reduceMotion ? undefined : { y: -2 }}
+            transition={{ type: "spring", stiffness: 320, damping: 26 }}
+          >
             <p className={cn("text-[11px] uppercase tracking-wide", muted)}>Продаж</p>
             <p className="text-[18px] font-semibold text-[#2563EB]">{formatMoney(ws.totals.grand)}</p>
             <p className={cn("text-[11px]", muted)}>рядки: {formatMoney(ws.totals.sumSale)}</p>
-          </div>
-          <div className="rounded-[12px] border border-[#E5E7EB] bg-white px-3 py-2">
+          </motion.div>
+          <motion.div
+            className="rounded-[12px] border border-[#E5E7EB] bg-white px-3 py-2"
+            whileHover={reduceMotion ? undefined : { y: -2 }}
+            transition={{ type: "spring", stiffness: 320, damping: 26 }}
+          >
             <p className={cn("text-[11px] uppercase tracking-wide", muted)}>Собівартість</p>
             <p className="text-[18px] font-semibold text-[#111111]">{formatMoney(ws.totals.sumCost)}</p>
             <p className={cn("text-[11px]", muted)}>доставка+монтаж: {formatMoney(ws.totals.delivery + ws.totals.install)}</p>
-          </div>
-          <div className="rounded-[12px] border border-[#E5E7EB] bg-white px-3 py-2">
+          </motion.div>
+          <motion.div
+            className="rounded-[12px] border border-[#E5E7EB] bg-white px-3 py-2"
+            whileHover={reduceMotion ? undefined : { y: -2 }}
+            transition={{ type: "spring", stiffness: 320, damping: 26 }}
+          >
             <p className={cn("text-[11px] uppercase tracking-wide", muted)}>Маржа</p>
             <p className={cn("text-[18px] font-semibold", ws.totals.margin < 0 ? "text-[#DC2626]" : "text-[#16A34A]")}>
               {formatMoney(ws.totals.margin)}
@@ -386,8 +415,12 @@ export function DealEstimateWorkspace({
             <p className={cn("text-[11px]", muted)}>
               {formatPct(ws.totals.grand > 0 ? (ws.totals.margin / ws.totals.grand) * 100 : null)}
             </p>
-          </div>
-          <div className="rounded-[12px] border border-[#E5E7EB] bg-white px-3 py-2">
+          </motion.div>
+          <motion.div
+            className="rounded-[12px] border border-[#E5E7EB] bg-white px-3 py-2"
+            whileHover={reduceMotion ? undefined : { y: -2 }}
+            transition={{ type: "spring", stiffness: 320, damping: 26 }}
+          >
             <p className={cn("text-[11px] uppercase tracking-wide", muted)}>Контроль</p>
             <p className="text-[13px] font-medium text-[#111111]">
               Оновлено: {formatDateTime(activeVersion?.updatedAt)}
@@ -395,35 +428,52 @@ export function DealEstimateWorkspace({
             <p className={cn("text-[11px]", muted)}>
               Менеджер: {managerName ?? "—"} · Знижка: {formatMoney(ws.totals.discount)}
             </p>
-          </div>
+          </motion.div>
         </div>
 
         <div className="mt-3 flex flex-wrap items-center gap-2 rounded-[12px] border border-[#E5E7EB] bg-white p-2">
           {(
             [
-              ["base", "Base"],
-              ["commercial", "Commercial"],
-              ["cost", "Cost"],
-              ["structure", "Structure"],
-              ["versions", "Versions"],
+              ["base", "Базовий"],
+              ["commercial", "Комерційний"],
+              ["cost", "Собівартість"],
+              ["structure", "Структура"],
+              ["versions", "Версії"],
             ] as const
           ).map(([id, label]) => (
-            <button
+            <motion.button
               key={id}
               type="button"
               className={cn(
-                "rounded-[10px] px-3 py-1.5 text-[12px] font-medium transition",
+                "relative rounded-[10px] px-3 py-1.5 text-[12px] font-medium transition",
                 viewMode === id
-                  ? "bg-[#2563EB] text-white shadow-sm"
+                  ? "text-white shadow-sm"
                   : "border border-[#E5E7EB] bg-white text-[#111111] hover:bg-[#F3F4F6]",
               )}
+              whileTap={reduceMotion ? undefined : { scale: 0.97 }}
               onClick={() => setViewMode(id)}
             >
-              {label}
-            </button>
+              {viewMode === id ? (
+                <motion.span
+                  layoutId="estimate-view-mode-pill"
+                  className="absolute inset-0 rounded-[10px] bg-[#2563EB]"
+                  transition={{ type: "spring", stiffness: 360, damping: 28 }}
+                />
+              ) : null}
+              <span className="relative z-10">{label}</span>
+            </motion.button>
           ))}
           <span className={cn("ml-auto text-[12px]", muted)}>
-            Режим: {viewMode === "base" ? "Звичний" : viewMode}
+            Режим:{" "}
+            {viewMode === "base"
+              ? "Базовий"
+              : viewMode === "commercial"
+                ? "Комерційний"
+                : viewMode === "cost"
+                  ? "Собівартість"
+                  : viewMode === "structure"
+                    ? "Структура"
+                    : "Версії"}
           </span>
         </div>
         <div className="mt-3 flex flex-wrap gap-2 border-t border-[#E5E7EB] pt-3">
@@ -491,19 +541,28 @@ export function DealEstimateWorkspace({
         </p>
       ) : null}
 
-      {viewMode === "versions" ? (
-        <div className="px-4 pt-3">
-          <EstimateVersionComparisonCard
-            dealId={dealId}
-            activeId={ws.activeId}
-            compareWithId={compareOther ?? ws.list.find((v) => v.id !== ws.activeId)?.id ?? null}
-          />
-        </div>
-      ) : null}
+      <AnimatePresence initial={false}>
+        {viewMode === "versions" ? (
+          <motion.div
+            key="versions-pane"
+            className="px-4 pt-3"
+            initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+            animate={reduceMotion ? undefined : { opacity: 1, y: 0 }}
+            exit={reduceMotion ? undefined : { opacity: 0, y: -6 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
+          >
+            <EstimateVersionComparisonCard
+              dealId={dealId}
+              activeId={ws.activeId}
+              compareWithId={compareOther ?? ws.list.find((v) => v.id !== ws.activeId)?.id ?? null}
+            />
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
 
       <div className="grid flex-1 grid-cols-1 gap-4 p-4 lg:grid-cols-[240px_minmax(0,1fr)_300px]">
         {/* Left: sections */}
-        <aside className={cn(card, "h-fit p-3 lg:sticky lg:top-[120px] lg:max-h-[calc(100vh-140px)] lg:overflow-auto")}>
+        <aside className={cn(card, "enver-hover-lift h-fit p-3 lg:sticky lg:top-[120px] lg:max-h-[calc(100vh-140px)] lg:overflow-auto")}>
           <p className={cn("text-[12px] font-medium uppercase tracking-wide", muted)}>
             Структура
           </p>
@@ -614,7 +673,7 @@ export function DealEstimateWorkspace({
               );
             }
             return (
-              <section key={sec.id} className={cn(card, "overflow-hidden")}>
+              <section key={sec.id} className={cn(card, "enver-hover-lift overflow-hidden")}>
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#E5E7EB] bg-[#FAFAFA] px-4 py-3">
                   <h3 className={cn("text-[18px] font-medium", text)}>
                     {sec.title}
@@ -677,7 +736,7 @@ export function DealEstimateWorkspace({
 
         {/* Right: summary */}
         <aside className="lg:sticky lg:top-[120px] lg:h-fit">
-          <div className={cn(card, "space-y-4 p-4")}>
+          <div className={cn(card, "enver-hover-lift space-y-4 p-4")}>
             <h3 className={cn("text-[18px] font-medium", text)}>Підсумок</h3>
             <dl className="space-y-2 text-[14px]">
               <div className="flex justify-between">
@@ -982,6 +1041,16 @@ export function DealEstimateWorkspace({
           });
         }}
       />
+      <CalculationImportModal
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        entity={{ type: "deal", id: dealId }}
+        onImported={(estimateId) => {
+          void ws.selectVersion(estimateId);
+          void ws.loadList();
+          router.refresh();
+        }}
+      />
     </div>
   );
 }
@@ -1014,17 +1083,12 @@ function LineRow({
     showCost && line.amountCost != null && line.amountSale > 0
       ? ((line.amountSale - line.amountCost) / line.amountSale) * 100
       : null;
-  const hasBreakdown = Boolean(
-    (line.metadataJson as Record<string, unknown> | undefined)?.breakdown,
-  );
   const badges: Array<{ label: string; tone?: "warn" | "ok" | "muted" }> = [];
-  if (m.pricingMode === "manual" || m.calculationMode === "manual") badges.push({ label: "Manual", tone: "muted" });
-  if ((line.costPrice ?? 0) <= 0) badges.push({ label: "No cost", tone: "warn" });
-  if (marginPct != null && marginPct < 12) badges.push({ label: "Low margin", tone: "warn" });
-  if (m.clientVisible === false) badges.push({ label: "Hidden from quote", tone: "muted" });
-  if (hasBreakdown) badges.push({ label: "Has breakdown", tone: "ok" });
-  if (m.supplier?.supplierName || m.supplier?.supplierCode) badges.push({ label: "Supplier linked", tone: "ok" });
-  if (warningText) badges.push({ label: "Warning", tone: "warn" });
+  if ((line.costPrice ?? 0) <= 0) badges.push({ label: "Без собівартості", tone: "warn" });
+  if (marginPct != null && marginPct < 12) badges.push({ label: "Низька маржа", tone: "warn" });
+  if (m.clientVisible === false) badges.push({ label: "Приховано у КП", tone: "muted" });
+  if (m.pricingMode === "manual" || m.calculationMode === "manual") badges.push({ label: "Ручний режим", tone: "muted" });
+  if (warningText) badges.push({ label: "Потрібна увага", tone: "warn" });
   if (m.rowTag?.trim()) badges.push({ label: m.rowTag.trim(), tone: "muted" });
 
   return (
@@ -1037,7 +1101,7 @@ function LineRow({
             onChange={(e) => onChange({ productName: e.target.value })}
           />
           <div className="mt-1 flex flex-wrap gap-1">
-            {badges.slice(0, 5).map((b) => (
+            {badges.slice(0, 3).map((b) => (
               <span
                 key={b.label}
                 className={cn(
@@ -1052,6 +1116,11 @@ function LineRow({
                 {b.label}
               </span>
             ))}
+            {badges.length > 3 ? (
+              <span className="rounded-full border border-slate-300 bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">
+                +{badges.length - 3}
+              </span>
+            ) : null}
           </div>
         </td>
         <td className="px-3 py-2 align-top">
@@ -1231,12 +1300,12 @@ function LineRow({
                 value={m.clientVisible === false ? "hidden" : "visible"}
                 onChange={(e) => onMeta({ clientVisible: e.target.value !== "hidden" })}
               >
-                <option value="visible">Visible in quote</option>
-                <option value="hidden">Hidden from quote</option>
+                <option value="visible">Видимо у КП</option>
+                <option value="hidden">Приховано у КП</option>
               </select>
             </label>
             <label className={muted}>
-              Production note
+              Нотатка для виробництва
               <input
                 className={cn(inputCls, "mt-0.5")}
                 value={m.productionNote ?? ""}
@@ -1244,7 +1313,7 @@ function LineRow({
               />
             </label>
             <label className={muted}>
-              Purchase note
+              Нотатка для закупівлі
               <input
                 className={cn(inputCls, "mt-0.5")}
                 value={m.purchaseNote ?? ""}
@@ -1293,8 +1362,8 @@ function buildEstimateInsights(
       id: "missing-cost",
       severity: "warning",
       title: "Є позиції без собівартості",
-      detail: `${missingCost.length} рядків без cost. Це спотворює маржу.`,
-      quickAction: "Review line",
+      detail: `${missingCost.length} рядків без собівартості. Це спотворює маржу.`,
+      quickAction: "Переглянути рядки",
     });
   }
 
@@ -1308,7 +1377,7 @@ function buildEstimateInsights(
       severity: "critical",
       title: "Низька маржа на позиціях",
       detail: `${lowMargin.length} рядків нижче порога 12%.`,
-      quickAction: "Open breakdown",
+      quickAction: "Відкрити деталізацію",
     });
   }
 
@@ -1325,8 +1394,8 @@ function buildEstimateInsights(
       id: "manual-overrides",
       severity: "info",
       title: "Ручні оверрайди ціни",
-      detail: `${manual.length} рядків із manual override.`,
-      quickAction: "Review line",
+      detail: `${manual.length} рядків із ручним перевизначенням.`,
+      quickAction: "Переглянути рядки",
     });
   }
 
@@ -1343,7 +1412,7 @@ function buildEstimateInsights(
       severity: "warning",
       title: "Можливі дублікати",
       detail: `Виявлено ${dupCount} груп схожих/дублікатних рядків.`,
-      quickAction: "Compare with previous version",
+      quickAction: "Порівняти з попередньою версією",
     });
   }
 
@@ -1354,9 +1423,9 @@ function buildEstimateInsights(
     out.push({
       id: "biggest-cost-driver",
       severity: "info",
-      title: "Найбільший cost driver",
+      title: "Найбільший драйвер собівартості",
       detail: `${biggestCost.productName}: ${formatMoney(biggestCost.amountCost ?? 0)}.`,
-      quickAction: "Open breakdown",
+      quickAction: "Відкрити деталізацію",
     });
   }
 
@@ -1366,7 +1435,7 @@ function buildEstimateInsights(
       severity: "warning",
       title: "Знижка без пояснення",
       detail: `Застосовано знижку ${formatMoney(discountAmount)} без явного ризик-коментаря.`,
-      quickAction: "Add internal note",
+      quickAction: "Додати внутрішню нотатку",
     });
   }
 
@@ -1377,7 +1446,7 @@ function EstimateInsightPanel({ insights }: { insights: EstimateInsight[] }) {
   if (insights.length === 0) return null;
   return (
     <div className={cn(card, "mt-4 space-y-3 p-4")}>
-      <h4 className={cn("text-[16px] font-semibold", text)}>Smart insights</h4>
+      <h4 className={cn("text-[16px] font-semibold", text)}>Розумні підказки</h4>
       <ul className="space-y-2">
         {insights.map((ins) => (
           <li
@@ -1393,7 +1462,7 @@ function EstimateInsightPanel({ insights }: { insights: EstimateInsight[] }) {
           >
             <p className="font-semibold text-[#111111]">{ins.title}</p>
             <p className="mt-0.5 text-[#4B5563]">{ins.detail}</p>
-            <p className="mt-1 text-[11px] text-[#1D4ED8]">Quick action: {ins.quickAction}</p>
+            <p className="mt-1 text-[11px] text-[#1D4ED8]">Швидка дія: {ins.quickAction}</p>
           </li>
         ))}
       </ul>
@@ -1441,7 +1510,7 @@ function EstimateVersionComparisonCard({
   if (!activeId || !compareWithId) {
     return (
       <div className={cn(card, "p-3 text-[12px]", muted)}>
-        Для Versions mode оберіть версію у полі «Порівняти з…».
+        Для режиму «Версії» оберіть версію у полі «Порівняти з…».
       </div>
     );
   }
@@ -1462,16 +1531,16 @@ function EstimateVersionComparisonCard({
   return (
     <div className={cn(card, "p-4")}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h4 className={cn("text-[16px] font-semibold", text)}>What changed</h4>
+        <h4 className={cn("text-[16px] font-semibold", text)}>Що змінилося</h4>
         <span className="rounded-full bg-[#EEF2FF] px-2 py-0.5 text-[11px] text-[#4338CA]">
           v{data.fromVersion.versionNumber} → v{data.toVersion.versionNumber}
         </span>
       </div>
       <div className="mt-3 grid gap-2 sm:grid-cols-4">
-        <StatMini label="Added" value={String(data.summary.added)} />
-        <StatMini label="Removed" value={String(data.summary.removed)} />
-        <StatMini label="Changed" value={String(data.summary.changed)} />
-        <StatMini label="Total delta" value={formatMoney(data.summary.totalDelta)} />
+        <StatMini label="Додано" value={String(data.summary.added)} />
+        <StatMini label="Видалено" value={String(data.summary.removed)} />
+        <StatMini label="Змінено" value={String(data.summary.changed)} />
+        <StatMini label="Загальна дельта" value={formatMoney(data.summary.totalDelta)} />
       </div>
       {topReasons.length > 0 ? (
         <div className="mt-3 rounded-[10px] border border-[#E5E7EB] bg-[#FAFAFA] p-3 text-[12px] text-[#374151]">

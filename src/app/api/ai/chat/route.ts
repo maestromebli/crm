@@ -3,6 +3,10 @@ import { z } from "zod";
 import { requireSessionUser } from "../../../../lib/authz/api-guard";
 import { hasEffectivePermission, P } from "../../../../lib/authz/permissions";
 import { buildAssistantAccessNarrative } from "../../../../lib/ai/assistant-context";
+import {
+  buildContinuousLearningBlock,
+  recordContinuousLearningEvent,
+} from "../../../../lib/ai/continuous-learning";
 import { AI_CHAT_TOOLS } from "../../../../lib/ai/tools/definitions";
 import { executeAiTool } from "../../../../lib/ai/tools/execute";
 import { requireDatabaseUrl } from "../../../../lib/api/route-guards";
@@ -153,11 +157,18 @@ export async function POST(request: Request) {
   }
 
   const accessNarrative = await buildAssistantAccessNarrative(user);
+  const memory = await buildContinuousLearningBlock({
+    userId: user.id,
+    take: 14,
+  });
+  const systemContent = memory
+    ? `${accessNarrative}\n\n${memory}`
+    : accessNarrative;
 
   const apiMessages: ChatMessage[] = [
     {
       role: "system",
-      content: accessNarrative,
+      content: systemContent,
     },
     ...parsed.data.messages.map((m) => ({
       role: m.role,
@@ -254,11 +265,33 @@ export async function POST(request: Request) {
         "Занадто багато кроків із інструментами. Спростіть запит або розбийте його на частини.";
     }
 
+    await recordContinuousLearningEvent({
+      userId: user.id,
+      action: "ai_chat_dialogue",
+      stage: "chat",
+      ok: true,
+      metadata: {
+        rounds,
+        toolsUsed: [...new Set(toolsUsed)],
+        usedLearningMemory: Boolean(memory),
+      },
+    });
+
     return NextResponse.json({
       text: lastAssistantText,
       toolsUsed: [...new Set(toolsUsed)],
     });
   } catch (error) {
+    await recordContinuousLearningEvent({
+      userId: user.id,
+      action: "ai_chat_dialogue",
+      stage: "chat",
+      ok: false,
+      metadata: {
+        error: (error as Error).message,
+        usedLearningMemory: Boolean(memory),
+      },
+    });
     return NextResponse.json(
       {
         error: "Помилка звернення до AI",

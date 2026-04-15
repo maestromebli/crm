@@ -189,6 +189,12 @@ export type DealWorkspacePayload = {
   stage: { id: string; name: string; slug: string; sortOrder: number };
   stages: Array<{ id: string; name: string; slug: string; sortOrder: number }>;
   leadId: string | null;
+  leadConversionSummary: {
+    filesMigrated: number;
+    contactsLinked: number;
+    estimatesMoved: number;
+    communicationMode: "full" | "recent";
+  } | null;
   /** Останні повідомлення ліда (історія до угоди). */
   leadMessagesPreview: Array<{
     id: string;

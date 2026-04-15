@@ -7,6 +7,10 @@ import {
   requireSessionUser,
 } from "../../../../../lib/authz/api-guard";
 import { P } from "../../../../../lib/authz/permissions";
+import {
+  buildContinuousLearningBlock,
+  recordContinuousLearningEvent,
+} from "../../../../../lib/ai/continuous-learning";
 import { prisma } from "../../../../../lib/prisma";
 
 type Ctx = { params: Promise<{ leadId: string }> };
@@ -91,13 +95,25 @@ async function postLeadAiInsight(req: Request, ctx: Ctx) {
   const viewDenied = await forbidUnlessLeadAccess(user, P.LEADS_VIEW, leadRow);
   if (viewDenied) return viewDenied;
 
-  const [msgCount, fileCount] = await Promise.all([
+  const [msgCount, fileCount, recentMessages] = await Promise.all([
     prisma.leadMessage.count({ where: { leadId } }),
     prisma.attachment.count({
       where: {
         entityType: "LEAD",
         entityId: leadId,
         deletedAt: null,
+      },
+    }),
+    prisma.leadMessage.findMany({
+      where: { leadId },
+      orderBy: [{ occurredAt: "desc" }, { createdAt: "desc" }],
+      take: 5,
+      select: {
+        body: true,
+        channel: true,
+        interactionKind: true,
+        occurredAt: true,
+        createdAt: true,
       },
     }),
   ]);
@@ -143,6 +159,16 @@ async function postLeadAiInsight(req: Request, ctx: Ctx) {
   contextLines.push(
     `Внутрішні повідомлення по ліду: ${msgCount}, файлів: ${fileCount}`,
   );
+  if (recentMessages.length > 0) {
+    const digest = recentMessages
+      .map((m) => {
+        const at = (m.occurredAt ?? m.createdAt).toISOString();
+        const body = m.body.replace(/\s+/g, " ").trim().slice(0, 220);
+        return `[${at}] ${m.channel}/${m.interactionKind}: ${body}`;
+      })
+      .join("\n");
+    contextLines.push(`Останні події комунікаційного центру:\n${digest}`);
+  }
 
   const stagesJson = JSON.stringify(
     stages.map((s) => ({
@@ -154,6 +180,15 @@ async function postLeadAiInsight(req: Request, ctx: Ctx) {
   );
 
   if (!apiKey) {
+    await recordContinuousLearningEvent({
+      userId: user.id,
+      action: "lead_ai_insight",
+      stage: "lead_stage_insight",
+      entityType: "LEAD",
+      entityId: leadId,
+      ok: false,
+      metadata: { reason: "missing_api_key" },
+    });
     return NextResponse.json({
       configured: false,
       summary:
@@ -196,6 +231,15 @@ ${stagesJson}
 - Якщо даних мало — recommendedStageId: null, stayOnCurrent: true, confidence: "low".
 - Не вигадуй id стадій — тільки зі списку.
 - Фінальні стадії (isFinal true) обирай лише якщо логічно закрити лід.`;
+  const memory = await buildContinuousLearningBlock({
+    userId: user.id,
+    entityType: "LEAD",
+    entityId: leadId,
+    take: 12,
+  });
+  const promptWithMemory = memory
+    ? `${memory}\n\n${userPrompt}`
+    : userPrompt;
 
   let parsed: {
     summary?: string;
@@ -221,7 +265,7 @@ ${stagesJson}
             content:
               "Ти повертаєш лише JSON без пояснень. Ключі англійською як у інструкції, текстові значення українською.",
           },
-          { role: "user", content: userPrompt },
+          { role: "user", content: promptWithMemory },
         ],
         temperature: 0.25,
         max_tokens: 900,
@@ -258,7 +302,7 @@ ${stagesJson}
     const content = data.choices?.[0]?.message?.content?.trim() ?? "";
     if (!content) {
       return NextResponse.json(
-        { error: "AI не повернув текст" },
+        { error: "ШІ не повернув текст" },
         { status: 502 },
       );
     }
@@ -367,6 +411,21 @@ ${stagesJson}
     revalidatePath(`/leads/${leadId}/activity`);
     appliedStage = true;
   }
+
+  await recordContinuousLearningEvent({
+    userId: user.id,
+    action: "lead_ai_insight",
+    stage: "lead_stage_insight",
+    entityType: "LEAD",
+    entityId: leadId,
+    ok: true,
+    metadata: {
+      recommendedStageId,
+      appliedStage,
+      confidence,
+      usedLearningMemory: Boolean(memory),
+    },
+  });
 
   return NextResponse.json({
     configured: true,

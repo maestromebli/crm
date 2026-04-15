@@ -58,8 +58,8 @@ export function LeadHubLeadsRail({ currentLeadId }: Props) {
   }, [load]);
 
   return (
-    <div className="flex h-full min-h-[calc(100vh-56px)] flex-col">
-      <div className="border-b border-[var(--enver-border)] p-3">
+    <div className="flex h-full min-h-[calc(100vh-56px)] flex-col bg-gradient-to-b from-[var(--enver-surface)] to-[var(--enver-bg)]">
+      <div className="border-b border-[var(--enver-border)]/80 p-3">
         <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--enver-muted)]">
           Ліди
         </p>
@@ -73,7 +73,7 @@ export function LeadHubLeadsRail({ currentLeadId }: Props) {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Пошук…"
-            className="w-full rounded-[12px] border border-[var(--enver-border)] bg-[var(--enver-card)] py-2 pl-8 pr-2 text-[14px] text-[var(--enver-text)] outline-none transition-[border-color,box-shadow] duration-200 placeholder:text-[var(--enver-muted)] focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB]/20"
+            className="w-full rounded-[12px] border border-[var(--enver-border)] bg-[var(--enver-card)]/90 py-2 pl-8 pr-2 text-[14px] text-[var(--enver-text)] outline-none transition-[border-color,box-shadow] duration-200 placeholder:text-[var(--enver-muted)] focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB]/20"
           />
         </div>
         <div className="mt-2 flex flex-wrap gap-1">
@@ -85,8 +85,8 @@ export function LeadHubLeadsRail({ currentLeadId }: Props) {
               className={cn(
                 "rounded-[12px] border px-2 py-1 text-[12px] font-medium transition duration-200 enver-press",
                 view === v.id
-                  ? "border-[#2563EB] bg-[var(--enver-card)] text-[var(--enver-accent)]"
-                  : "border-transparent bg-[var(--enver-card)] text-[var(--enver-muted)] hover:border-[var(--enver-border)]",
+                  ? "border-[#2563EB] bg-[var(--enver-card)] text-[var(--enver-accent)] shadow-sm"
+                  : "border-transparent bg-[var(--enver-card)] text-[var(--enver-muted)] hover:-translate-y-0.5 hover:border-[var(--enver-border)]",
               )}
             >
               {v.label}
@@ -114,7 +114,7 @@ export function LeadHubLeadsRail({ currentLeadId }: Props) {
                     className={cn(
                       "enver-card-appear block rounded-[12px] border px-2.5 py-2 transition duration-200 enver-hover-lift",
                       active
-                        ? "border-[#2563EB] bg-[var(--enver-card)] shadow-[var(--enver-shadow)]"
+                        ? "border-[#2563EB] bg-[var(--enver-card)] shadow-[0_10px_18px_rgba(37,99,235,0.2)]"
                         : "border-[var(--enver-border)] bg-[var(--enver-card)] hover:border-[var(--enver-border-strong)]",
                     )}
                     style={{ animationDelay: `${Math.min(idx, 12) * 24}ms` }}

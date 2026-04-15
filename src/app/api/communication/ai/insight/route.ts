@@ -11,7 +11,10 @@ import { prisma } from "../../../../../lib/prisma";
 import { buildCommunicationHub } from "../../../../../features/communication/services/hub-query";
 import { generateConversationInsight } from "../../../../../features/communication/ai/conversation-insight";
 import { persistConversationInsight } from "../../../../../features/communication/services/persist-insight";
-import { logAiEvent } from "../../../../../lib/ai/log-ai-event";
+import {
+  buildContinuousLearningBlock,
+  recordContinuousLearningEvent,
+} from "../../../../../lib/ai/continuous-learning";
 
 export const runtime = "nodejs";
 
@@ -109,7 +112,17 @@ export async function POST(request: Request) {
     );
   }
 
-  const gen = await generateConversationInsight({ transcript });
+  const memory = await buildContinuousLearningBlock({
+    userId: user.id,
+    entityType: hub.entity,
+    entityId: hub.entityId,
+    take: 10,
+  });
+
+  const transcriptForAi = memory
+    ? `${memory}\n\nConversation transcript:\n${transcript}`
+    : transcript;
+  const gen = await generateConversationInsight({ transcript: transcriptForAi });
   if (gen.ok === false) {
     return NextResponse.json({ error: gen.error }, { status: 503 });
   }
@@ -129,14 +142,18 @@ export async function POST(request: Request) {
     data: gen.data,
   });
 
-  await logAiEvent({
+  await recordContinuousLearningEvent({
     userId: user.id,
     action: "comm_conversation_insight",
+    stage: "communication_insight",
     entityType: hub.entity,
     entityId: hub.entityId,
-    model: process.env.AI_MODEL ?? null,
     ok: true,
-    metadata: { threadId: tid },
+    metadata: {
+      threadId: tid,
+      model: process.env.AI_MODEL ?? null,
+      usedLearningMemory: Boolean(memory),
+    },
   });
 
   return NextResponse.json({ ok: true, insight: gen.data });

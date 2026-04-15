@@ -9,7 +9,7 @@ type Ctx = { params: Promise<{ token: string }> };
 export async function POST(req: Request, ctx: Ctx) {
   const { token } = await ctx.params;
   const payload = verifyClientPortalToken(token);
-  if (!payload) return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+  if (!payload) return NextResponse.json({ error: "Некоректний токен" }, { status: 401 });
 
   let body: unknown;
   try {
@@ -25,14 +25,14 @@ export async function POST(req: Request, ctx: Ctx) {
 
   const action = typeof o.action === "string" ? o.action : "";
   if (!["approve_quote", "approve_changes"].includes(action)) {
-    return NextResponse.json({ error: "Unknown approval action" }, { status: 400 });
+    return NextResponse.json({ error: "Невідома дія погодження" }, { status: 400 });
   }
 
   const deal = await prisma.deal.findUnique({
     where: { id: payload.dealId },
     select: { id: true, workspaceMeta: true },
   });
-  if (!deal) return NextResponse.json({ error: "Deal not found" }, { status: 404 });
+  if (!deal) return NextResponse.json({ error: "Угоду не знайдено" }, { status: 404 });
 
   const meta =
     deal.workspaceMeta && typeof deal.workspaceMeta === "object" && !Array.isArray(deal.workspaceMeta)

@@ -16,6 +16,8 @@ import {
   applyVisualizationUrlsToQuoteSnapshot,
   buildProposalSnapshotV3FromEstimate,
 } from "../../../../../lib/leads/proposal-snapshot";
+import { syncLeadStageFromProposalStatus } from "../../../../../lib/leads/proposal-status-stage-sync";
+import { estimateLinesToQuoteItems } from "../../../../../lib/quotes/estimate-to-quote-items";
 
 type Ctx = { params: Promise<{ leadId: string }> };
 
@@ -71,6 +73,11 @@ export async function POST(req: Request, ctx: Ctx) {
     summary?: string | null;
     visualizationUrl?: string | null;
     visualizationUrls?: unknown;
+    quoteGroupingMode?: unknown;
+    quoteMaterialBuckets?: unknown;
+    sourceEstimateLines?: unknown;
+    sourceEstimateName?: unknown;
+    sourceEstimateTemplateKey?: unknown;
   };
   try {
     body = (await req.json()) as typeof body;
@@ -154,6 +161,92 @@ export async function POST(req: Request, ctx: Ctx) {
     );
   }
 
+  const sourceEstimateLinesRaw = Array.isArray(body.sourceEstimateLines)
+    ? body.sourceEstimateLines
+    : [];
+  const sourceEstimateLines = sourceEstimateLinesRaw
+    .map((raw) => {
+      if (!raw || typeof raw !== "object") return null;
+      const row = raw as Record<string, unknown>;
+      const id = typeof row.id === "string" ? row.id : "";
+      const type = typeof row.type === "string" ? row.type : "PRODUCT";
+      const category =
+        typeof row.category === "string" ? row.category : null;
+      const productName =
+        typeof row.productName === "string" ? row.productName.trim() : "";
+      const qty =
+        typeof row.qty === "number" && Number.isFinite(row.qty) ? row.qty : 0;
+      const unit = typeof row.unit === "string" && row.unit.trim() ? row.unit : "шт";
+      const salePrice =
+        typeof row.salePrice === "number" && Number.isFinite(row.salePrice)
+          ? row.salePrice
+          : 0;
+      const amountSale =
+        typeof row.amountSale === "number" && Number.isFinite(row.amountSale)
+          ? row.amountSale
+          : qty * salePrice;
+      if (!productName) return null;
+      return {
+        id: id || `tmp_${Math.random().toString(36).slice(2, 10)}`,
+        type,
+        category,
+        productName,
+        qty,
+        unit,
+        salePrice,
+        amountSale,
+        metadataJson: row.metadataJson ?? undefined,
+      };
+    })
+    .filter((x): x is NonNullable<typeof x> => Boolean(x));
+  const effectiveLineItems =
+    sourceEstimateLines.length > 0
+      ? sourceEstimateLines
+      : estimateFull.lineItems.map((li) => ({
+          id: li.id,
+          type: li.type,
+          category: li.category,
+          productName: li.productName,
+          qty: li.qty,
+          unit: li.unit,
+          salePrice: li.salePrice,
+          amountSale: li.amountSale,
+          metadataJson: li.metadataJson ?? undefined,
+        }));
+
+  const groupingMode =
+    body.quoteGroupingMode === "furniture_type" ? "furniture_type" : "group";
+  const allowedBuckets = new Set([
+    "dsp",
+    "facades",
+    "hardware",
+    "countertop",
+    "services",
+    "other",
+  ]);
+  const materialBuckets = Array.isArray(body.quoteMaterialBuckets)
+    ? body.quoteMaterialBuckets.filter(
+        (x): x is "dsp" | "facades" | "hardware" | "countertop" | "services" | "other" =>
+          typeof x === "string" && allowedBuckets.has(x),
+      )
+    : [];
+  const quoteItems = estimateLinesToQuoteItems(
+    effectiveLineItems,
+    {
+      estimateName:
+        typeof body.sourceEstimateName === "string" && body.sourceEstimateName.trim()
+          ? body.sourceEstimateName.trim()
+          : estimateFull.name,
+      estimateTemplateKey:
+        typeof body.sourceEstimateTemplateKey === "string" &&
+        body.sourceEstimateTemplateKey.trim()
+          ? body.sourceEstimateTemplateKey.trim()
+          : estimateFull.templateKey,
+      groupingMode,
+      materialBuckets: materialBuckets.length ? materialBuckets : undefined,
+    },
+  );
+
   let snapshotJson = buildProposalSnapshotV3FromEstimate({
     id: estimateFull.id,
     version: estimateFull.version,
@@ -164,18 +257,8 @@ export async function POST(req: Request, ctx: Ctx) {
     deliveryCost: estimateFull.deliveryCost,
     installationCost: estimateFull.installationCost,
     notes: estimateFull.notes,
-    lineItems: estimateFull.lineItems.map((li) => ({
-      id: li.id,
-      type: li.type,
-      category: li.category,
-      productName: li.productName,
-      qty: li.qty,
-      unit: li.unit,
-      salePrice: li.salePrice,
-      amountSale: li.amountSale,
-      metadataJson: li.metadataJson ?? undefined,
-    })),
-  });
+    lineItems: effectiveLineItems,
+  }, { quoteItems });
 
   if (mergedVisualizationUrls.some((u) => u.length > 0)) {
     snapshotJson = applyVisualizationUrlsToQuoteSnapshot(
@@ -266,9 +349,15 @@ export async function POST(req: Request, ctx: Ctx) {
       }
     }
 
+    await syncLeadStageFromProposalStatus(prisma, {
+      leadId,
+      status: created.status,
+    });
+
     revalidatePath(`/leads/${leadId}`);
     revalidatePath(`/leads/${leadId}/pricing`);
     revalidatePath(`/leads/${leadId}/estimate/${estimateId}`);
+    revalidatePath("/leads");
 
     return NextResponse.json({
       ok: true,

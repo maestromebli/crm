@@ -110,8 +110,8 @@ export function CalendarWeekView({
   const now = new Date();
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-[var(--enver-border)] bg-[var(--enver-card)] shadow-[0_2px_12px_rgba(15,23,42,0.06)]">
-      <div className="grid grid-cols-[48px_repeat(7,minmax(0,1fr))] border-b border-[var(--enver-border)] bg-gradient-to-b from-slate-50/90 to-[var(--enver-card)] text-[11px]">
+    <div className="overflow-hidden rounded-2xl border border-[var(--enver-border)] bg-[var(--enver-card)]">
+      <div className="grid grid-cols-[48px_repeat(7,minmax(0,1fr))] border-b border-[var(--enver-border)] bg-[var(--enver-surface)] text-[11px]">
         <div className="p-2" aria-hidden />
         {byDay.map(({ day }) => (
           <div
@@ -125,7 +125,7 @@ export function CalendarWeekView({
               className={cn(
                 "flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold",
                 isSameDay(day, new Date())
-                  ? "bg-slate-900 text-white shadow-md shadow-slate-900/25"
+                  ? "bg-[var(--enver-accent)] text-white"
                   : "text-[var(--enver-text)]",
               )}
             >
@@ -185,7 +185,7 @@ export function CalendarWeekView({
               <div
                 key={key}
                 className={cn(
-                  "relative border-l border-[var(--enver-border)]/70 bg-[var(--enver-bg)]/30",
+                  "relative border-l border-[var(--enver-border)]/70 bg-[var(--enver-bg)]/22",
                   dragOverKey === key &&
                     onEventReschedule &&
                     "bg-[var(--enver-accent-soft)]/50 ring-inset ring-2 ring-[var(--enver-accent)]/30",
@@ -219,7 +219,7 @@ export function CalendarWeekView({
                 {Array.from({ length: CALENDAR_DAY_HOUR_COUNT }, (_, i) => (
                   <div
                     key={i}
-                    className="pointer-events-none border-b border-dashed border-slate-200/90"
+                    className="pointer-events-none border-b border-dashed border-[var(--enver-border)]/70"
                     style={{ height: CALENDAR_HOUR_PX }}
                   />
                 ))}

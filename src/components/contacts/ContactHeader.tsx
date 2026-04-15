@@ -2,6 +2,7 @@ import type { ContactLifecycle } from "@prisma/client";
 import { Building2, Mail, MapPin, Phone } from "lucide-react";
 
 import type { ContactDetailRow } from "../../features/contacts/queries";
+import { CONTACT_CATEGORY_LABEL } from "../../lib/contacts/contact-categories";
 
 function lifecycleLabel(lifecycle: ContactLifecycle): string {
   return lifecycle === "CUSTOMER" ? "Клієнт" : "Контакт (лід)";
@@ -39,6 +40,9 @@ export function ContactHeader({ contact }: ContactHeaderProps) {
             <h1 className="text-xl font-semibold tracking-tight text-[var(--enver-text)] md:text-2xl">
               {contact.fullName}
             </h1>
+            <span className="inline-flex rounded-full bg-indigo-50 px-2.5 py-0.5 text-[11px] font-semibold text-indigo-800 ring-1 ring-indigo-200/70">
+              {CONTACT_CATEGORY_LABEL[contact.category]}
+            </span>
             <span
               className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 ${lifecycleClass(
                 contact.lifecycle,

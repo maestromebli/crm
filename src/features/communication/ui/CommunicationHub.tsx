@@ -88,7 +88,7 @@ export function CommunicationHub({
     });
   }, [hub]);
 
-  const threads = hub?.threads ?? [];
+  const threads = useMemo(() => hub?.threads ?? [], [hub?.threads]);
   const filteredThreads = useMemo(() => {
     if (filter === "ALL") return threads;
     return threads.filter((t) => t.channelType === filter);

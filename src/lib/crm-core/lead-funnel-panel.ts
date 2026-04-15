@@ -15,12 +15,43 @@ export type LeadFunnelPanelRow = {
 const PANEL_ORDER: LeadStageKey[] = LEAD_FUNNEL_LINEAR.filter(
   (k) => k !== "PRODUCTION_READY",
 ) as LeadStageKey[];
+const STAGES_BEFORE_APPROVED: ReadonlySet<LeadStageKey> = new Set([
+  "CALCULATION",
+  "QUOTE_DRAFT",
+  "QUOTE_SENT",
+]);
+
+function normalizeStageForPanel(stage: LeadStageKey): LeadStageKey {
+  if (stage === "PRODUCTION_READY") return "DEAL";
+  if (
+    stage === "CLIENT" ||
+    stage === "CONTROL_MEASUREMENT" ||
+    stage === "CONTRACT"
+  ) {
+    return "APPROVED";
+  }
+  return stage;
+}
+
+function hasApprovedProposal(core: LeadCoreInput): boolean {
+  if (core.projectAgreed) return true;
+  return core.commercial.proposals.some((p) => {
+    const status = p.status.toLowerCase();
+    return Boolean(p.approvedAt) || status.includes("approv") || status.includes("погод");
+  });
+}
+
+function resolveCurrentPanelStage(core: LeadCoreInput): LeadStageKey {
+  const normalized = normalizeStageForPanel(core.stageKey);
+  if (!STAGES_BEFORE_APPROVED.has(normalized)) return normalized;
+  return hasApprovedProposal(core) ? "APPROVED" : normalized;
+}
 
 /**
  * Рядки для візуальної панелі етапів (зв’язок із Flow Engine / канонічними ключами).
  */
 export function buildLeadFunnelPanelRows(core: LeadCoreInput): LeadFunnelPanelRow[] {
-  const cur = core.stageKey;
+  const cur = resolveCurrentPanelStage(core);
   if (isTerminalStageKey(cur)) {
     return [
       {

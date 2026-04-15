@@ -146,7 +146,8 @@ export function GenerateQuoteModal({
     if (!open) return;
     const init: Record<string, boolean> = {};
     for (const s of sections) init[s.id] = true;
-    setSelected(init);
+    const timer = window.setTimeout(() => setSelected(init), 0);
+    return () => window.clearTimeout(timer);
   }, [open, sections]);
 
   return (
@@ -254,8 +255,11 @@ export function FormulaEditorModal({
 
   useEffect(() => {
     if (open) {
-      setMode(initialMode);
-      setLabel("");
+      const timer = window.setTimeout(() => {
+        setMode(initialMode);
+        setLabel("");
+      }, 0);
+      return () => window.clearTimeout(timer);
     }
   }, [open, initialMode]);
 

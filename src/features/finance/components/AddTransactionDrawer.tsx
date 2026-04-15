@@ -35,12 +35,12 @@ export function AddTransactionDrawer({ onCreate }: Props) {
                   value={type}
                   onChange={(e) => setType(e.target.value as FinanceTransactionType)}
                 >
-                  <option value="INCOME">INCOME</option>
-                  <option value="EXPENSE">EXPENSE</option>
-                  <option value="PAYROLL">PAYROLL</option>
-                  <option value="COMMISSION">COMMISSION</option>
-                  <option value="TRANSFER">TRANSFER</option>
-                  <option value="REFUND">REFUND</option>
+                  <option value="INCOME">Надходження</option>
+                  <option value="EXPENSE">Витрата</option>
+                  <option value="PAYROLL">Зарплата</option>
+                  <option value="COMMISSION">Комісія</option>
+                  <option value="TRANSFER">Переказ</option>
+                  <option value="REFUND">Повернення</option>
                 </select>
               </label>
               <label className="text-xs">
@@ -53,12 +53,12 @@ export function AddTransactionDrawer({ onCreate }: Props) {
               </label>
               {type === "PAYROLL" ? (
                 <p className="rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
-                  Payroll-режим: заповніть роль працівника та тип розрахунку.
+                  Режим зарплати: заповніть роль працівника та тип розрахунку.
                 </p>
               ) : null}
               {type === "COMMISSION" ? (
                 <p className="rounded border border-sky-200 bg-sky-50 p-2 text-xs text-sky-800">
-                  Commission-режим: вкажіть отримувача і базу розрахунку.
+                  Режим комісії: вкажіть отримувача і базу розрахунку.
                 </p>
               ) : null}
               <Button

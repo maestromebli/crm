@@ -272,7 +272,6 @@ export function LineBreakdownEditor({
                           "rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600",
                           disabled && "pointer-events-none opacity-40",
                         )}
-                        title="Видалити підпозицію"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>

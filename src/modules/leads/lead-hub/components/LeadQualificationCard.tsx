@@ -18,7 +18,8 @@ export function LeadQualificationCard({ lead, canUpdateLead }: Props) {
   const saving = leadActions.isPending;
 
   useEffect(() => {
-    setQ(lead.qualification);
+    const timer = window.setTimeout(() => setQ(lead.qualification), 0);
+    return () => window.clearTimeout(timer);
   }, [lead.qualification, lead.updatedAt]);
 
   const savePatch = useCallback(

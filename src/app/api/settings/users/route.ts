@@ -7,7 +7,11 @@ import {
   forbidUnlessPermission,
   requireSessionUser,
 } from "../../../../lib/authz/api-guard";
-import { hasEffectivePermission, P } from "../../../../lib/authz/permissions";
+import {
+  canAssignSuperAdminRole,
+  hasEffectivePermission,
+  P,
+} from "../../../../lib/authz/permissions";
 import { generateSecurePassword } from "../../../../lib/auth/generate-password";
 import { assignDefaultPermissionsForNewUser } from "../../../../lib/users/assign-default-permissions";
 import { settingsUsersListWhere } from "../../../../lib/authz/data-scope";
@@ -46,7 +50,9 @@ export async function GET() {
     realRole: user.realRole,
     impersonatorId: user.impersonatorId,
   });
-  const canAssignSuperAdmin = user.realRole === "SUPER_ADMIN";
+  const canAssignSuperAdmin = canAssignSuperAdminRole({
+    realRole: user.realRole,
+  });
 
   return NextResponse.json({
     users: rows,
@@ -76,7 +82,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Некоректні дані" }, { status: 400 });
   }
 
-  if (body.role === "SUPER_ADMIN" && user.realRole !== "SUPER_ADMIN") {
+  if (
+    body.role === "SUPER_ADMIN" &&
+    !canAssignSuperAdminRole({ realRole: user.realRole })
+  ) {
     return NextResponse.json(
       { error: "Лише SUPER_ADMIN може створювати SUPER_ADMIN" },
       { status: 403 },

@@ -9,6 +9,10 @@ import {
 } from "../../../../features/dashboard/queries";
 import { loadCrmDashboardAnalytics } from "../../../../features/crm-dashboard/analytics";
 import { buildServerDashboardAiContext } from "../../../../lib/ai/dashboard-ai-context";
+import {
+  buildContinuousLearningBlock,
+  recordContinuousLearningEvent,
+} from "../../../../lib/ai/continuous-learning";
 
 export const runtime = "nodejs";
 
@@ -61,9 +65,16 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
+    const memory = await buildContinuousLearningBlock({
+      userId: user.id,
+      take: 12,
+    });
+    const contextual = memory ? `${memory}\n\n${trimmed}` : trimmed;
     return runOpenAi(
       `Тип: executive_dashboard (оновлення текстового підсумку для UI).\nКонтекст:\n${trimmed}`,
       type,
+      user.id,
+      contextual,
     );
   }
 
@@ -94,7 +105,14 @@ export async function POST(request: Request) {
       snapshot,
       analytics,
     });
-    return runOpenAi(serverContext, type);
+    const memory = await buildContinuousLearningBlock({
+      userId: user.id,
+      entityType: "DASHBOARD",
+      entityId: user.id,
+      take: 12,
+    });
+    const contextual = memory ? `${memory}\n\n${serverContext}` : serverContext;
+    return runOpenAi(serverContext, type, user.id, contextual);
   }
 
   const canLegacy =
@@ -113,13 +131,27 @@ export async function POST(request: Request) {
     );
   }
 
+  const memory = await buildContinuousLearningBlock({
+    userId: user.id,
+    take: 12,
+  });
+  const contextual = memory
+    ? `${memory}\n\n${trimmed}`
+    : trimmed;
   return runOpenAi(
     `Тип: ${type}.\nКонтекст (перевірте на відповідність політиці безпеки):\n${trimmed}`,
     type,
+    user.id,
+    contextual,
   );
 }
 
-async function runOpenAi(contextBlock: string, type: string) {
+async function runOpenAi(
+  contextBlock: string,
+  type: string,
+  userId: string,
+  learningContext?: string,
+) {
   const apiKey = process.env.AI_API_KEY;
   const baseUrl = process.env.AI_BASE_URL ?? "https://api.openai.com/v1";
   const model = process.env.AI_MODEL ?? "gpt-4.1-mini";
@@ -140,13 +172,13 @@ async function runOpenAi(contextBlock: string, type: string) {
 Rewrite and tighten the executive summary for the director UI in Ukrainian.
 Return 3–5 short sentences as one block, no greeting, no markdown.
 Context:
-${contextBlock}`
+${learningContext ?? contextBlock}`
       : `You are an AI assistant for ENVER CRM (custom furniture CRM for Ukrainian market).
 Generate a short Ukrainian summary (max 3 sentences) for UI display.
 Context type: ${type}.
 
 Context:
-${contextBlock}`;
+${learningContext ?? contextBlock}`;
 
   try {
     const response = await fetch(`${baseUrl}/chat/completions`, {
@@ -189,8 +221,31 @@ ${contextBlock}`;
       data.choices?.[0]?.message?.content ??
       "AI не надіслав контент. Перевірте модель та ключ.";
 
+    await recordContinuousLearningEvent({
+      userId,
+      action: "ai_summary",
+      stage: "summary",
+      entityType: "DASHBOARD",
+      entityId: userId,
+      ok: true,
+      metadata: { type, usedLearningMemory: Boolean(learningContext) },
+    });
+
     return NextResponse.json({ text: content });
   } catch (error) {
+    await recordContinuousLearningEvent({
+      userId,
+      action: "ai_summary",
+      stage: "summary",
+      entityType: "DASHBOARD",
+      entityId: userId,
+      ok: false,
+      metadata: {
+        type,
+        error: (error as Error).message,
+        usedLearningMemory: Boolean(learningContext),
+      },
+    });
     return NextResponse.json(
       {
         error: "Помилка звернення до AI",

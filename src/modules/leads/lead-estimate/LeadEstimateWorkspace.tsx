@@ -16,13 +16,18 @@ import {
   type EstimateCategoryKey,
   parseCategoryKey,
 } from "../../../lib/estimates/estimate-categories";
+import {
+  getFurnitureTemplateDraftLines,
+  isFurnitureTemplateKey,
+} from "../../../lib/estimates/furniture-estimate-templates";
 import { buildEstimateLinePayload } from "../../../lib/estimates/build-estimate-line-payload";
 import { estimateVersionPreviewStorageKey } from "../../../lib/estimates/estimate-version-preview-storage";
 import type { CompareEstimateVersionsResult } from "../../../lib/estimates/compare-estimate-versions";
 import { patchLeadEstimateById } from "../../../features/leads/lead-estimate-api";
-import { postJson } from "../../../lib/api/patch-json";
+import { postFormData, postJson } from "../../../lib/api/patch-json";
 import { cn } from "../../../lib/utils";
 import { CreateProposalModal } from "./CreateProposalModal";
+import { CalculationImportModal } from "@/features/calculation-import/ui/CalculationImportModal";
 
 type LineMeta = {
   supplierProvider?: string | null;
@@ -180,6 +185,25 @@ type EstimateWorkspaceJson = {
   }>;
 };
 
+type AnalyzeEstimateApiResponse = {
+  aiSummary?: string | null;
+  confidence?: string | null;
+  isProjectDocument?: boolean;
+  templateKey?: string | null;
+  extractMode?: string | null;
+  draft?: {
+    lines?: Array<{
+      categoryKey?: EstimateCategoryKey;
+      productName?: string;
+      qty?: number;
+      unit?: string;
+      salePrice?: number;
+    }>;
+    assumptions?: string[];
+    missing?: string[];
+  };
+};
+
 export function LeadEstimateWorkspace({
   leadId,
   estimateId,
@@ -210,6 +234,25 @@ export function LeadEstimateWorkspace({
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
   const [aiPreview, setAiPreview] = useState<LineDraft[] | null>(null);
+  const [excelImportOpen, setExcelImportOpen] = useState(false);
+  const [imageIntelOpen, setImageIntelOpen] = useState(false);
+  const [imageUploadBusy, setImageUploadBusy] = useState(false);
+  const [imageAnalyzeBusy, setImageAnalyzeBusy] = useState(false);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  const [imageAttachmentId, setImageAttachmentId] = useState<string | null>(null);
+  const [imageAttachmentName, setImageAttachmentName] = useState<string | null>(
+    null,
+  );
+  const [imageExtractMode, setImageExtractMode] = useState<string | null>(null);
+  const [imageAnalyzeErr, setImageAnalyzeErr] = useState<string | null>(null);
+  const [imageAnalyzeResult, setImageAnalyzeResult] = useState<{
+    lines: LineDraft[];
+    assumptions: string[];
+    summary: string | null;
+    templateKey: string | null;
+    confidence: string | null;
+    isProjectDocument: boolean;
+  } | null>(null);
 
   const [matQ, setMatQ] = useState("");
   const [matHits, setMatHits] = useState<
@@ -235,6 +278,7 @@ export function LeadEstimateWorkspace({
   const [proposalOpen, setProposalOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement | null>(null);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const matSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -314,6 +358,12 @@ export function LeadEstimateWorkspace({
     setCompareToId(null);
     setCompareResult(null);
   }, [estimateId]);
+
+  useEffect(() => {
+    return () => {
+      if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
+    };
+  }, [imagePreviewUrl]);
 
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
@@ -543,6 +593,145 @@ export function LeadEstimateWorkspace({
       versioning: "fork",
       forceNewVersion: true,
     });
+  };
+
+  const uploadImageForEstimate = async (file: File) => {
+    setImageAnalyzeErr(null);
+    setImageAnalyzeResult(null);
+    setImageAttachmentId(null);
+    setImageAttachmentName(file.name);
+    setImageExtractMode(null);
+    if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
+    setImagePreviewUrl(URL.createObjectURL(file));
+    setImageUploadBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("category", "MEASUREMENT_SHEET");
+      const j = await postFormData<{ id?: string; fileName?: string }>(
+        `/api/leads/${leadId}/attachments`,
+        fd,
+      );
+      if (!j.id) throw new Error("Не вдалося зберегти зображення");
+      setImageAttachmentId(j.id);
+      setImageAttachmentName(j.fileName ?? file.name);
+    } catch (e) {
+      setImageAnalyzeErr(
+        e instanceof Error ? e.message : "Помилка завантаження зображення",
+      );
+    } finally {
+      setImageUploadBusy(false);
+    }
+  };
+
+  const analyzeEstimateImage = async () => {
+    if (!imageAttachmentId) {
+      setImageAnalyzeErr("Спочатку завантажте зображення");
+      return;
+    }
+    setImageAnalyzeBusy(true);
+    setImageAnalyzeErr(null);
+    try {
+      const j = await postJson<AnalyzeEstimateApiResponse>(
+        `/api/leads/${leadId}/attachments/${imageAttachmentId}/analyze-estimate`,
+        { apply: false },
+      );
+      const rawLines = j.draft?.lines ?? [];
+      let mapped: LineDraft[] = rawLines
+        .map((line): LineDraft | null => {
+          const name = String(line.productName ?? "").trim();
+          if (!name) return null;
+          const categoryKey = ESTIMATE_CATEGORY_KEYS.includes(
+            String(line.categoryKey) as EstimateCategoryKey,
+          )
+            ? (line.categoryKey as EstimateCategoryKey)
+            : "extras";
+          return {
+            key: newLineKey(),
+            categoryKey,
+            productName: name,
+            qty: String(
+              typeof line.qty === "number" && Number.isFinite(line.qty)
+                ? line.qty
+                : 1,
+            ),
+            coefficient: "1",
+            unit:
+              typeof line.unit === "string" && line.unit.trim()
+                ? line.unit.trim()
+                : "шт",
+            salePrice: String(
+              typeof line.salePrice === "number" && Number.isFinite(line.salePrice)
+                ? Math.max(0, line.salePrice)
+                : 0,
+            ),
+            supplierProvider: null,
+            supplierMaterialId: null,
+            supplierMaterialName: null,
+            supplierPriceSnapshot: null,
+            baseItemId: undefined,
+            unitPriceSource: null,
+          } satisfies LineDraft;
+        })
+        .filter((line): line is LineDraft => line !== null);
+      const templateKey =
+        typeof j.templateKey === "string" && j.templateKey.trim()
+          ? j.templateKey.trim()
+          : null;
+      if (!mapped.length && templateKey && isFurnitureTemplateKey(templateKey)) {
+        mapped = getFurnitureTemplateDraftLines(templateKey).map((line) => ({
+          key: newLineKey(),
+          categoryKey: line.categoryKey,
+          productName: line.productName,
+          qty: String(line.qty),
+          coefficient: "1",
+          unit: line.unit || "шт",
+          salePrice: String(line.salePrice),
+          supplierProvider: null,
+          supplierMaterialId: null,
+          supplierMaterialName: null,
+          supplierPriceSnapshot: null,
+          baseItemId: undefined,
+          unitPriceSource: null,
+        }));
+      }
+      setImageExtractMode(
+        typeof j.extractMode === "string" ? j.extractMode : null,
+      );
+      setImageAnalyzeResult({
+        lines: mapped,
+        assumptions: j.draft?.assumptions ?? [],
+        summary:
+          typeof j.aiSummary === "string" && j.aiSummary.trim()
+            ? j.aiSummary.trim()
+            : null,
+        templateKey,
+        confidence:
+          typeof j.confidence === "string" && j.confidence.trim()
+            ? j.confidence.trim()
+            : null,
+        isProjectDocument: Boolean(j.isProjectDocument),
+      });
+    } catch (e) {
+      setImageAnalyzeErr(e instanceof Error ? e.message : "Помилка аналізу");
+    } finally {
+      setImageAnalyzeBusy(false);
+    }
+  };
+
+  const applyImageAnalysisToEstimate = () => {
+    if (readOnly) return;
+    if (!imageAnalyzeResult?.lines.length) return;
+    const next = imageAnalyzeResult.lines;
+    setLines(next);
+    void persist(buildEstimateLinePayload(next), {
+      changeSummary: `AI: шаблон із зображення${
+        imageAttachmentName ? ` (${imageAttachmentName})` : ""
+      }`,
+      versioning: "fork",
+      forceNewVersion: true,
+    });
+    setImageIntelOpen(false);
   };
 
   const setCurrent = async () => {
@@ -828,6 +1017,15 @@ export function LeadEstimateWorkspace({
         summaryHint={summaryHint}
         kpVisualizationRows={[]}
       />
+      <CalculationImportModal
+        open={excelImportOpen}
+        onOpenChange={setExcelImportOpen}
+        entity={{ type: "lead", id: leadId }}
+        onImported={(newEstimateId) => {
+          router.push(`/leads/${leadId}/estimate/${newEstimateId}`);
+          router.refresh();
+        }}
+      />
 
       {aiPreview && aiPreview.length > 0 ? (
         <div
@@ -875,6 +1073,179 @@ export function LeadEstimateWorkspace({
               >
                 Додати до смети
               </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {imageIntelOpen ? (
+        <div
+          className="fixed inset-0 z-[95] flex items-end justify-center bg-slate-900/50 p-3 backdrop-blur-[2px] sm:items-center"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setImageIntelOpen(false)}
+        >
+          <div
+            className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-2xl border border-slate-200/90 bg-[var(--enver-card)] p-4 shadow-2xl shadow-slate-900/10"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold text-[var(--enver-text)]">
+                  Фото / креслення для прорахунку
+                </h3>
+                <p className="mt-1 text-[11px] text-slate-600">
+                  Завантажте зображення, запустіть розпізнавання та застосуйте
+                  автозгенерований шаблон до таблиці позицій.
+                </p>
+              </div>
+              <button
+                type="button"
+                className={btnGhost}
+                onClick={() => setImageIntelOpen(false)}
+              >
+                Закрити
+              </button>
+            </div>
+
+            <div className="mt-4 grid gap-4 lg:grid-cols-[1.15fr_1fr]">
+              <section className="rounded-xl border border-slate-200 bg-slate-50/50 p-3">
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.currentTarget.files?.[0];
+                    if (!file) return;
+                    void uploadImageForEstimate(file);
+                    e.currentTarget.value = "";
+                  }}
+                />
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={imageUploadBusy}
+                    className={btnPrimary}
+                    onClick={() => imageInputRef.current?.click()}
+                  >
+                    {imageUploadBusy ? "Завантаження…" : "Додати зображення"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={imageAnalyzeBusy || imageUploadBusy || !imageAttachmentId}
+                    className={btnGhost}
+                    onClick={() => void analyzeEstimateImage()}
+                  >
+                    {imageAnalyzeBusy ? "Розпізнавання…" : "Розпізнати та створити шаблон"}
+                  </button>
+                </div>
+                <p className="mt-2 text-[11px] text-slate-500">
+                  {imageAttachmentName
+                    ? `Файл: ${imageAttachmentName}`
+                    : "Ще не вибрано файл"}
+                </p>
+                {imagePreviewUrl ? (
+                  <div className="mt-3 overflow-hidden rounded-lg border border-slate-200 bg-white">
+                    {/* Local blob/data preview: Next/Image optimization is not applicable here. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={imagePreviewUrl}
+                      alt="Зображення для прорахунку"
+                      className="max-h-[54vh] w-full object-contain"
+                    />
+                  </div>
+                ) : (
+                  <div className="mt-3 rounded-lg border border-dashed border-slate-300 bg-white px-3 py-6 text-center text-xs text-slate-500">
+                    Додайте фото або креслення, щоб переглядати його тут під час
+                    підготовки смети.
+                  </div>
+                )}
+              </section>
+
+              <section className="rounded-xl border border-slate-200 bg-[var(--enver-card)] p-3">
+                <h4 className="text-xs font-semibold text-[var(--enver-text)]">
+                  Результат розпізнавання
+                </h4>
+                {imageAnalyzeErr ? (
+                  <p className="mt-2 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-2 text-[11px] text-rose-800">
+                    {imageAnalyzeErr}
+                  </p>
+                ) : null}
+                {!imageAnalyzeResult ? (
+                  <p className="mt-2 text-[11px] text-slate-500">
+                    Після розпізнавання тут з&apos;явиться чернетка шаблону
+                    прорахунку.
+                  </p>
+                ) : (
+                  <>
+                    <div className="mt-2 flex flex-wrap gap-2 text-[10px]">
+                      {imageAnalyzeResult.templateKey ? (
+                        <span className="rounded-full bg-blue-100 px-2 py-0.5 font-semibold text-blue-900">
+                          Шаблон: {imageAnalyzeResult.templateKey}
+                        </span>
+                      ) : null}
+                      {imageAnalyzeResult.confidence ? (
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-700">
+                          Впевненість: {imageAnalyzeResult.confidence}
+                        </span>
+                      ) : null}
+                      {imageExtractMode ? (
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-700">
+                          Режим: {imageExtractMode}
+                        </span>
+                      ) : null}
+                    </div>
+                    {imageAnalyzeResult.summary ? (
+                      <p className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 text-[11px] text-slate-700">
+                        {imageAnalyzeResult.summary}
+                      </p>
+                    ) : null}
+                    {imageAnalyzeResult.assumptions.length > 0 ? (
+                      <ul className="mt-2 list-disc space-y-0.5 pl-4 text-[11px] text-slate-600">
+                        {imageAnalyzeResult.assumptions.map((row, idx) => (
+                          <li key={`${idx}-${row.slice(0, 24)}`}>{row}</li>
+                        ))}
+                      </ul>
+                    ) : null}
+                    <div className="mt-3 max-h-56 overflow-y-auto rounded-lg border border-slate-100 bg-slate-50/80 p-2">
+                      {imageAnalyzeResult.lines.length > 0 ? (
+                        <ul className="space-y-1 text-[11px]">
+                          {imageAnalyzeResult.lines.map((line) => (
+                            <li
+                              key={line.key}
+                              className="rounded border border-slate-200 bg-white px-2 py-1"
+                            >
+                              <span className="font-medium text-slate-800">
+                                {line.productName}
+                              </span>
+                              <span className="text-slate-500">
+                                {" "}
+                                · {line.qty} {line.unit} × {line.salePrice}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-[11px] text-slate-500">
+                          Позицій не знайдено. Спробуйте інше зображення або
+                          додайте рядки вручну.
+                        </p>
+                      )}
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        disabled={readOnly || imageAnalyzeResult.lines.length === 0}
+                        className={btnPrimary}
+                        onClick={applyImageAnalysisToEstimate}
+                      >
+                        Застосувати шаблон у таблицю
+                      </button>
+                    </div>
+                  </>
+                )}
+              </section>
             </div>
           </div>
         </div>
@@ -952,6 +1323,14 @@ export function LeadEstimateWorkspace({
                 onClick={() => void createBlankEstimate()}
               >
                 Створити
+              </button>
+              <button
+                type="button"
+                className={btnGhost}
+                onClick={() => setExcelImportOpen(true)}
+                title="Імпорт позицій у смету з Excel (.xlsx/.xls)"
+              >
+                Імпорт з Excel
               </button>
               <button
                 type="button"
@@ -1162,6 +1541,13 @@ export function LeadEstimateWorkspace({
                 onClick={applyTemplate}
               >
                 Шаблон (кухня)
+              </button>
+              <button
+                type="button"
+                className={btnGhost}
+                onClick={() => setExcelImportOpen(true)}
+              >
+                Імпорт з Excel
               </button>
             </div>
           </section>
@@ -1439,9 +1825,18 @@ export function LeadEstimateWorkspace({
         {/* Права панель — розрахунок + історія версій */}
         <aside className="space-y-5 md:sticky md:top-4 md:self-start">
           <section className="rounded-xl border border-slate-200/90 bg-[var(--enver-card)] p-5 shadow-sm">
-            <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-              Розрахунок
-            </h3>
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                Розрахунок
+              </h3>
+              <button
+                type="button"
+                className={btnGhost}
+                onClick={() => setImageIntelOpen(true)}
+              >
+                Фото → шаблон
+              </button>
+            </div>
             <div className="mt-4 space-y-3 text-sm">
               <div className="flex justify-between gap-2 border-b border-slate-100 pb-2">
                 <span className="text-slate-600">Підсумок позицій</span>

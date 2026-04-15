@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ClipboardEvent } from "react";
 import { useRouter } from "next/navigation";
-import { ImageIcon, Info } from "lucide-react";
-import { postJson } from "../../../lib/api/patch-json";
+import { ImageIcon, Info, Loader2, Upload } from "lucide-react";
+import { postFormData, postJson } from "../../../lib/api/patch-json";
 
 type Props = {
   open: boolean;
@@ -22,7 +22,39 @@ type Props = {
   kpVisualizationRows: { title: string }[];
   /** URL зображень з файлів ліда — автоматично підставляються у поля «Віз» (по порядку). */
   leadImageUrls?: string[];
+  /** Актуальні рядки смети з UI (якщо є незбережені локальні зміни). */
+  sourceEstimateLines?: Array<{
+    id: string;
+    type: string;
+    category: string | null;
+    productName: string;
+    qty: number;
+    unit: string;
+    salePrice: number;
+    amountSale: number;
+    metadataJson?: unknown;
+  }>;
+  sourceEstimateName?: string | null;
+  sourceEstimateTemplateKey?: string | null;
 };
+
+type QuoteGroupingMode = "group" | "furniture_type";
+type QuoteMaterialBucket =
+  | "dsp"
+  | "facades"
+  | "hardware"
+  | "countertop"
+  | "services"
+  | "other";
+
+const QUOTE_BUCKET_OPTIONS: Array<{ key: QuoteMaterialBucket; label: string }> = [
+  { key: "dsp", label: "ДСП / корпус" },
+  { key: "hardware", label: "Фурнітура" },
+  { key: "facades", label: "Фасади" },
+  { key: "countertop", label: "Стільниця" },
+  { key: "services", label: "Сервіс / монтаж / доставка" },
+  { key: "other", label: "Інше" },
+];
 
 const btn =
   "rounded-lg border border-blue-700 bg-blue-600 px-3.5 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-600/15 hover:bg-blue-700 disabled:opacity-50";
@@ -38,6 +70,24 @@ function formatUah(n: number | null | undefined): string {
   );
 }
 
+function normalizeVisualizationUrlFromPaste(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+  const firstToken = trimmed.split(/\s+/)[0] ?? "";
+  if (!firstToken) return "";
+  if (/^https?:\/\//i.test(firstToken)) return firstToken;
+  if (firstToken.startsWith("/")) {
+    if (typeof window !== "undefined") {
+      return `${window.location.origin}${firstToken}`;
+    }
+    return firstToken;
+  }
+  if (/^[\w.-]+\.[a-z]{2,}(\/.*)?$/i.test(firstToken)) {
+    return `https://${firstToken}`;
+  }
+  return firstToken;
+}
+
 export function CreateProposalModal({
   open,
   onClose,
@@ -50,17 +100,39 @@ export function CreateProposalModal({
   defaultSummary = "",
   kpVisualizationRows,
   leadImageUrls,
+  sourceEstimateLines,
+  sourceEstimateName,
+  sourceEstimateTemplateKey,
 }: Props) {
   const router = useRouter();
   const [title, setTitle] = useState(defaultTitle);
   const [summary, setSummary] = useState(defaultSummary);
   const [visualizationUrls, setVisualizationUrls] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
+  const [quoteMaterialBuckets, setQuoteMaterialBuckets] = useState<
+    QuoteMaterialBucket[]
+  >(["dsp", "hardware", "facades", "countertop", "services", "other"]);
   const [busy, setBusy] = useState(false);
+  const [uploadingVisualizationIndex, setUploadingVisualizationIndex] = useState<
+    number | null
+  >(null);
+  const [dragOverVisualizationIndex, setDragOverVisualizationIndex] = useState<
+    number | null
+  >(null);
   const [err, setErr] = useState<string | null>(null);
 
+  const previewRows = (() => {
+    const seen = new Set<string>();
+    return kpVisualizationRows.filter((row) => {
+      const key = (row.title || "").trim().toLowerCase();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  })();
+
   const fillVisualizationsFromLeadFiles = () => {
-    const len = kpVisualizationRows.length;
+    const len = previewRows.length;
     if (len === 0 || !leadImageUrls?.length) return;
     setVisualizationUrls(() => {
       const next = Array(len).fill("") as string[];
@@ -75,7 +147,7 @@ export function CreateProposalModal({
     if (!open) return;
     setTitle(defaultTitle);
     setSummary(defaultSummary.trim() || "");
-    const len = kpVisualizationRows.length;
+    const len = previewRows.length;
     const initial = Array(len).fill("") as string[];
     if (leadImageUrls?.length && len > 0) {
       for (let i = 0; i < Math.min(len, leadImageUrls.length); i++) {
@@ -86,13 +158,33 @@ export function CreateProposalModal({
     setVisualizationUrls(initial);
     setNotes("");
     setErr(null);
+    setQuoteMaterialBuckets([
+      "dsp",
+      "hardware",
+      "facades",
+      "countertop",
+      "services",
+      "other",
+    ]);
   }, [
     open,
     defaultTitle,
     defaultSummary,
-    kpVisualizationRows.length,
-    leadImageUrls?.join("|"),
+    previewRows.length,
+    leadImageUrls,
   ]);
+
+  useEffect(() => {
+    setVisualizationUrls((prev) => {
+      const len = previewRows.length;
+      if (prev.length === len) return prev;
+      const next = Array(len).fill("") as string[];
+      for (let i = 0; i < Math.min(prev.length, len); i++) {
+        next[i] = prev[i] ?? "";
+      }
+      return next;
+    });
+  }, [previewRows.length]);
 
   if (!open) return null;
 
@@ -111,6 +203,15 @@ export function CreateProposalModal({
         notes: notes.trim() || undefined,
         summary: summary.trim() || undefined,
         visualizationUrls: visualizationUrls.map((u) => u.trim()),
+        quoteGroupingMode: "furniture_type" as QuoteGroupingMode,
+        quoteMaterialBuckets,
+        ...(sourceEstimateLines && sourceEstimateLines.length > 0
+          ? {
+              sourceEstimateLines,
+              sourceEstimateName: sourceEstimateName ?? null,
+              sourceEstimateTemplateKey: sourceEstimateTemplateKey ?? null,
+            }
+          : {}),
       });
       if (typeof j.warning === "string" && j.warning.trim()) {
         window.alert(j.warning.trim());
@@ -125,6 +226,65 @@ export function CreateProposalModal({
       setErr(e instanceof Error ? e.message : "Помилка");
     } finally {
       setBusy(false);
+    }
+  };
+
+  const handleVisualizationPaste = (
+    index: number,
+    event: ClipboardEvent<HTMLInputElement>,
+  ) => {
+    const imageItem = Array.from(event.clipboardData.items).find((item) =>
+      item.type.startsWith("image/"),
+    );
+    if (imageItem) {
+      const file = imageItem.getAsFile();
+      if (file) {
+        event.preventDefault();
+        void uploadVisualizationFile(index, file);
+        return;
+      }
+    }
+    const pasted = event.clipboardData.getData("text/plain");
+    const normalized = normalizeVisualizationUrlFromPaste(pasted);
+    if (!normalized) return;
+    event.preventDefault();
+    setVisualizationUrls((prev) => {
+      const next = [...prev];
+      next[index] = normalized;
+      return next;
+    });
+  };
+
+  const uploadVisualizationFile = async (index: number, file: File) => {
+    if (!file.type.startsWith("image/")) {
+      setErr("Можна завантажувати лише зображення (jpg, png, webp, gif).");
+      return;
+    }
+    setErr(null);
+    setUploadingVisualizationIndex(index);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("category", "OBJECT_PHOTO");
+      const j = await postFormData<{
+        id?: string;
+        fileUrl?: string;
+        fileName?: string;
+        error?: string;
+      }>(`/api/leads/${leadId}/attachments`, fd);
+      if (!j.fileUrl) {
+        throw new Error("Не вдалося отримати URL зображення");
+      }
+      setVisualizationUrls((prev) => {
+        const next = [...prev];
+        next[index] = j.fileUrl ?? "";
+        return next;
+      });
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Помилка завантаження зображення");
+    } finally {
+      setUploadingVisualizationIndex(null);
+      setDragOverVisualizationIndex((prev) => (prev === index ? null : prev));
     }
   };
 
@@ -195,6 +355,35 @@ export function CreateProposalModal({
           </label>
 
           <div className="block text-[11px]">
+            <span className="font-medium text-slate-700">
+              Матеріали в описі рядка
+            </span>
+            <div className="mt-1 grid grid-cols-1 gap-1 rounded-lg border border-slate-200 bg-slate-50/70 p-2 sm:grid-cols-2">
+              {QUOTE_BUCKET_OPTIONS.map((opt) => (
+                <label
+                  key={opt.key}
+                  className="inline-flex items-center gap-2 text-[11px] text-slate-700"
+                >
+                  <input
+                    type="checkbox"
+                    checked={quoteMaterialBuckets.includes(opt.key)}
+                    onChange={(e) => {
+                      setQuoteMaterialBuckets((prev) => {
+                        if (e.target.checked) {
+                          return [...prev, opt.key];
+                        }
+                        const next = prev.filter((x) => x !== opt.key);
+                        return next.length > 0 ? next : prev;
+                      });
+                    }}
+                  />
+                  {opt.label}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="block text-[11px]">
             <span className="inline-flex items-center gap-1 font-medium text-slate-700">
               <ImageIcon className="h-3.5 w-3.5 text-slate-500" />
               Візуалізація (посилання на зображення)
@@ -204,7 +393,7 @@ export function CreateProposalModal({
               Якщо на ліді завантажені зображення — вони підставляються автоматично
               (можна змінити вручну).
             </span>
-            {kpVisualizationRows.length > 0 &&
+            {previewRows.length > 0 &&
             leadImageUrls &&
             leadImageUrls.length > 0 ? (
               <button
@@ -215,34 +404,76 @@ export function CreateProposalModal({
                 Підставити з файлу ліда (перезаписати поля)
               </button>
             ) : null}
-            {kpVisualizationRows.length === 0 ? (
+            {previewRows.length === 0 ? (
               <p className="mt-2 rounded-lg border border-amber-100 bg-amber-50/80 px-2 py-2 text-[11px] text-amber-900">
                 У розрахунку немає згрупованих позицій для КП — додайте рядки в
                 таблицю, збережіть смету й відкрийте вікно знову.
               </p>
             ) : (
               <ul className="mt-2 max-h-48 space-y-2 overflow-y-auto pr-1">
-                {kpVisualizationRows.map((row, i) => (
+                {previewRows.map((row, i) => (
                   <li key={i}>
                     <label className="block">
                       <span className="line-clamp-2 text-[10px] font-medium text-slate-600">
                         {i + 1}. {row.title || "Позиція"}
                       </span>
-                      <input
-                        type="url"
-                        inputMode="url"
-                        value={visualizationUrls[i] ?? ""}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          setVisualizationUrls((prev) => {
-                            const next = [...prev];
-                            next[i] = v;
-                            return next;
-                          });
-                        }}
-                        placeholder="https://…"
-                        className="mt-0.5 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
-                      />
+                      <div className="mt-0.5 flex items-center gap-1.5">
+                        <input
+                          type="url"
+                          inputMode="url"
+                          value={visualizationUrls[i] ?? ""}
+                          onPaste={(e) => handleVisualizationPaste(i, e)}
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            setDragOverVisualizationIndex(i);
+                          }}
+                          onDragLeave={() =>
+                            setDragOverVisualizationIndex((prev) =>
+                              prev === i ? null : prev,
+                            )
+                          }
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            const file = e.dataTransfer.files?.[0];
+                            if (!file) return;
+                            void uploadVisualizationFile(i, file);
+                          }}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setVisualizationUrls((prev) => {
+                              const next = [...prev];
+                              next[i] = v;
+                              return next;
+                            });
+                          }}
+                          placeholder="https://… або Ctrl+V / перетягніть зображення"
+                          title="Підтримується URL, Ctrl+V (скрін), drag&drop, вибір файлу"
+                          className={`w-full rounded-lg border px-2 py-1.5 text-sm ${
+                            dragOverVisualizationIndex === i
+                              ? "border-violet-400 bg-violet-50"
+                              : "border-slate-200"
+                          }`}
+                        />
+                        <label className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[11px] font-medium text-slate-700 hover:bg-slate-50">
+                          {uploadingVisualizationIndex === i ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Upload className="h-3.5 w-3.5" />
+                          )}
+                          Фото
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.currentTarget.files?.[0];
+                              if (!file) return;
+                              void uploadVisualizationFile(i, file);
+                              e.currentTarget.value = "";
+                            }}
+                          />
+                        </label>
+                      </div>
                     </label>
                   </li>
                 ))}

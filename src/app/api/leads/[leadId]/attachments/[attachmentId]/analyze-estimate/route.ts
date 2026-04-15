@@ -4,18 +4,18 @@ import {
   forbidUnlessLeadAccess,
   forbidUnlessPermission,
   requireSessionUser,
-} from "../../../../../../../lib/authz/api-guard";
-import { P } from "../../../../../../../lib/authz/permissions";
-import { analyzeEstimateFromContent } from "../../../../../../../lib/estimates/ai-estimate-from-file";
-import { createOrForkLeadEstimateFromDraft } from "../../../../../../../lib/estimates/create-lead-estimate-from-draft";
+} from "@/lib/authz/api-guard";
+import { P } from "@/lib/authz/permissions";
+import { analyzeEstimateFromContent } from "@/lib/estimates/ai-estimate-from-file";
+import { createOrForkLeadEstimateFromDraft } from "@/lib/estimates/create-lead-estimate-from-draft";
 import {
   extractTextFromLeadPublicFile,
   readFileAsBase64,
-} from "../../../../../../../lib/estimates/lead-file-text-extract";
+} from "@/lib/estimates/lead-file-text-extract";
 import {
   prisma,
   prismaCodegenIncludesEstimateLeadId,
-} from "../../../../../../../lib/prisma";
+} from "@/lib/prisma";
 
 type Ctx = {
   params: Promise<{ leadId: string; attachmentId: string }>;

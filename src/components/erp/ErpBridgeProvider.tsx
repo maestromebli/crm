@@ -63,7 +63,7 @@ export function ErpBridgeProvider({ children }: { children: ReactNode }) {
     const load = async () => {
       try {
         const response = await fetch("/api/crm/erp/bridge", { cache: "no-store" });
-        if (!response.ok) throw new Error("Failed to load ERP bridge");
+        if (!response.ok) throw new Error("Не вдалося завантажити ERP-міст");
         const payload = (await response.json()) as ErpState;
         if (cancelled) return;
         setState({
@@ -106,7 +106,7 @@ export function ErpBridgeProvider({ children }: { children: ReactNode }) {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     const timer = window.setTimeout(() => {
       void putJson<Record<string, unknown>>("/api/crm/erp/bridge", state).catch(() => {
-        // Silent fallback to localStorage when API is unavailable.
+        // Тихий fallback до localStorage, коли API недоступне.
       });
     }, 350);
     return () => window.clearTimeout(timer);
@@ -251,7 +251,7 @@ export function ErpBridgeProvider({ children }: { children: ReactNode }) {
 export function useErpBridge() {
   const ctx = useContext(ErpBridgeContext);
   if (!ctx) {
-    throw new Error("useErpBridge must be used within ErpBridgeProvider");
+    throw new Error("useErpBridge можна використовувати лише всередині ErpBridgeProvider");
   }
   return ctx;
 }

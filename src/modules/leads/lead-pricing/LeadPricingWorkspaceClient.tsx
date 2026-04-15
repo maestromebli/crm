@@ -2,6 +2,7 @@
 
 /**
  * Робоче місце «Розрахунок» по ліду: таблиця «Кухня без стільниці», версії, КП.
+ * DUPLICATE PRICING - TO BE REFACTORED
  */
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -15,13 +16,15 @@ import {
   Loader2,
   Plus,
   Save,
+  Send,
+  Sparkles,
 } from "lucide-react";
 import type {
   LeadEstimateSummary,
   LeadProposalSummary,
 } from "../../../features/leads/queries";
 import { patchLeadEstimateById } from "../../../features/leads/lead-estimate-api";
-import { postJson } from "../../../lib/api/patch-json";
+import { patchJson, postFormData, postJson } from "../../../lib/api/patch-json";
 import { parseResponseJson } from "../../../lib/api/parse-response-json";
 import { parseEstimateLineBreakdown } from "../../../lib/estimates/estimate-line-breakdown";
 import {
@@ -40,20 +43,24 @@ import {
   getFurnitureTemplateMeta,
   isFurnitureTemplateKey,
 } from "../../../lib/estimates/furniture-estimate-templates";
-import { recalculateEstimateTotals } from "../../../lib/estimates/recalculate";
 import { estimateLinesToQuoteItems } from "../../../lib/quotes/estimate-to-quote-items";
 import { lookupViyarPriceByName } from "../../../lib/estimates/viyar-price-lookup";
 import { cn } from "../../../lib/utils";
-import type { MaterialSearchHit } from "../../../lib/materials/material-provider";
+import type { SupplierItem } from "../../../features/suppliers/core/supplierTypes";
 import type { EstimateLineDraft, LineType } from "./estimate-line-draft";
 import { CreateProposalModal } from "../lead-estimate/CreateProposalModal";
 import { KitchenCostSheetTable } from "./KitchenCostSheetTable";
+import { ObjectPhotoDropWindow } from "./ObjectPhotoDropWindow";
 import { PricingAiHelpPanel } from "./PricingAiHelpPanel";
 import {
   iconForBlockKind,
   nextBlockLabel,
   seedRowsForFurnitureBlock,
 } from "./seed-furniture-block";
+import {
+  buildLiveLineStats,
+  buildLivePricingTotals,
+} from "./services/live-pricing";
 
 export type { EstimateLineDraft } from "./estimate-line-draft";
 
@@ -74,6 +81,13 @@ type EstimatePayload = {
   lineItems: EstimateLineDraft[];
 };
 
+type UploadedObjectPhoto = {
+  id: string;
+  fileUrl: string;
+  fileName: string;
+  fileSize?: number;
+};
+
 const STATUS_OPTIONS = [
   { v: "DRAFT", label: "Чернетка" },
   { v: "SENT", label: "Надіслано" },
@@ -83,9 +97,53 @@ const STATUS_OPTIONS = [
 
 const PRICING_VIEW_KEY = "enver.leadPricing.viewMode";
 const PRICING_ROLE_KEY = "enver.leadPricing.rolePreset";
+const PRICING_DRAFT_KEY_PREFIX = "enver.leadPricing.localDraft";
 
 export type PricingViewMode = "compact" | "standard" | "pro";
 export type PricingRolePreset = "manager" | "technologist";
+
+type PricingLocalDraft = {
+  lines: EstimateLineDraft[];
+  notes: string;
+  discountAmount: number;
+  deliveryCost: number;
+  installationCost: number;
+  status: string;
+};
+
+function pricingDraftStorageKey(leadId: string, estimateId: string): string {
+  return `${PRICING_DRAFT_KEY_PREFIX}.${leadId}.${estimateId}`;
+}
+
+function parsePricingLocalDraft(raw: string | null): PricingLocalDraft | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<PricingLocalDraft>;
+    if (!parsed || !Array.isArray(parsed.lines)) return null;
+    return {
+      lines: parsed.lines as EstimateLineDraft[],
+      notes: typeof parsed.notes === "string" ? parsed.notes : "",
+      discountAmount:
+        typeof parsed.discountAmount === "number" &&
+        Number.isFinite(parsed.discountAmount)
+          ? parsed.discountAmount
+          : 0,
+      deliveryCost:
+        typeof parsed.deliveryCost === "number" &&
+        Number.isFinite(parsed.deliveryCost)
+          ? parsed.deliveryCost
+          : 0,
+      installationCost:
+        typeof parsed.installationCost === "number" &&
+        Number.isFinite(parsed.installationCost)
+          ? parsed.installationCost
+          : 0,
+      status: typeof parsed.status === "string" ? parsed.status : "DRAFT",
+    };
+  } catch {
+    return null;
+  }
+}
 
 function formatUah(n: number | null | undefined): string {
   if (n === null || n === undefined || Number.isNaN(n)) return "—";
@@ -107,17 +165,188 @@ function normalizeMaterialName(s: string): string {
   return s.toLowerCase().replace(/\s+/g, " ").trim();
 }
 
-function pickBestMaterialHit(
+function pickBestSupplierItem(
   query: string,
-  items: MaterialSearchHit[],
-): MaterialSearchHit | null {
+  items: SupplierItem[],
+): SupplierItem | null {
   if (!items.length) return null;
   const q = normalizeMaterialName(query);
-  const exact = items.find((x) => normalizeMaterialName(x.label) === q);
+  const exact = items.find((x) => normalizeMaterialName(x.name) === q);
   if (exact) return exact;
-  const starts = items.find((x) => normalizeMaterialName(x.label).startsWith(q));
+  const starts = items.find((x) => normalizeMaterialName(x.name).startsWith(q));
   if (starts) return starts;
   return items[0] ?? null;
+}
+
+function parseCategoryToken(
+  category: string | null | undefined,
+): "cabinets" | "facades" | "countertop" | "fittings" | "delivery" | "installation" | "extras" {
+  const c = (category ?? "").toLowerCase().trim();
+  if (c.startsWith("cat:")) {
+    const key = c.slice(4);
+    if (
+      key === "cabinets" ||
+      key === "facades" ||
+      key === "countertop" ||
+      key === "fittings" ||
+      key === "delivery" ||
+      key === "installation" ||
+      key === "extras"
+    ) {
+      return key;
+    }
+  }
+  if (/(доставк|delivery|логіст|рейс)/.test(c)) return "delivery";
+  if (/(монтаж|install|збірк)/.test(c)) return "installation";
+  if (/(фасад|front|door)/.test(c)) return "facades";
+  if (/(стільниц|столеш|counter)/.test(c)) return "countertop";
+  if (/(фурнітур|fitting|blum|hettich|петл|напрям)/.test(c)) return "fittings";
+  if (/(корпус|модул|дсп|мдф|cabinets)/.test(c)) return "cabinets";
+  return "extras";
+}
+
+function inferBlockKindFromText(
+  text: string,
+  fallback: FurnitureBlockKind,
+): FurnitureBlockKind {
+  const t = text.toLowerCase();
+  const score = (re: RegExp) => (re.test(t) ? 1 : 0);
+  const scores: Array<[FurnitureBlockKind, number]> = [
+    [
+      "kitchen_island",
+      score(/острів|остров|island/) * 3 +
+        score(/кухн|стільниц|фасад|модул|blum|hettich/),
+    ],
+    [
+      "wardrobe",
+      score(/шаф|гардероб|купе|wardrobe/) * 3 +
+        score(/наповнення|штанг|дзеркал/),
+    ],
+    [
+      "bathroom",
+      score(/санвуз|ванн|bathroom|умиваль|пенал/) * 3 +
+        score(/вологостій|дзеркал/),
+    ],
+    ["living", score(/віталь|tv|тумба тв|living/) * 3 + score(/стінк|полиц/)],
+    [
+      "hallway",
+      score(/коридор|передпок|hallway/) * 3 + score(/взут|вішалк|ніш/),
+    ],
+    ["office", score(/офіс|кабінет|office/) * 3 + score(/стелаж|панел|робоч/)],
+    ["children", score(/дитяч|children/) * 3 + score(/ліжк|стіл|безпек/)],
+    [
+      "kitchen",
+      score(/кухн|фасад|стільниц|blum|hettich|модул/) * 2 +
+        score(/цоколь|кромк|мийк/),
+    ],
+  ];
+  scores.sort((a, b) => b[1] - a[1]);
+  const top = scores[0];
+  if (top && top[1] >= 2) return top[0];
+  return fallback;
+}
+
+function inferBlockKindFromMetadata(rawObj: Record<string, unknown>): FurnitureBlockKind | undefined {
+  if (
+    typeof rawObj.furnitureBlockKind === "string" &&
+    isFurnitureTemplateKey(rawObj.furnitureBlockKind)
+  ) {
+    return rawObj.furnitureBlockKind;
+  }
+  if (rawObj.templateKey === KITCHEN_NO_COUNTER_TEMPLATE_KEY) {
+    return "kitchen";
+  }
+  if (typeof rawObj.templateKey === "string" && isFurnitureTemplateKey(rawObj.templateKey)) {
+    return rawObj.templateKey;
+  }
+  return undefined;
+}
+
+type CategoryToken = ReturnType<typeof parseCategoryToken>;
+
+function categoryTokenFromLineLike(args: {
+  category: string | null | undefined;
+  productName: string;
+}): CategoryToken {
+  return parseCategoryToken(`${args.category ?? ""} ${args.productName}`);
+}
+
+function requiredCategoryTokensByBlock(
+  block: FurnitureBlockKind,
+): CategoryToken[] {
+  if (block === "kitchen" || block === "kitchen_island") {
+    return [
+      "cabinets",
+      "facades",
+      "fittings",
+      "countertop",
+      "delivery",
+      "installation",
+    ];
+  }
+  return ["cabinets", "fittings", "delivery", "installation"];
+}
+
+function groupMetaByCategory(cat: ReturnType<typeof parseCategoryToken>): {
+  groupId: string;
+  groupLabel: string;
+  groupIcon: string;
+  kitchenRole: EstimateLineDraft["kitchenRole"];
+} {
+  if (cat === "cabinets") {
+    return {
+      groupId: "cabinets",
+      groupLabel: "Корпус / модулі",
+      groupIcon: "🧱",
+      kitchenRole: "material",
+    };
+  }
+  if (cat === "facades") {
+    return {
+      groupId: "facades",
+      groupLabel: "Фасади",
+      groupIcon: "🎨",
+      kitchenRole: "material",
+    };
+  }
+  if (cat === "countertop") {
+    return {
+      groupId: "countertop",
+      groupLabel: "Стільниця",
+      groupIcon: "🪵",
+      kitchenRole: "material",
+    };
+  }
+  if (cat === "fittings") {
+    return {
+      groupId: "fittings",
+      groupLabel: "Фурнітура",
+      groupIcon: "🔩",
+      kitchenRole: "material",
+    };
+  }
+  if (cat === "delivery") {
+    return {
+      groupId: "delivery",
+      groupLabel: "Доставка",
+      groupIcon: "🚚",
+      kitchenRole: "measurement",
+    };
+  }
+  if (cat === "installation") {
+    return {
+      groupId: "installation",
+      groupLabel: "Монтаж",
+      groupIcon: "🛠",
+      kitchenRole: "measurement",
+    };
+  }
+  return {
+    groupId: "custom",
+    groupLabel: "Інше",
+    groupIcon: "📦",
+    kitchenRole: "material",
+  };
 }
 
 function mapApiLine(
@@ -147,13 +376,7 @@ function mapApiLine(
       rowStyle = rawObj.rowStyle;
     }
   }
-  let furnitureBlockKind: EstimateLineDraft["furnitureBlockKind"];
-  if (
-    typeof rawObj.furnitureBlockKind === "string" &&
-    isFurnitureTemplateKey(rawObj.furnitureBlockKind)
-  ) {
-    furnitureBlockKind = rawObj.furnitureBlockKind;
-  }
+  const furnitureBlockKind = inferBlockKindFromMetadata(rawObj);
   return {
     id: String(li.id ?? ""),
     type: (li.type as LineType) ?? "PRODUCT",
@@ -198,6 +421,26 @@ function mapApiLine(
     rawObj.kitchenMaterialMarkupPercent > 0
       ? { kitchenMaterialMarkupPercent: rawObj.kitchenMaterialMarkupPercent }
       : {}),
+    ...(typeof rawObj.supplierItemId === "string" && rawObj.supplierItemId
+      ? { supplierItemId: rawObj.supplierItemId }
+      : {}),
+    ...(typeof rawObj.supplierSource === "string" &&
+    (rawObj.supplierSource === "VIYAR" ||
+      rawObj.supplierSource === "CSV" ||
+      rawObj.supplierSource === "MANUAL")
+      ? {
+          supplierSource: rawObj.supplierSource as
+            | "VIYAR"
+            | "CSV"
+            | "MANUAL",
+        }
+      : {}),
+    ...(typeof rawObj.supplierCode === "string" && rawObj.supplierCode
+      ? { supplierCode: rawObj.supplierCode }
+      : {}),
+    ...(typeof rawObj.supplierUpdatedAt === "string" && rawObj.supplierUpdatedAt
+      ? { supplierUpdatedAt: rawObj.supplierUpdatedAt }
+      : {}),
     ...(meta ? { metadataJson: meta } : {}),
   };
 }
@@ -235,6 +478,10 @@ function buildKitchenSheetMetadataForSave(
     li.kitchenMaterialMarkupPercent > 0
       ? { kitchenMaterialMarkupPercent: li.kitchenMaterialMarkupPercent }
       : {}),
+    ...(li.supplierItemId ? { supplierItemId: li.supplierItemId } : {}),
+    ...(li.supplierSource ? { supplierSource: li.supplierSource } : {}),
+    ...(li.supplierCode ? { supplierCode: li.supplierCode } : {}),
+    ...(li.supplierUpdatedAt ? { supplierUpdatedAt: li.supplierUpdatedAt } : {}),
   };
   return withFurnitureBlockKind(m, li.furnitureBlockKind ?? null);
 }
@@ -269,12 +516,23 @@ function partitionLinesByBlockKind(
     blockKind: FurnitureBlockKind | null;
     lines: EstimateLineDraft[];
   }> = [];
+  const consumed = new Set<string>();
   for (const t of FURNITURE_TEMPLATES) {
     const arr = byKey.get(t.key);
-    if (arr?.length) out.push({ blockKind: t.key, lines: arr });
+    if (arr?.length) {
+      out.push({ blockKind: t.key, lines: arr });
+      consumed.add(t.key);
+    }
   }
   const rest = byKey.get("__none__");
   if (rest?.length) out.push({ blockKind: null, lines: rest });
+  consumed.add("__none__");
+  // Захист від втрати таблиць: якщо в даних збережений нестандартний ключ блоку,
+  // все одно показуємо його в окремій партиції (а не "губимо" після refresh).
+  for (const [rawKey, arr] of byKey.entries()) {
+    if (!arr.length || consumed.has(rawKey)) continue;
+    out.push({ blockKind: null, lines: arr });
+  }
   return out;
 }
 
@@ -287,7 +545,53 @@ function sheetTitleForBlockPartition(
       getFurnitureTemplateMeta(blockKind)?.label ?? getTemplateTitle(sheetKey)
     );
   }
-  return `Інші позиції · ${getTemplateTitle(sheetKey)}`;
+  return getTemplateTitle(sheetKey);
+}
+
+function furniturePartitionTone(blockKind: FurnitureBlockKind | null): {
+  wrap: string;
+  badge: string;
+  hint: string;
+  accent: string;
+} {
+  if (blockKind === "kitchen" || blockKind === "kitchen_island") {
+    return {
+      wrap: "border-sky-200/80 bg-sky-50/35",
+      badge: "bg-sky-100 text-sky-900 ring-sky-200/80",
+      hint: "text-sky-900/80",
+      accent: "border-l-sky-400",
+    };
+  }
+  if (blockKind === "wardrobe" || blockKind === "hallway") {
+    return {
+      wrap: "border-violet-200/80 bg-violet-50/30",
+      badge: "bg-violet-100 text-violet-900 ring-violet-200/80",
+      hint: "text-violet-900/80",
+      accent: "border-l-violet-400",
+    };
+  }
+  if (blockKind === "bathroom") {
+    return {
+      wrap: "border-cyan-200/80 bg-cyan-50/30",
+      badge: "bg-cyan-100 text-cyan-900 ring-cyan-200/80",
+      hint: "text-cyan-900/80",
+      accent: "border-l-cyan-400",
+    };
+  }
+  if (blockKind === "living" || blockKind === "office" || blockKind === "children") {
+    return {
+      wrap: "border-emerald-200/80 bg-emerald-50/30",
+      badge: "bg-emerald-100 text-emerald-900 ring-emerald-200/80",
+      hint: "text-emerald-900/80",
+      accent: "border-l-emerald-400",
+    };
+  }
+  return {
+    wrap: "border-slate-400/80 bg-gradient-to-br from-slate-100 via-slate-50 to-white",
+    badge: "bg-slate-900 text-white ring-slate-700/60 shadow-sm",
+    hint: "text-slate-800",
+    accent: "border-l-slate-600",
+  };
 }
 
 const uid = () => `t_${Math.random().toString(36).slice(2, 11)}`;
@@ -333,6 +637,10 @@ export function LeadPricingWorkspaceClient({
   const [kpBusy, setKpBusy] = useState(false);
   const [proposalModalOpen, setProposalModalOpen] = useState(false);
   const [pdfBusyId, setPdfBusyId] = useState<string | null>(null);
+  const [proposalStatusBusyKey, setProposalStatusBusyKey] = useState<string | null>(
+    null,
+  );
+  const [messengerBusyId, setMessengerBusyId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(
     initialEstimates[0]?.id ?? null,
   );
@@ -350,13 +658,29 @@ export function LeadPricingWorkspaceClient({
   const [forkOnSave, setForkOnSave] = useState(false);
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
+  const [aiFileBusy, setAiFileBusy] = useState(false);
   const [aiHints, setAiHints] = useState<string[]>([]);
+  const [aiAutoRunPending, setAiAutoRunPending] = useState(false);
   const [materialLookupBusy, setMaterialLookupBusy] = useState(false);
   const inFlightLookupRef = useRef<Set<string>>(new Set());
   const resolvedNameByLineRef = useRef<Record<string, string>>({});
+  const [supplierPriceAlerts, setSupplierPriceAlerts] = useState<
+    Record<string, { currentPrice: number; currency: "UAH"; updatedAt: string }>
+  >({});
   const [viewMode, setViewMode] = useState<PricingViewMode>("standard");
   const [rolePreset, setRolePreset] = useState<PricingRolePreset>("manager");
+  const [createTemplateKey, setCreateTemplateKey] =
+    useState<FurnitureTemplateKey>(KITCHEN_NO_COUNTER_TEMPLATE_KEY);
   const [prefsHydrated, setPrefsHydrated] = useState(false);
+  const [photoWindowPartitionKey, setPhotoWindowPartitionKey] = useState<
+    string | null
+  >(null);
+  const [tableObjectPhotos, setTableObjectPhotos] = useState<
+    Record<string, UploadedObjectPhoto[]>
+  >({});
+  const [photoUploadBusy, setPhotoUploadBusy] = useState(false);
+  const [photoUploadErr, setPhotoUploadErr] = useState<string | null>(null);
+  const pricingContentRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     try {
@@ -468,6 +792,21 @@ export function LeadPricingWorkspaceClient({
           typeof e.installationCost === "number" ? e.installationCost : 0,
         );
         setStatus(String(e.status ?? "DRAFT"));
+        try {
+          const localDraft = parsePricingLocalDraft(
+            localStorage.getItem(pricingDraftStorageKey(leadId, estimateId)),
+          );
+          if (localDraft) {
+            setLines(localDraft.lines);
+            setNotes(localDraft.notes);
+            setDiscountAmount(localDraft.discountAmount);
+            setDeliveryCost(localDraft.deliveryCost);
+            setInstallationCost(localDraft.installationCost);
+            setStatus(localDraft.status);
+          }
+        } catch {
+          // no-op: draft restore is optional
+        }
       } catch (e) {
         setErr(e instanceof Error ? e.message : "Помилка");
         setEstimate(null);
@@ -483,6 +822,36 @@ export function LeadPricingWorkspaceClient({
     if (!selectedId || !canView) return;
     void loadEstimate(selectedId);
   }, [selectedId, canView, loadEstimate]);
+
+  useEffect(() => {
+    if (!selectedId || !estimate) return;
+    try {
+      const payload: PricingLocalDraft = {
+        lines,
+        notes,
+        discountAmount,
+        deliveryCost,
+        installationCost,
+        status,
+      };
+      localStorage.setItem(
+        pricingDraftStorageKey(leadId, selectedId),
+        JSON.stringify(payload),
+      );
+    } catch {
+      // no-op
+    }
+  }, [
+    leadId,
+    selectedId,
+    estimate,
+    lines,
+    notes,
+    discountAmount,
+    deliveryCost,
+    installationCost,
+    status,
+  ]);
 
   const refreshList = useCallback(async () => {
     const r = await fetch(`/api/leads/${leadId}/estimates`);
@@ -541,19 +910,19 @@ export function LeadPricingWorkspaceClient({
         inFlightLookupRef.current.add(li.id);
         try {
           const r = await fetch(
-            `/api/materials/search?q=${encodeURIComponent(query)}&limit=8`,
+            `/api/suppliers/search?q=${encodeURIComponent(query)}&limit=8`,
           );
-          const j = await parseResponseJson<{ items?: MaterialSearchHit[] }>(r);
+          const j = await parseResponseJson<{ items?: SupplierItem[] }>(r);
           if (!r.ok) return;
-          const best = pickBestMaterialHit(query, j.items ?? []);
+          const best = pickBestSupplierItem(query, j.items ?? []);
           if (!best) return;
 
           setLines((prev) =>
             prev.map((x) => {
               if (x.id !== li.id) return x;
               const patch: Partial<EstimateLineDraft> = {};
-              if ((x.salePrice ?? 0) <= 0 && typeof best.unitPrice === "number") {
-                patch.salePrice = best.unitPrice;
+              if ((x.salePrice ?? 0) <= 0 && typeof best.price === "number") {
+                patch.salePrice = best.price;
               }
               if (!x.unit?.trim() && best.unit?.trim()) {
                 patch.unit = best.unit.trim();
@@ -561,11 +930,14 @@ export function LeadPricingWorkspaceClient({
               if (!x.category?.trim()) {
                 patch.category =
                   best.category?.trim() ||
-                  best.brand?.trim() ||
-                  best.providerKey?.trim() ||
-                  best.supplier?.toUpperCase() ||
+                  best.metadata?.brand?.trim() ||
+                  best.supplier ||
                   x.category;
               }
+              patch.supplierItemId = best.id;
+              patch.supplierSource = best.supplier;
+              patch.supplierCode = best.code;
+              patch.supplierUpdatedAt = best.updatedAt;
               if (Object.keys(patch).length === 0) return x;
               return recalcLineAmount({ ...x, ...patch });
             }),
@@ -580,7 +952,55 @@ export function LeadPricingWorkspaceClient({
     ).finally(() => setMaterialLookupBusy(false));
   }, [lines, canUpdate]);
 
-  const createEstimate = async () => {
+  useEffect(() => {
+    const supplierLines = lines.filter((x) => x.supplierItemId);
+    if (!supplierLines.length) {
+      setSupplierPriceAlerts({});
+      return;
+    }
+    const ac = new AbortController();
+    const ids = supplierLines
+      .map((x) => x.supplierItemId)
+      .filter((x): x is string => Boolean(x));
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const r = await fetch(
+            `/api/suppliers/items/batch?ids=${encodeURIComponent(ids.join(","))}`,
+            { signal: ac.signal },
+          );
+          const j = await parseResponseJson<{ items?: SupplierItem[] }>(r);
+          if (!r.ok) return;
+          const byId = new Map((j.items ?? []).map((x) => [x.id, x]));
+          const alerts: Record<
+            string,
+            { currentPrice: number; currency: "UAH"; updatedAt: string }
+          > = {};
+          for (const line of supplierLines) {
+            if (!line.supplierItemId) continue;
+            const item = byId.get(line.supplierItemId);
+            if (!item) continue;
+            if (Math.abs((line.salePrice ?? 0) - item.price) > 0.009) {
+              alerts[line.id] = {
+                currentPrice: item.price,
+                currency: item.currency,
+                updatedAt: item.updatedAt,
+              };
+            }
+          }
+          setSupplierPriceAlerts(alerts);
+        } catch {
+          // no-op, warnings are supplemental
+        }
+      })();
+    }, 220);
+    return () => {
+      window.clearTimeout(timer);
+      ac.abort();
+    };
+  }, [lines]);
+
+  const createEstimate = async (): Promise<string | null> => {
     if (!canCreate) return;
     setCreateBusy(true);
     setErr(null);
@@ -590,18 +1010,39 @@ export function LeadPricingWorkspaceClient({
         error?: string;
       }>(`/api/leads/${leadId}/estimates`, {
         estimateName: leadTitle,
-        templateKey: KITCHEN_NO_COUNTER_TEMPLATE_KEY,
+        templateKey: createTemplateKey,
       });
       if (j.estimate?.id) {
         await refreshList();
         setSelectedId(j.estimate.id);
         router.refresh();
+        return j.estimate.id;
       }
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Помилка");
+      return null;
     } finally {
       setCreateBusy(false);
     }
+    return null;
+  };
+
+  const createEstimateWithAiFocus = async () => {
+    if (!canCreate || createBusy) return;
+    setAiPrompt((prev) =>
+      prev.trim()
+        ? prev
+        : `Сформуй стартовий розрахунок для "${leadTitle}" з типовими матеріалами, фурнітурою, доставкою та монтажем.`,
+    );
+    const createdEstimateId = await createEstimate();
+    if (!createdEstimateId) return;
+    setAiAutoRunPending(true);
+    window.setTimeout(() => {
+      document.getElementById("lead-pricing-ai-anchor")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 220);
   };
 
   const recalcLineAmount = (li: EstimateLineDraft): EstimateLineDraft => {
@@ -639,22 +1080,33 @@ export function LeadPricingWorkspaceClient({
     );
   };
 
-  /** Вибір рядка з випадаючого списку прайсу в таблиці кухні */
-  const applyKitchenCatalogHit = (
-    lineId: string,
-    hit: MaterialSearchHit,
-  ) => {
-    resolvedNameByLineRef.current[lineId] = normalizeMaterialName(hit.label);
-    const cat =
-      hit.category?.trim() ||
-      hit.brand?.trim() ||
-      hit.providerKey?.trim() ||
-      undefined;
+  /** Вибір рядка з випадаючого списку постачальників у таблиці кухні */
+  const applySupplierItemToLine = (lineId: string, item: SupplierItem) => {
+    resolvedNameByLineRef.current[lineId] = normalizeMaterialName(item.name);
+    const token = `${item.category ?? ""} ${item.name}`.toLowerCase();
+    const type: LineType = /(фурнітур|blum|hettich|напрям|петл|ручк)/.test(token)
+      ? "FITTING"
+      : "MATERIAL";
     updateLine(lineId, {
-      productName: hit.label,
-      ...(typeof hit.unitPrice === "number" ? { salePrice: hit.unitPrice } : {}),
-      ...(hit.unit?.trim() ? { unit: hit.unit.trim() } : {}),
-      ...(cat ? { category: cat } : {}),
+      productName: item.name,
+      salePrice: item.price,
+      unit: item.unit,
+      category: item.category ?? null,
+      type,
+      coefficient: 1,
+      supplierItemId: item.id,
+      supplierSource: item.supplier,
+      supplierCode: item.code,
+      supplierUpdatedAt: item.updatedAt,
+    });
+  };
+
+  const applySupplierPriceUpdate = (lineId: string, currentPrice: number) => {
+    updateLine(lineId, { salePrice: currentPrice });
+    setSupplierPriceAlerts((prev) => {
+      const next = { ...prev };
+      delete next[lineId];
+      return next;
     });
   };
 
@@ -796,6 +1248,37 @@ export function LeadPricingWorkspaceClient({
     });
   };
 
+  const addKitchenManualRow = (blockKind: FurnitureBlockKind | null) => {
+    if (!canUpdate) return;
+    setLines((prev) => {
+      const part = prev.filter((li) => lineMatchesBlockPartition(li, blockKind));
+      const inherited = part.map((li) => li.tableTitle?.trim()).find(Boolean);
+      return [
+        ...prev,
+        recalcLineAmount({
+          id: uid(),
+          type: "PRODUCT",
+          category: getTemplateTitle(activeTemplateKey),
+          productName: "Ручна позиція",
+          qty: 1,
+          unit: "послуга",
+          salePrice: 0,
+          costPrice: null,
+          amountSale: 0,
+          amountCost: null,
+          coefficient: 1,
+          kitchenRole: "measurement",
+          groupId: "manual",
+          groupLabel: "Ручні / послуги",
+          groupIcon: "🛠",
+          templateKey: activeTemplateKey,
+          ...(blockKind ? { furnitureBlockKind: blockKind } : {}),
+          ...(inherited ? { tableTitle: inherited } : {}),
+        }),
+      ];
+    });
+  };
+
   const addFurnitureBlock = (kind: FurnitureBlockKind) => {
     if (!canUpdate) return;
     const meta = FURNITURE_TEMPLATES.find((t) => t.key === kind);
@@ -882,6 +1365,11 @@ export function LeadPricingWorkspaceClient({
       const aiLines = j.draft?.lines ?? [];
       if (!aiLines.length) return;
       setAiHints([...(j.draft?.assumptions ?? []), ...(j.draft?.missing ?? [])]);
+      if (lines.length === 0) {
+        setLines(mapRecognizedToStructuredLines(aiLines));
+        setAiPrompt("");
+        return;
+      }
       const next = [...lines];
       for (let i = 0; i < Math.min(lines.length, aiLines.length); i++) {
         const d = aiLines[i];
@@ -932,6 +1420,163 @@ export function LeadPricingWorkspaceClient({
     }
   };
 
+  const mapRecognizedToStructuredLines = (
+    aiLines: Array<{
+      type: LineType;
+      category: string | null;
+      productName: string;
+      qty: number;
+      unit: string;
+      salePrice: number;
+      amountSale: number;
+    }>,
+    opts?: { templateKey?: string | null },
+  ): EstimateLineDraft[] => {
+    const fallbackFromActive: FurnitureBlockKind = isFurnitureTemplateKey(
+      activeTemplateKey,
+    )
+      ? activeTemplateKey
+      : "kitchen";
+    const fallbackBlock: FurnitureBlockKind =
+      opts?.templateKey && isFurnitureTemplateKey(opts.templateKey)
+        ? opts.templateKey
+        : fallbackFromActive;
+    const titleByBlock = new Map<FurnitureBlockKind, string>();
+
+    const mapped = aiLines.map((d) => {
+      const cat = parseCategoryToken(d.category);
+      const group = groupMetaByCategory(cat);
+      const block = inferBlockKindFromText(
+        `${d.productName} ${d.category ?? ""}`,
+        fallbackBlock,
+      );
+      if (!titleByBlock.has(block)) {
+        const meta = getFurnitureTemplateMeta(block);
+        titleByBlock.set(block, meta?.label ?? getTemplateTitle(activeTemplateKey));
+      }
+      const tableTitle = titleByBlock.get(block) ?? getTemplateTitle(activeTemplateKey);
+      return recalcLineAmount({
+        id: uid(),
+        type: d.type,
+        category: d.category ?? getTemplateTitle(activeTemplateKey),
+        productName: d.productName,
+        qty: d.qty > 0 ? d.qty : 1,
+        unit: d.unit || "шт",
+        salePrice: d.salePrice >= 0 ? d.salePrice : 0,
+        costPrice: null,
+        amountSale: d.amountSale,
+        amountCost: null,
+        coefficient: 1,
+        kitchenRole: group.kitchenRole,
+        groupId: group.groupId,
+        groupLabel: group.groupLabel,
+        groupIcon: group.groupIcon,
+        templateKey: activeTemplateKey,
+        furnitureBlockKind: block,
+        tableTitle,
+      });
+    });
+
+    const byBlock = new Map<FurnitureBlockKind, EstimateLineDraft[]>();
+    for (const row of mapped) {
+      const bk = row.furnitureBlockKind ?? fallbackBlock;
+      const arr = byBlock.get(bk) ?? [];
+      arr.push(row);
+      byBlock.set(bk, arr);
+    }
+
+    const enriched: EstimateLineDraft[] = [...mapped];
+    for (const [block, rows] of byBlock.entries()) {
+      const existing = new Set<CategoryToken>(
+        rows.map((r) =>
+          categoryTokenFromLineLike({
+            category: r.category,
+            productName: r.productName,
+          }),
+        ),
+      );
+      const required = requiredCategoryTokensByBlock(block);
+      const missing = required.filter((token) => !existing.has(token));
+      if (missing.length === 0) continue;
+
+      const blockMeta = getFurnitureTemplateMeta(block);
+      const blockLabel = nextBlockLabel(
+        blockMeta?.label ?? getTemplateTitle(activeTemplateKey),
+        block,
+        [...lines, ...enriched],
+      );
+      const seeded = seedRowsForFurnitureBlock(block, {
+        blockLabel,
+        newId: uid,
+      });
+      const seededByToken = new Map<CategoryToken, EstimateLineDraft[]>();
+      for (const row of seeded) {
+        const token = categoryTokenFromLineLike({
+          category: row.category,
+          productName: row.productName,
+        });
+        const arr = seededByToken.get(token) ?? [];
+        arr.push(row);
+        seededByToken.set(token, arr);
+      }
+      for (const token of missing) {
+        const candidate = seededByToken.get(token)?.[0];
+        if (!candidate) continue;
+        enriched.push(recalcLineAmount(candidate));
+      }
+    }
+    return enriched;
+  };
+
+  const runAiAssistFromFile = async (file: File) => {
+    if (!canUpdate || aiFileBusy) return;
+    setAiFileBusy(true);
+    setErr(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const j = await postFormData<{
+        draft?: {
+          lines: Array<{
+            type: LineType;
+            category: string | null;
+            productName: string;
+            qty: number;
+            unit: string;
+            salePrice: number;
+            amountSale: number;
+          }>;
+          assumptions?: string[];
+          missing?: string[];
+        };
+        source?: { fileName?: string; mode?: string };
+        templateKey?: string | null;
+      }>(`/api/leads/${leadId}/estimates/ai-assist-file`, fd);
+      const aiLines = j.draft?.lines ?? [];
+      if (!aiLines.length) return;
+      setAiHints([
+        ...(j.source?.fileName ? [`Файл: ${j.source.fileName}`] : []),
+        ...(j.draft?.assumptions ?? []),
+        ...(j.draft?.missing ?? []),
+      ]);
+      const structured = mapRecognizedToStructuredLines(aiLines, {
+        templateKey: j.templateKey ?? null,
+      });
+      // Для імпорту з файлу краще одразу побудувати таблиці з розпізнаних рядків.
+      const next = structured;
+      setLines(next);
+      setAiPrompt((prev) =>
+        prev.trim()
+          ? prev
+          : `Розпізнано з файлу: ${j.source?.fileName ?? file.name}`,
+      );
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Помилка розпізнавання файлу");
+    } finally {
+      setAiFileBusy(false);
+    }
+  };
+
   const save = async () => {
     if (!selectedId || !canUpdate) return;
     setSaveBusy(true);
@@ -975,6 +1620,11 @@ export function LeadPricingWorkspaceClient({
       }
       await refreshList();
       router.refresh();
+      try {
+        localStorage.removeItem(pricingDraftStorageKey(leadId, selectedId));
+      } catch {
+        // no-op
+      }
       if (j.estimate && typeof j.estimate.id === "string") {
         await loadEstimate(String(j.estimate.id));
       } else if (selectedId) {
@@ -1038,29 +1688,17 @@ export function LeadPricingWorkspaceClient({
    * (після збереження збігається з полями смети в БД).
    */
   const livePricingTotals = useMemo(() => {
-    if (!estimate) {
-      return {
-        totalPrice: null as number | null,
-        totalCost: null as number | null,
-      };
-    }
-    if (lines.length === 0) {
-      return {
-        totalPrice: estimate.totalPrice,
-        totalCost: estimate.totalCost,
-      };
-    }
-    const lineLikes = lines.map((li) => ({
-      amountSale: li.amountSale,
-      amountCost: li.amountCost ?? null,
-      metadataJson: metadataJsonForSave(li, activeTemplateKey),
-    }));
-    return recalculateEstimateTotals(
-      lineLikes,
+    // DUPLICATE PRICING - TO BE REFACTORED
+    // Adapter layer keeps legacy lead pricing stable while estimate-core becomes canonical.
+    return buildLivePricingTotals({
+      estimate,
+      lines,
+      activeTemplateKey,
       discountAmount,
       deliveryCost,
       installationCost,
-    );
+      metadataJsonForSave,
+    });
   }, [
     estimate,
     lines,
@@ -1083,19 +1721,24 @@ export function LeadPricingWorkspaceClient({
     }
     return p;
   }, [lines]);
+  const activePhotoWindowTitle = useMemo(() => {
+    if (!photoWindowPartitionKey) return "";
+    const partition = estimateLineTablePartitions.find(
+      ({ blockKind }) => (blockKind ?? "__none__") === photoWindowPartitionKey,
+    );
+    if (!partition) return "Розрахунок";
+    return sheetTitleForBlockPartition(partition.blockKind, activeTemplateKey);
+  }, [photoWindowPartitionKey, estimateLineTablePartitions, activeTemplateKey]);
+  const activePhotoWindowItems = useMemo(() => {
+    if (!photoWindowPartitionKey) return [];
+    return tableObjectPhotos[photoWindowPartitionKey] ?? [];
+  }, [photoWindowPartitionKey, tableObjectPhotos]);
 
   /** Живі метрики для стрічки під KPI */
-  const liveLineStats = useMemo(() => {
-    const total = lines.length;
-    const named = lines.filter((l) => l.productName.trim()).length;
-    const priced = lines.filter(
-      (l) => l.productName.trim() && (l.salePrice ?? 0) > 0,
-    ).length;
-    const tables = estimateLineTablePartitions.filter(
-      (p) => p.lines.length > 0,
-    ).length;
-    return { total, named, priced, tables };
-  }, [lines, estimateLineTablePartitions]);
+  const liveLineStats = useMemo(
+    () => buildLiveLineStats(lines, estimateLineTablePartitions),
+    [lines, estimateLineTablePartitions],
+  );
 
   /** Контекстні підказки без запиту до сервера */
   const smartContextHints = useMemo(() => {
@@ -1112,7 +1755,7 @@ export function LeadPricingWorkspaceClient({
     ).length;
     if (noPrice > 0) {
       hints.push(
-        `${noPrice} ${noPrice === 1 ? "позиція без ціни" : "позицій без ціни"} — використайте пошук прайсу або кнопку «Застосувати AI до смети».`,
+        `${noPrice} ${noPrice === 1 ? "позиція без ціни" : "позицій без ціни"} — використайте пошук прайсу або кнопку «AI: додати/оновити позиції».`,
       );
     }
     const zeroQty = lines.filter(
@@ -1140,6 +1783,22 @@ export function LeadPricingWorkspaceClient({
       (lines.length > 0 || aiPrompt.trim().length > 0),
     [canUpdate, lines.length, aiPrompt],
   );
+  const runAiAssistRef = useRef(runAiAssist);
+  runAiAssistRef.current = runAiAssist;
+
+  useEffect(() => {
+    if (!aiAutoRunPending) return;
+    if (!estimate || !selectedId) return;
+    if (!canRunAiAssist || aiBusy) return;
+    setAiAutoRunPending(false);
+    void runAiAssistRef.current();
+  }, [
+    aiAutoRunPending,
+    estimate,
+    selectedId,
+    canRunAiAssist,
+    aiBusy,
+  ]);
 
   const proposalSummaryHint = useMemo(() => {
     if (!estimate) return "";
@@ -1230,6 +1889,71 @@ export function LeadPricingWorkspaceClient({
     }
   };
 
+  const updateProposalStatus = async (
+    proposalId: string,
+    status: "SENT" | "APPROVED",
+  ) => {
+    if (!canCreate) return;
+    const busyKey = `${proposalId}:${status}`;
+    setProposalStatusBusyKey(busyKey);
+    setErr(null);
+    try {
+      await patchJson<{ ok?: boolean }>(
+        `/api/leads/${leadId}/proposals/${proposalId}`,
+        { status },
+      );
+      setProposals((prev) =>
+        prev.map((pr) =>
+          pr.id === proposalId
+            ? {
+                ...pr,
+                status,
+                ...(status === "SENT" ? { sentAt: new Date() } : {}),
+              }
+            : pr,
+        ),
+      );
+      router.refresh();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Не вдалося оновити статус КП");
+    } finally {
+      setProposalStatusBusyKey(null);
+    }
+  };
+
+  const sendProposalToMessenger = async (proposal: LeadProposalSummary) => {
+    if (!canUpdate || !proposal.publicToken) return;
+    setMessengerBusyId(proposal.id);
+    setErr(null);
+    try {
+      const publicUrl =
+        typeof window !== "undefined"
+          ? `${window.location.origin}/p/${proposal.publicToken}`
+          : `/p/${proposal.publicToken}`;
+      const titlePart =
+        estimate?.name?.trim() ||
+        proposal.title?.trim() ||
+        leadTitle?.trim() ||
+        "ваше КП";
+      const text = [
+        `Надсилаю комерційну пропозицію по "${titlePart}" (v${proposal.version}).`,
+        `Публічний перегляд: ${publicUrl}`,
+      ].join("\n");
+
+      await postJson<{ error?: string; providerError?: string | null }>(
+        `/api/leads/${leadId}/messenger-thread`,
+        { text },
+      );
+      router.refresh();
+    } catch (e) {
+      setErr(
+        e instanceof Error ? e.message : "Не вдалося відправити КП у месенджер",
+      );
+    } finally {
+      setMessengerBusyId(null);
+    }
+  };
+
   if (!canView) {
     return (
       <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
@@ -1263,69 +1987,77 @@ export function LeadPricingWorkspaceClient({
   if (!estimates.length) {
     return (
       <div className={cn(mainSpacingClass)}>
-        <div
-          className={cn(
-            "rounded-xl border bg-[var(--enver-card)] p-3 shadow-sm",
-            rolePreset === "technologist"
-              ? "border-emerald-200"
-              : "border-slate-200",
-          )}
-        >
-          <p className="text-[11px] font-medium text-slate-600">
-            Налаштування робочого місця
-          </p>
-          <div className="mt-2 flex flex-wrap gap-4">
-            <label className="flex flex-col gap-0.5 text-[11px] text-slate-500">
-              Вигляд
-              <select
-                value={viewMode}
-                onChange={(e) =>
-                  setViewMode(e.target.value as PricingViewMode)
-                }
-                className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-800"
-              >
-                <option value="compact">Компактний</option>
-                <option value="standard">Стандартний</option>
-                <option value="pro">Pro</option>
-              </select>
-            </label>
-            <label className="flex flex-col gap-0.5 text-[11px] text-slate-500">
-              Профіль
-              <select
-                value={rolePreset}
-                onChange={(e) =>
-                  setRolePreset(e.target.value as PricingRolePreset)
-                }
-                className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-800"
-              >
-                <option value="manager">Менеджер</option>
-                <option value="technologist">Технолог</option>
-              </select>
-            </label>
-          </div>
-        </div>
         <p className="text-sm text-slate-600">
-          Ще немає розрахунку для «{leadTitle}». Буде створено таблицю «Кухня без
-          стільниці» (як у Excel-КП): кількість, коефіцієнт, ціна, сума та
-          підсумки з націнкою.
+          Ще немає розрахунку для «{leadTitle}». Оберіть шаблон меблів перед
+          створенням стартової таблиці.
         </p>
         {canCreate ? (
-          <button
-            type="button"
-            onClick={() => void createEstimate()}
-            disabled={createBusy}
-            className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-          >
-            {createBusy ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Plus className="h-4 w-4" />
-            )}
-            Створити розрахунок
-          </button>
+          <div className="flex flex-wrap items-end gap-2">
+            <label className="flex min-w-[16rem] flex-col gap-1 text-xs text-slate-500">
+              Шаблон розрахунку
+              <select
+                value={createTemplateKey}
+                onChange={(e) =>
+                  setCreateTemplateKey(e.target.value as FurnitureTemplateKey)
+                }
+                disabled={createBusy}
+                className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-800"
+              >
+                {FURNITURE_TEMPLATES.map((t) => (
+                  <option key={t.key} value={t.key}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              onClick={() => void createEstimate()}
+              disabled={createBusy}
+              className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            >
+              {createBusy ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Plus className="h-4 w-4" />
+              )}
+              Створити розрахунок
+            </button>
+          </div>
         ) : (
           <p className="text-xs text-slate-500">Недостатньо прав на створення.</p>
         )}
+        <div className="rounded-xl border border-violet-200/90 bg-gradient-to-br from-violet-50/95 via-white to-fuchsia-50/50 px-3 py-3 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="flex items-center gap-2 text-sm font-semibold text-violet-950">
+                <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-violet-600 text-white">
+                  <Sparkles className="h-3.5 w-3.5" />
+                </span>
+                AI-допомога з розрахунком
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-violet-900/85">
+                Можна почати зі стартової смети від AI: система створить розрахунок
+                і відкриє AI-панель для уточнень та доповнень.
+              </p>
+            </div>
+            {canCreate ? (
+              <button
+                type="button"
+                onClick={() => void createEstimateWithAiFocus()}
+                disabled={createBusy}
+                className="inline-flex items-center gap-2 rounded-lg border border-violet-300 bg-[var(--enver-card)] px-3 py-1.5 text-xs font-medium text-violet-900 hover:bg-violet-100/70 disabled:opacity-50"
+              >
+                {createBusy ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="h-3.5 w-3.5" />
+                )}
+                Старт з AI
+              </button>
+            ) : null}
+          </div>
+        </div>
         {err ? (
           <p className="text-sm text-rose-600">{err}</p>
         ) : null}
@@ -1348,61 +2080,25 @@ export function LeadPricingWorkspaceClient({
           defaultSummary={proposalDefaultSummary}
           kpVisualizationRows={kpVisualizationRows}
           leadImageUrls={leadImageUrlsForKp}
+          sourceEstimateLines={lines.map((li) => ({
+            id: li.id,
+            type: li.type,
+            category: li.category,
+            productName: li.productName,
+            qty: li.qty,
+            unit: li.unit,
+            salePrice: li.salePrice,
+            amountSale: li.amountSale,
+            metadataJson: metadataJsonForSave(li, activeTemplateKey),
+          }))}
+          sourceEstimateName={estimate.name}
+          sourceEstimateTemplateKey={estimate.templateKey}
         />
       ) : null}
 
-      <div
-        className={cn(
-          "rounded-2xl border px-4 py-3 shadow-sm",
-          rolePreset === "technologist"
-            ? "border-emerald-200/90 bg-gradient-to-r from-white to-emerald-50/50"
-            : "border-slate-200/90 bg-gradient-to-r from-white to-slate-50/70",
-        )}
-      >
-        <h2
-          className={cn(
-            "font-semibold tracking-tight text-[var(--enver-text)]",
-            viewMode === "pro" ? "text-base" : "text-sm",
-          )}
-        >
-          Розрахунок вартості
-        </h2>
-        <p className="mt-1 text-[12px] text-slate-600">
-          Прорахунок по блоках, пошук прайсу, AI-підказки та версії смети — у
-          одному екрані з живими підсумками.
-        </p>
-        <div className="mt-3 flex flex-wrap gap-4">
-          <label className="flex flex-col gap-0.5 text-[11px] text-slate-500">
-            Вигляд
-            <select
-              value={viewMode}
-              onChange={(e) =>
-                setViewMode(e.target.value as PricingViewMode)
-              }
-              className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-800"
-            >
-              <option value="compact">Компактний</option>
-              <option value="standard">Стандартний</option>
-              <option value="pro">Pro</option>
-            </select>
-          </label>
-          <label className="flex flex-col gap-0.5 text-[11px] text-slate-500">
-            Профіль
-            <select
-              value={rolePreset}
-              onChange={(e) =>
-                setRolePreset(e.target.value as PricingRolePreset)
-              }
-              className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-800"
-            >
-              <option value="manager">Менеджер (комерція)</option>
-              <option value="technologist">Технолог (собівартість)</option>
-            </select>
-          </label>
-        </div>
-        {estimates.length > 0 ? (
+      {estimates.length > 0 ? (
           <nav
-            className="mt-2 flex flex-wrap gap-x-2 gap-y-1 text-[11px] text-slate-500"
+            className="flex flex-wrap gap-x-2 gap-y-1 text-[11px] text-slate-500"
             aria-label="Швидкі переходи по розрахунку"
           >
             <a
@@ -1419,15 +2115,6 @@ export function LeadPricingWorkspaceClient({
               className="underline decoration-slate-300 underline-offset-2 hover:text-slate-800"
             >
               КП
-            </a>
-            <span className="text-slate-300" aria-hidden>
-              ·
-            </span>
-            <a
-              href="#lead-pricing-kpi-anchor"
-              className="underline decoration-slate-300 underline-offset-2 hover:text-slate-800"
-            >
-              Підсумки
             </a>
             <span className="text-slate-300" aria-hidden>
               ·
@@ -1458,10 +2145,12 @@ export function LeadPricingWorkspaceClient({
             </a>
           </nav>
         ) : null}
-      </div>
 
       <div className="lg:flex lg:items-start lg:gap-6">
-        <div className={cn("min-w-0 flex-1", mainSpacingClass)}>
+        <div
+          ref={pricingContentRef}
+          className={cn("relative min-w-0 flex-1", mainSpacingClass)}
+        >
       <div
         id="lead-pricing-estimate-anchor"
         className={cn(
@@ -1480,7 +2169,14 @@ export function LeadPricingWorkspaceClient({
               <option key={e.id} value={e.id}>
                 {e.name?.trim() ? `${e.name.trim()} · ` : ""}
                 v{e.version} ·{" "}
-                {e.totalPrice != null ? formatUah(e.totalPrice) : "—"} ·{" "}
+                {(() => {
+                  const optionTotal =
+                    e.id === selectedId
+                      ? (livePricingTotals.totalPrice ?? estimate?.totalPrice ?? e.totalPrice)
+                      : e.totalPrice;
+                  return optionTotal != null ? formatUah(optionTotal) : "—";
+                })()}{" "}
+                ·{" "}
                 {e.status}
                 {e.id === activeEstimateId ? " · поточна" : ""}
               </option>
@@ -1488,19 +2184,21 @@ export function LeadPricingWorkspaceClient({
           </select>
         </label>
         {canCreate ? (
-          <button
-            type="button"
-            onClick={() => void createEstimate()}
-            disabled={createBusy}
-            className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-800 hover:bg-[var(--enver-hover)] disabled:opacity-50"
-          >
-            {createBusy ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Plus className="h-3.5 w-3.5" />
-            )}
-            Нова версія
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={() => void createEstimate()}
+              disabled={createBusy}
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-800 hover:bg-[var(--enver-hover)] disabled:opacity-50"
+            >
+              {createBusy ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Plus className="h-3.5 w-3.5" />
+              )}
+              Нова версія
+            </button>
+          </>
         ) : null}
         {canUpdate && selectedId ? (
           <button
@@ -1594,6 +2292,30 @@ export function LeadPricingWorkspaceClient({
                       Редагувати позиції КП
                     </Link>
                   ) : null}
+                  {canCreate && p.status !== "SENT" && p.status !== "APPROVED" ? (
+                    <button
+                      type="button"
+                      onClick={() => void updateProposalStatus(p.id, "SENT")}
+                      disabled={proposalStatusBusyKey != null}
+                      className="inline-flex items-center gap-1 rounded border border-sky-300 bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-900 hover:bg-sky-100 disabled:opacity-50"
+                    >
+                      {proposalStatusBusyKey === `${p.id}:SENT`
+                        ? "Оновлення…"
+                        : "Позначити як надіслано"}
+                    </button>
+                  ) : null}
+                  {canCreate && p.status !== "APPROVED" ? (
+                    <button
+                      type="button"
+                      onClick={() => void updateProposalStatus(p.id, "APPROVED")}
+                      disabled={proposalStatusBusyKey != null}
+                      className="inline-flex items-center gap-1 rounded border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-900 hover:bg-emerald-100 disabled:opacity-50"
+                    >
+                      {proposalStatusBusyKey === `${p.id}:APPROVED`
+                        ? "Оновлення…"
+                        : "Підтверджено клієнтом"}
+                    </button>
+                  ) : null}
                   {canCreate && !p.hasPdf ? (
                     <button
                       type="button"
@@ -1607,6 +2329,21 @@ export function LeadPricingWorkspaceClient({
                         <FileText className="h-3 w-3" />
                       )}
                       PDF
+                    </button>
+                  ) : null}
+                  {canUpdate && p.publicToken ? (
+                    <button
+                      type="button"
+                      onClick={() => void sendProposalToMessenger(p)}
+                      disabled={messengerBusyId === p.id}
+                      className="inline-flex items-center gap-1 rounded border border-emerald-300 bg-[var(--enver-card)] px-2 py-0.5 text-[11px] font-medium text-emerald-900 hover:bg-emerald-100 disabled:opacity-50"
+                    >
+                      {messengerBusyId === p.id ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Send className="h-3 w-3" />
+                      )}
+                      Відправити
                     </button>
                   ) : null}
                   {p.hasPdf ? (
@@ -1644,105 +2381,31 @@ export function LeadPricingWorkspaceClient({
 
       {estimate ? (
         <>
-          <div
-            id="lead-pricing-kpi-anchor"
-            className={cn(
-              "grid gap-3 rounded-xl border border-slate-200 bg-[var(--enver-card)] px-4 py-3 shadow-sm md:grid-cols-[auto_auto_1fr_auto]",
-              rolePreset === "technologist"
-                ? "ring-1 ring-emerald-300/45"
-                : "ring-1 ring-sky-200/50",
-            )}
-          >
-            <div>
-              <p className="text-[10px] font-medium uppercase text-slate-400">
-                До оплати (оціночно)
-              </p>
-              <motion.p
-                key={String(
-                  livePricingTotals.totalPrice ?? estimate.totalPrice ?? "x",
-                )}
-                initial={{ opacity: 0.65, y: 2 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ type: "spring", stiffness: 380, damping: 28 }}
-                className={cn(
-                  "font-semibold tabular-nums text-[var(--enver-text)]",
-                  viewMode === "pro" ? "text-xl" : "text-lg",
-                )}
-              >
-                {formatUah(livePricingTotals.totalPrice)}
-              </motion.p>
-            </div>
-            <div>
-              <p className="text-[10px] font-medium uppercase text-slate-400">
-                Собівартість
-              </p>
-              <p className="text-sm font-medium text-slate-700">
-                {formatUah(livePricingTotals.totalCost)}
-              </p>
-            </div>
-            <label className="text-xs">
-              <span className="text-slate-500">Назва розрахунку</span>
-              <input
-                type="text"
-                value={estimate.name ?? ""}
-                onChange={(e) =>
-                  setEstimate((prev) =>
-                    prev
-                      ? { ...prev, name: e.target.value.slice(0, 200) }
-                      : prev,
-                  )
-                }
-                disabled={!canUpdate}
-                placeholder="Назва розрахунку"
-                className="mt-1 block min-w-[16rem] rounded-lg border border-slate-200 px-2 py-1 text-sm focus:border-slate-400 focus:outline-none"
-              />
-            </label>
-            <label className="text-xs">
-              <span className="text-slate-500">Статус</span>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value)}
-                disabled={!canUpdate}
-                className="mt-1 block rounded-lg border border-slate-200 px-2 py-1 text-sm focus:border-slate-400 focus:outline-none"
-              >
-                {STATUS_OPTIONS.map((o) => (
-                  <option key={o.v} value={o.v}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-
           <motion.div
             layout
-            className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-100 bg-gradient-to-r from-slate-50 to-sky-50/40 px-3 py-2 text-[10px] text-slate-600 shadow-sm"
+            className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200/80 bg-[var(--enver-surface)] px-3 py-2 text-[10px] text-slate-600"
           >
             <span className="font-semibold uppercase tracking-wide text-slate-400">
               Живий стан
             </span>
             <span
               className="inline-flex items-center gap-1 rounded-full bg-white/90 px-2 py-0.5 font-medium text-slate-800 shadow-sm ring-1 ring-slate-200/80"
-              title="Усі рядки в усіх таблицях"
             >
               <Layers className="h-3 w-3 text-sky-600" aria-hidden />
               Рядків: {liveLineStats.total}
             </span>
             <span
               className="inline-flex items-center gap-1 rounded-full bg-white/90 px-2 py-0.5 font-medium text-slate-800 shadow-sm ring-1 ring-slate-200/80"
-              title="Заповнена назва позиції"
             >
               З назвою: {liveLineStats.named}
             </span>
             <span
               className="inline-flex items-center gap-1 rounded-full bg-white/90 px-2 py-0.5 font-medium text-emerald-900 shadow-sm ring-1 ring-emerald-200/80"
-              title="Ціна за одиницю більше 0"
             >
               З ціною: {liveLineStats.priced}
             </span>
             <span
               className="inline-flex items-center gap-1 rounded-full bg-white/90 px-2 py-0.5 font-medium text-slate-800 shadow-sm ring-1 ring-slate-200/80"
-              title="Окремі таблиці по блоках меблів"
             >
               <LayoutGrid className="h-3 w-3 text-violet-600" aria-hidden />
               Таблиць: {liveLineStats.tables}
@@ -1757,62 +2420,31 @@ export function LeadPricingWorkspaceClient({
 
           <div
             id="lead-pricing-blocks-anchor"
-            className="scroll-mt-28 rounded-xl border border-emerald-200 bg-emerald-50/40 p-4"
+            className="scroll-mt-28 rounded-xl border border-emerald-200/80 bg-emerald-50/25 p-3"
           >
-            <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-emerald-950">
-              <Boxes className="h-4 w-4 text-emerald-700" />
+            <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold text-emerald-950">
+              <Boxes className="h-3.5 w-3.5 text-emerald-700" />
               Типи меблів у цьому розрахунку
             </div>
-            <ul className="mt-2 list-disc space-y-1.5 pl-4 text-xs leading-relaxed text-emerald-900/90 marker:text-emerald-600">
-              <li>
-                Натисніть тип блоку нижче (кухня, шафа, ванна…) — з’явиться{" "}
-                <strong className="font-semibold text-emerald-950">
-                  окрема розрахункова таблиця
-                </strong>{" "}
-                з власними підсумками; усередині — секції по групах матеріалів.
-              </li>
-              <li>
-                У колонці{" "}
-                <strong className="font-semibold text-emerald-950">
-                  «Найменування»
-                </strong>{" "}
-                введіть{" "}
-                <strong className="font-semibold text-emerald-950">
-                  щонайменше 2 літери
-                </strong>
-                — відкриється список з каталогу прайсів. Оберіть рядок: підставляться
-                назва, ціна та од. виміру (як у підказці над таблицею).
-              </li>
-              <li>
-                Можна не обирати зі списку й ввести назву вручну — тоді за
-                можливості ціни доповняться фоново з каталогу.
-              </li>
-              <li>
-                <a
-                  href="#lead-pricing-ai-anchor"
-                  className="font-medium text-emerald-900 underline decoration-emerald-400/80 underline-offset-2 hover:text-emerald-950"
-                >
-                  AI-допомога
-                </a>
-                {" · "}
-                <a
-                  href="#lead-pricing-tables-anchor"
-                  className="font-medium text-emerald-900 underline decoration-emerald-400/80 underline-offset-2 hover:text-emerald-950"
-                >
-                  таблиці блоків
-                </a>
-                .
-              </li>
-            </ul>
+            <p className="mt-1 text-[11px] leading-snug text-emerald-900/90">
+              Оберіть тип блоку, щоб додати окрему таблицю. Для автодоповнення
+              використовуйте{" "}
+              <a
+                href="#lead-pricing-ai-anchor"
+                className="font-medium text-emerald-900 underline decoration-emerald-400/80 underline-offset-2 hover:text-emerald-950"
+              >
+                AI
+              </a>
+              .
+            </p>
             {canUpdate ? (
-              <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-2 flex flex-wrap gap-1.5">
                 {FURNITURE_TEMPLATES.map((t) => (
                   <button
                     key={t.key}
                     type="button"
                     onClick={() => addFurnitureBlock(t.key)}
-                    title={t.description}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300/80 bg-[var(--enver-card)] px-2.5 py-1.5 text-[11px] font-medium text-emerald-950 shadow-sm transition hover:bg-emerald-100/80"
+                    className="inline-flex items-center gap-1 rounded-lg border border-emerald-300/80 bg-[var(--enver-card)] px-2 py-1 text-[10px] font-medium text-emerald-950 transition hover:bg-emerald-100/70"
                   >
                     <span className="text-base leading-none" aria-hidden>
                       {iconForBlockKind(t.key)}
@@ -1838,59 +2470,247 @@ export function LeadPricingWorkspaceClient({
             smartHints={smartContextHints}
             apiHints={aiHints}
             materialLookupBusy={materialLookupBusy}
+            onFileDrop={runAiAssistFromFile}
+            fileBusy={aiFileBusy}
           />
 
-          <div id="lead-pricing-tables-anchor" className="scroll-mt-28 space-y-6">
-            {estimateLineTablePartitions.map(({ blockKind, lines: tableLines }) => {
+          <div id="lead-pricing-tables-anchor" className="scroll-mt-28 space-y-5">
+            {estimateLineTablePartitions.length > 1 ? (
+              <div className="rounded-xl border border-slate-200/90 bg-[var(--enver-card)] px-3 py-2 shadow-sm">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                  Швидкий перехід по блоках
+                </p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {estimateLineTablePartitions.map(({ blockKind }, idx) => {
+                    const key = blockKind ?? "__none__";
+                    const label = blockKind
+                      ? (getFurnitureTemplateMeta(blockKind)?.label ?? `Блок ${idx + 1}`)
+                      : "Інші позиції";
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => {
+                          document.getElementById(`pricing-table-${key}`)?.scrollIntoView({
+                            behavior: "smooth",
+                            block: "start",
+                          });
+                        }}
+                        className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50"
+                      >
+                        <span className="text-slate-500">#{idx + 1}</span>
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+            {estimateLineTablePartitions.map(
+              ({ blockKind, lines: tableLines }, idx) => {
               const defaultTableTitle = sheetTitleForBlockPartition(
                 blockKind,
                 activeTemplateKey,
               );
+              const partitionKey = blockKind ?? "__none__";
+              const blockLabel = blockKind
+                ? (getFurnitureTemplateMeta(blockKind)?.label ?? defaultTableTitle)
+                : "Інші позиції";
+              const blockIcon = blockKind ? iconForBlockKind(blockKind) : "📦";
+              const tone = furniturePartitionTone(blockKind);
+              const blockTotal = tableLines.reduce(
+                (sum, li) => sum + (Number.isFinite(li.amountSale) ? li.amountSale : 0),
+                0,
+              );
+              const blockTotalLabel = formatUahCompact(blockTotal) ?? "0 грн";
+              const isFallbackPartition = blockKind == null;
               return (
-                <KitchenCostSheetTable
-                  key={blockKind ?? "__none__"}
-                  sheetTitle={defaultTableTitle}
-                  lines={tableLines}
-                  density={viewMode}
-                  canUpdate={canUpdate}
-                  showCostFields={showCostFields}
-                  onUpdateLine={updateLine}
-                  onRemoveLine={removeLine}
-                  onDuplicateLine={duplicateLine}
-                  onAddMaterialRow={() => addKitchenMaterialRow(blockKind)}
-                  onAddMaterialRowToGroup={(groupId, groupLabel, groupIcon) =>
-                    addKitchenMaterialRowToGroup(
-                      groupId,
-                      groupLabel,
-                      groupIcon,
-                      blockKind,
-                    )
-                  }
-                  onTableTitleChange={
-                    canUpdate
-                      ? (title) =>
-                          updatePartitionTableTitle(
-                            blockKind,
-                            title,
-                            defaultTableTitle,
-                          )
-                      : undefined
-                  }
-                  onCatalogLinePick={applyKitchenCatalogHit}
-                  onKitchenPricingChange={
-                    canUpdate
-                      ? (clientMultiplier, markupPercent) =>
-                          updatePartitionKitchenPricing(
-                            blockKind,
-                            clientMultiplier,
-                            markupPercent,
-                          )
-                      : undefined
-                  }
-                />
+                <section
+                  id={`pricing-table-${partitionKey}`}
+                  key={partitionKey}
+                  className={cn(
+                    "scroll-mt-28 space-y-2.5 rounded-2xl border border-l-4 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.5)]",
+                    tone.wrap,
+                    tone.accent,
+                    isFallbackPartition &&
+                      "border-2 border-l-4 border-slate-500/90 shadow-[0_10px_30px_rgba(15,23,42,0.12)]",
+                  )}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1",
+                        tone.badge,
+                        isFallbackPartition && "px-3 py-1.5 text-xs",
+                      )}
+                    >
+                      <span className="text-sm leading-none" aria-hidden>
+                        {blockIcon}
+                      </span>
+                      <span className="text-slate-500">#{idx + 1}</span>
+                      {blockLabel}
+                    </span>
+                    <span className={cn("text-[11px] font-medium", tone.hint)}>
+                      {tableLines.length > 0 ? `${tableLines.length} рядків` : "Порожній блок"} · {blockTotalLabel}
+                    </span>
+                  </div>
+                  <KitchenCostSheetTable
+                    sheetTitle={defaultTableTitle}
+                    lines={tableLines}
+                    density={viewMode}
+                    canUpdate={canUpdate}
+                    showCostFields={showCostFields}
+                    objectPhotoCount={tableObjectPhotos[partitionKey]?.length ?? 0}
+                    onOpenObjectPhotoWindow={() =>
+                      setPhotoWindowPartitionKey(partitionKey)
+                    }
+                    onUpdateLine={updateLine}
+                    onRemoveLine={removeLine}
+                    onDuplicateLine={duplicateLine}
+                    onAddMaterialRow={() => addKitchenMaterialRow(blockKind)}
+                    onAddManualRow={() => addKitchenManualRow(blockKind)}
+                    onAddMaterialRowToGroup={(groupId, groupLabel, groupIcon) =>
+                      addKitchenMaterialRowToGroup(
+                        groupId,
+                        groupLabel,
+                        groupIcon,
+                        blockKind,
+                      )
+                    }
+                    onTableTitleChange={
+                      canUpdate
+                        ? (title) =>
+                            updatePartitionTableTitle(
+                              blockKind,
+                              title,
+                              defaultTableTitle,
+                            )
+                        : undefined
+                    }
+                    onSupplierItemPick={applySupplierItemToLine}
+                    supplierPriceAlerts={supplierPriceAlerts}
+                    onApplySupplierPrice={applySupplierPriceUpdate}
+                    onKitchenPricingChange={
+                      canUpdate
+                        ? (clientMultiplier, markupPercent) =>
+                            updatePartitionKitchenPricing(
+                              blockKind,
+                              clientMultiplier,
+                              markupPercent,
+                            )
+                        : undefined
+                    }
+                  />
+                </section>
               );
             })}
           </div>
+          <ObjectPhotoDropWindow
+            open={photoWindowPartitionKey != null}
+            containerRef={pricingContentRef}
+            title={activePhotoWindowTitle}
+            items={activePhotoWindowItems}
+            busy={photoUploadBusy}
+            error={photoUploadErr}
+            onClose={() => setPhotoWindowPartitionKey(null)}
+            onAddFiles={async (filesToAdd) => {
+              if (!photoWindowPartitionKey || filesToAdd.length === 0) return;
+              setPhotoUploadErr(null);
+              setPhotoUploadBusy(true);
+              const targetKey = photoWindowPartitionKey;
+              try {
+                const uploaded: UploadedObjectPhoto[] = [];
+                for (const file of filesToAdd) {
+                  const fd = new FormData();
+                  fd.append("file", file);
+                  fd.append("category", "OBJECT_PHOTO");
+                  const j = await postFormData<{
+                    id?: string;
+                    fileUrl?: string;
+                    fileName?: string;
+                    error?: string;
+                  }>(`/api/leads/${leadId}/attachments`, fd);
+                  if (j.id && j.fileUrl && j.fileName) {
+                    uploaded.push({
+                      id: j.id,
+                      fileUrl: j.fileUrl,
+                      fileName: j.fileName,
+                      fileSize: file.size,
+                    });
+                  }
+                }
+                if (uploaded.length > 0) {
+                  setTableObjectPhotos((prev) => ({
+                    ...prev,
+                    [targetKey]: [...(prev[targetKey] ?? []), ...uploaded],
+                  }));
+                }
+                router.refresh();
+              } catch (e) {
+                setPhotoUploadErr(
+                  e instanceof Error ? e.message : "Помилка завантаження фото",
+                );
+              } finally {
+                setPhotoUploadBusy(false);
+              }
+            }}
+            onReplaceFiles={async (filesToReplace) => {
+              if (!photoWindowPartitionKey || filesToReplace.length === 0) return;
+              setPhotoUploadErr(null);
+              setPhotoUploadBusy(true);
+              const targetKey = photoWindowPartitionKey;
+              try {
+                const uploaded: UploadedObjectPhoto[] = [];
+                for (const file of filesToReplace) {
+                  const fd = new FormData();
+                  fd.append("file", file);
+                  fd.append("category", "OBJECT_PHOTO");
+                  const j = await postFormData<{
+                    id?: string;
+                    fileUrl?: string;
+                    fileName?: string;
+                    error?: string;
+                  }>(`/api/leads/${leadId}/attachments`, fd);
+                  if (j.id && j.fileUrl && j.fileName) {
+                    uploaded.push({
+                      id: j.id,
+                      fileUrl: j.fileUrl,
+                      fileName: j.fileName,
+                      fileSize: file.size,
+                    });
+                  }
+                }
+                setTableObjectPhotos((prev) => ({
+                  ...prev,
+                  [targetKey]: uploaded,
+                }));
+                router.refresh();
+              } catch (e) {
+                setPhotoUploadErr(
+                  e instanceof Error ? e.message : "Помилка заміни фото",
+                );
+              } finally {
+                setPhotoUploadBusy(false);
+              }
+            }}
+            onRemoveFile={(index) => {
+              if (!photoWindowPartitionKey) return;
+              setTableObjectPhotos((prev) => {
+                const current = prev[photoWindowPartitionKey] ?? [];
+                return {
+                  ...prev,
+                  [photoWindowPartitionKey]: current.filter((_, i) => i !== index),
+                };
+              });
+            }}
+            onClear={() => {
+              if (!photoWindowPartitionKey) return;
+              setTableObjectPhotos((prev) => ({
+                ...prev,
+                [photoWindowPartitionKey]: [],
+              }));
+            }}
+          />
           {materialLookupBusy ? (
             <p className="text-xs text-slate-500">
               Оновлюю ціни та поля з бази матеріалів…
@@ -1951,7 +2771,7 @@ export function LeadPricingWorkspaceClient({
           </label>
 
           {canUpdate ? (
-            <div className="sticky bottom-3 z-20 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white/95 px-3 py-2 shadow-lg backdrop-blur-sm">
+            <div className="sticky bottom-3 z-20 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white/95 px-3 py-2 shadow-sm backdrop-blur-sm">
               <div className="flex min-w-0 flex-col gap-0.5">
                 <label className="flex cursor-pointer items-center gap-2 text-xs text-slate-600">
                   <input
@@ -2007,12 +2827,6 @@ export function LeadPricingWorkspaceClient({
               className="block rounded-lg px-2 py-1.5 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
             >
               КП
-            </a>
-            <a
-              href="#lead-pricing-kpi-anchor"
-              className="block rounded-lg px-2 py-1.5 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
-            >
-              Підсумки
             </a>
             <a
               href="#lead-pricing-blocks-anchor"

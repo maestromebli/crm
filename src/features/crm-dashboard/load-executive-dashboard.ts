@@ -179,6 +179,59 @@ function deltaVsPrev(
   return { absolute, percent, label };
 }
 
+const DEFAULT_DASHBOARD_BEHAVIOR: BehaviorEngineSnapshot = {
+  teamBehaviorScore: 0,
+  managerScores: [],
+  weakManagers: [],
+  alerts: [],
+};
+
+const DEFAULT_DASHBOARD_DAILY: DailyOperatingSnapshot = {
+  priorities: [],
+  workload: {
+    overdueTasks: 0,
+    meetingsToday: 0,
+    staleLeads: 0,
+    delayedProduction: 0,
+  },
+  weakManagers: [],
+};
+
+function buildEmptyDashboardPayload(
+  layout: ExecutiveDashboardPayload["layout"],
+  query: ExecutiveDashboardQuery,
+  opts?: {
+    error?: string;
+    aiSummaryLine?: string;
+  },
+): ExecutiveDashboardPayload {
+  return {
+    layout,
+    query,
+    kpis: [],
+    funnel: [],
+    trend: [],
+    cashflow: null,
+    nextActions: [],
+    risks: [],
+    team: null,
+    finance: null,
+    production: null,
+    procurement: null,
+    schedule: null,
+    directorAi: {
+      summaryLines: [opts?.aiSummaryLine ?? "Завантажуємо дані для AI-блоку…"],
+      problems: [],
+      recommendations: [],
+      forecast: { revenue: "—", risks: "—", bottlenecks: "—" },
+    },
+    behavior: DEFAULT_DASHBOARD_BEHAVIOR,
+    daily: DEFAULT_DASHBOARD_DAILY,
+    legacyAttentionCount: 0,
+    ...(opts?.error ? { error: opts.error } : {}),
+  };
+}
+
 export async function loadExecutiveDashboard(
   access: SessionAccess,
   perms: ExecutiveDashboardPerms,
@@ -186,50 +239,11 @@ export async function loadExecutiveDashboard(
   query: ExecutiveDashboardQuery,
 ): Promise<ExecutiveDashboardPayload> {
   const layout = getExecutiveLayoutMode(role);
-  const emptyAi: DirectorAiBlock = {
-    summaryLines: ["Завантажуємо дані для AI-блоку…"],
-    problems: [],
-    recommendations: [],
-    forecast: { revenue: "—", risks: "—", bottlenecks: "—" },
-  };
-  const emptyBehavior: BehaviorEngineSnapshot = {
-    teamBehaviorScore: 0,
-    managerScores: [],
-    weakManagers: [],
-    alerts: [],
-  };
-  const emptyDaily: DailyOperatingSnapshot = {
-    priorities: [],
-    workload: {
-      overdueTasks: 0,
-      meetingsToday: 0,
-      staleLeads: 0,
-      delayedProduction: 0,
-    },
-    weakManagers: [],
-  };
 
   if (!process.env.DATABASE_URL?.trim()) {
-    return {
-      layout,
-      query,
-      kpis: [],
-      funnel: [],
-      trend: [],
-      cashflow: null,
-      nextActions: [],
-      risks: [],
-      team: null,
-      finance: null,
-      production: null,
-      procurement: null,
-      schedule: null,
-      directorAi: emptyAi,
-      behavior: emptyBehavior,
-      daily: emptyDaily,
-      legacyAttentionCount: 0,
+    return buildEmptyDashboardPayload(layout, query, {
       error: "База даних не налаштована.",
-    };
+    });
   }
 
   const ctx = access.ctx;
@@ -293,8 +307,8 @@ export async function loadExecutiveDashboard(
         procurement: null,
         schedule,
         directorAi: buildDirectorAiStub("measurer"),
-        behavior: emptyBehavior,
-        daily: emptyDaily,
+        behavior: DEFAULT_DASHBOARD_BEHAVIOR,
+        daily: DEFAULT_DASHBOARD_DAILY,
         legacyAttentionCount: 0,
       };
     }
@@ -622,33 +636,11 @@ export async function loadExecutiveDashboard(
     };
   } catch (e) {
     console.error("loadExecutiveDashboard", e);
-    return {
-      layout,
-      query,
-      kpis: [],
-      funnel: [],
-      trend: [],
-      cashflow: null,
-      nextActions: [],
-      risks: [],
-      team: null,
-      finance: null,
-      production: null,
-      procurement: null,
-      schedule: null,
-      directorAi: {
-        summaryLines: [
-          "Не вдалося завантажити агрегати дашборду. Спробуйте оновити сторінку.",
-        ],
-        problems: [],
-        recommendations: [],
-        forecast: { revenue: "—", risks: "—", bottlenecks: "—" },
-      },
-      behavior: emptyBehavior,
-      daily: emptyDaily,
-      legacyAttentionCount: 0,
+    return buildEmptyDashboardPayload(layout, query, {
+      aiSummaryLine:
+        "Не вдалося завантажити агрегати дашборду. Спробуйте оновити сторінку.",
       error: "Помилка завантаження даних.",
-    };
+    });
   }
 }
 

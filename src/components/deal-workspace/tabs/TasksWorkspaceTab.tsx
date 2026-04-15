@@ -167,7 +167,7 @@ export function TasksWorkspaceTab({ data }: { data: DealWorkspacePayload }) {
               <option value="PREPARE_ESTIMATE">Підготувати розрахунок</option>
               <option value="SCHEDULE_MEETING">Зустріч</option>
               <option value="VERIFY_PAYMENT">Перевірити оплату</option>
-              <option value="FOLLOW_UP">Follow-up</option>
+              <option value="FOLLOW_UP">Повторний контакт</option>
               <option value="OTHER">Інше</option>
             </select>
           </label>
@@ -224,7 +224,7 @@ export function TasksWorkspaceTab({ data }: { data: DealWorkspacePayload }) {
                     className="rounded border border-slate-300 bg-[var(--enver-card)] px-2.5 py-1 text-xs font-medium"
                     onClick={() => void complete(t.id)}
                   >
-                    OK
+                    Готово
                   </button>
                 ) : null}
               </li>

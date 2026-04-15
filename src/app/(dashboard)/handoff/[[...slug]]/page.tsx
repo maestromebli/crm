@@ -39,7 +39,7 @@ type HandoffRow = {
 const VIEW_LABELS: Record<HandoffView, { title: string; subtitle: string }> = {
   waiting: {
     title: "Очікують передачі",
-    subtitle: "Чернетки, які ще не відправлені в production handoff.",
+    subtitle: "Чернетки, які ще не відправлені в передачу у виробництво.",
   },
   "need-completion": {
     title: "Потребують доповнення",
@@ -47,7 +47,7 @@ const VIEW_LABELS: Record<HandoffView, { title: string; subtitle: string }> = {
   },
   ready: {
     title: "Готові до прийняття",
-    subtitle: "Пакети у статусі SUBMITTED для перевірки виробництвом.",
+    subtitle: "Пакети у статусі «Надіслано» для перевірки виробництвом.",
   },
   accepted: {
     title: "Прийняті",
@@ -55,13 +55,21 @@ const VIEW_LABELS: Record<HandoffView, { title: string; subtitle: string }> = {
   },
   returned: {
     title: "Повернуті на доопрацювання",
-    subtitle: "Передачі у статусі REJECTED з причинами повернення.",
+    subtitle: "Передачі у статусі «Повернено» з причинами повернення.",
   },
   checklists: {
     title: "Чек-листи готовності",
-    subtitle: "Контроль блокерів readiness перед submit handoff.",
+    subtitle: "Контроль блокерів готовності перед передачею у виробництво.",
   },
 };
+
+function handoffStatusLabel(status: HandoffStatus): string {
+  if (status === "DRAFT") return "Чернетка";
+  if (status === "SUBMITTED") return "Надіслано";
+  if (status === "ACCEPTED") return "Прийнято";
+  if (status === "REJECTED") return "Повернено";
+  return status;
+}
 
 function resolveView(slug?: string[]): HandoffView {
   const first = slug?.[0];
@@ -222,8 +230,8 @@ export default async function HandoffPage({ params }: PageProps) {
                 <th className="px-3 py-2">Угода</th>
                 <th className="px-3 py-2">Клієнт</th>
                 <th className="px-3 py-2">Власник</th>
-                <th className="px-3 py-2">Handoff</th>
-                <th className="px-3 py-2">Readiness</th>
+                <th className="px-3 py-2">Передача</th>
+                <th className="px-3 py-2">Готовність</th>
                 <th className="px-3 py-2">Оновлено</th>
               </tr>
             </thead>
@@ -246,32 +254,32 @@ export default async function HandoffPage({ params }: PageProps) {
                   <td className="px-3 py-2 text-slate-700">{row.clientName}</td>
                   <td className="px-3 py-2 text-slate-700">{row.ownerName}</td>
                   <td className="px-3 py-2">
-                    <p className="font-medium text-slate-800">{row.handoffStatus}</p>
+                    <p className="font-medium text-slate-800">{handoffStatusLabel(row.handoffStatus)}</p>
                     {row.submittedAt ? (
                       <p className="text-xs text-slate-500">
-                        submitted: {row.submittedAt.toLocaleString("uk-UA")}
+                        надіслано: {row.submittedAt.toLocaleString("uk-UA")}
                       </p>
                     ) : null}
                     {row.acceptedAt ? (
                       <p className="text-xs text-emerald-700">
-                        accepted: {row.acceptedAt.toLocaleString("uk-UA")}
+                        прийнято: {row.acceptedAt.toLocaleString("uk-UA")}
                       </p>
                     ) : null}
                     {row.rejectedAt ? (
                       <p className="text-xs text-rose-700">
-                        rejected: {row.rejectedAt.toLocaleString("uk-UA")}
+                        повернено: {row.rejectedAt.toLocaleString("uk-UA")}
                       </p>
                     ) : null}
                   </td>
                   <td className="px-3 py-2">
                     {row.readinessAllMet ? (
                       <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-800">
-                        READY
+                        ГОТОВО
                       </span>
                     ) : (
                       <div className="space-y-1">
                         <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">
-                          BLOCKED
+                          БЛОКЕРИ
                         </span>
                         <p className="max-w-[300px] text-xs text-slate-500">
                           {row.blockers.slice(0, 2).join(" · ")}

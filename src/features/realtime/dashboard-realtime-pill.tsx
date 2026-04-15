@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
-import { useRouter } from "next/navigation";
 
 type PulseResponse = {
   pulseKey: string;
@@ -12,10 +11,10 @@ type PulseResponse = {
 const POLL_MS = 20000;
 
 export function DashboardRealtimePill() {
-  const router = useRouter();
   const [hasUpdate, setHasUpdate] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const pulseRef = useRef<string | null>(null);
+  const refreshTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -47,6 +46,9 @@ export function DashboardRealtimePill() {
     return () => {
       active = false;
       if (timer) clearInterval(timer);
+      if (refreshTimeoutRef.current) {
+        window.clearTimeout(refreshTimeoutRef.current);
+      }
     };
   }, []);
 
@@ -55,9 +57,19 @@ export function DashboardRealtimePill() {
       type="button"
       onClick={() => {
         setIsRefreshing(true);
-        router.refresh();
         setHasUpdate(false);
-        window.setTimeout(() => setIsRefreshing(false), 600);
+        if (refreshTimeoutRef.current) {
+          window.clearTimeout(refreshTimeoutRef.current);
+        }
+        refreshTimeoutRef.current = window.setTimeout(() => {
+          refreshTimeoutRef.current = null;
+          /*
+           * Next.js `router.refresh()` can intermittently throw `Failed to fetch`
+           * in the client router reducer. For this explicit user action, do a
+           * hard refresh to avoid noisy runtime errors and guarantee fresh data.
+           */
+          window.location.reload();
+        }, 120);
       }}
       className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium transition ${
         hasUpdate

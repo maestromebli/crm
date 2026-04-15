@@ -15,7 +15,7 @@ type PageHeaderProps = {
 
 export function PageHeader({ title, subtitle, actions = [], actionsSlot }: PageHeaderProps) {
   return (
-    <header className="enver-panel enver-panel--interactive p-5">
+    <header className="enver-panel p-4 md:p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold tracking-tight text-[var(--enver-text)]">{title}</h1>

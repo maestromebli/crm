@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Eye, X } from "lucide-react";
 import { Button } from "../ui/button";
@@ -14,6 +15,7 @@ type Target = {
 
 export function ImpersonationSwitcher() {
   const { data: session, status, update } = useSession();
+  const router = useRouter();
   const [targets, setTargets] = useState<Target[]>([]);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -42,6 +44,7 @@ export function ImpersonationSwitcher() {
     setBusy(true);
     try {
       await update({ impersonateUserId: userId });
+      router.refresh();
     } finally {
       setBusy(false);
     }
@@ -51,6 +54,7 @@ export function ImpersonationSwitcher() {
     setBusy(true);
     try {
       await update({ impersonateUserId: null });
+      router.refresh();
     } finally {
       setBusy(false);
     }

@@ -4,7 +4,7 @@ import { DashboardAiSummary } from "../../../../components/dashboard/DashboardAi
 import { ModuleWorkspace } from "../../../../components/module/ModuleWorkspace";
 
 export const metadata: Metadata = {
-  title: "AI summary · ENVER CRM",
+  title: "AI-підсумок · ENVER CRM",
 };
 
 export default function DashboardAiPage() {

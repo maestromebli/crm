@@ -92,7 +92,6 @@ export function ConvertToDealModal({
   const [recentCount, setRecentCount] = useState(30);
 
   const [ownerId, setOwnerId] = useState(lead.ownerId);
-  const [productionManagerId, setProductionManagerId] = useState("");
   const [installationDate, setInstallationDate] = useState("");
   const [handoffNote, setHandoffNote] = useState("");
 
@@ -148,7 +147,6 @@ export function ConvertToDealModal({
     setCommMode("full");
     setRecentCount(30);
     setOwnerId(lead.ownerId);
-    setProductionManagerId("");
     setInstallationDate("");
     setHandoffNote("");
     const ids = new Set<string>();
@@ -255,7 +253,7 @@ export function ConvertToDealModal({
       },
       dealSetup: {
         ownerId,
-        productionManagerId: productionManagerId.trim() || null,
+        productionManagerId: null,
         installationDate: installationDate.trim() || null,
         handoffNote: handoffNote.trim() || null,
       },
@@ -293,7 +291,6 @@ export function ConvertToDealModal({
     onClose,
     onConverted,
     ownerId,
-    productionManagerId,
     recentCount,
     selectedContacts,
   ]);
@@ -539,21 +536,6 @@ export function ConvertToDealModal({
                 <option key={a.id} value={a.id}>
                   {a.name ?? a.email}
                   {a.id === lead.ownerId ? " (поточний)" : ""}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block text-xs">
-            <span className="text-slate-500">Менеджер виробництва</span>
-            <select
-              value={productionManagerId}
-              onChange={(e) => setProductionManagerId(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
-            >
-              <option value="">—</option>
-              {assignees.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name ?? a.email}
                 </option>
               ))}
             </select>

@@ -10,14 +10,14 @@ type SummaryCardProps = {
 };
 
 const toneClass: Record<NonNullable<SummaryCardProps["tone"]>, string> = {
-  neutral: "border-slate-200",
-  income: "border-emerald-200",
-  expense: "border-rose-200",
-  warning: "border-amber-200",
+  neutral: "border-[var(--enver-border)]",
+  income: "border-emerald-200/80",
+  expense: "border-rose-200/80",
+  warning: "border-amber-200/80",
 };
 
 const interactiveClass =
-  "w-full cursor-pointer text-left transition hover:bg-[var(--enver-hover)]/90 hover:shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400";
+  "w-full cursor-pointer text-left transition hover:bg-[var(--enver-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400";
 
 export function SummaryCard({
   label,
@@ -39,9 +39,9 @@ export function SummaryCard({
   const body = (
     <>
       {noteDot}
-      <p className="text-xs text-slate-500">{label}</p>
+      <p className="text-xs text-[var(--enver-text-muted)]">{label}</p>
       <p className="mt-1 text-lg font-semibold text-[var(--enver-text)]">{value}</p>
-      {hint ? <p className="mt-1 text-[11px] text-slate-500">{hint}</p> : null}
+      {hint ? <p className="mt-1 text-[11px] text-[var(--enver-text-muted)]">{hint}</p> : null}
     </>
   );
   if (onClick) {

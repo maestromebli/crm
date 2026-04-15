@@ -23,13 +23,13 @@ export function EnverPageHeader({
   return (
     <header
       className={cn(
-        "flex flex-col gap-4 border-b border-[var(--enver-border)] pb-6 md:flex-row md:items-end md:justify-between",
+        "flex flex-col gap-3 border-b border-[var(--enver-border)] pb-4 md:flex-row md:items-end md:justify-between",
         className,
       )}
     >
       <div className="min-w-0 space-y-1">
         {eyebrow ? (
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--enver-muted)]">
+          <p className="enver-status-chip w-fit">
             {eyebrow}
           </p>
         ) : null}

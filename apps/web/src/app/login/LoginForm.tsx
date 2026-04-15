@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
+import { emitRobotEmotion } from "./robotEmotion";
 
 type Props = {
   devHint?: string;
@@ -21,9 +22,19 @@ export function LoginForm({ devHint }: Props) {
         startTransition(() => {
           setError(null);
         });
+        emitRobotEmotion("loading");
       }}
+      onInvalid={() => emitRobotEmotion("sad")}
     >
       <div className="space-y-2">
+        <div className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 shadow-sm">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-900 text-[10px] font-semibold tracking-tight text-white">
+            EN
+          </div>
+          <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-700">
+            ENVER CRM-ERP SYSTEM
+          </span>
+        </div>
         <h2 className="text-lg font-semibold leading-tight text-slate-900">
           Увійти в ENVER CRM
         </h2>
@@ -52,6 +63,8 @@ export function LoginForm({ devHint }: Props) {
             type="email"
             autoComplete="email"
             required
+            onFocus={() => emitRobotEmotion("thinking")}
+            onChange={() => emitRobotEmotion("thinking")}
             className="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
             placeholder="manager@enver.com"
           />
@@ -79,6 +92,8 @@ export function LoginForm({ devHint }: Props) {
             type={passwordVisible ? "text" : "password"}
             autoComplete="current-password"
             required
+            onFocus={() => emitRobotEmotion("thinking")}
+            onChange={() => emitRobotEmotion("thinking")}
             className="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
             placeholder="••••••••"
           />
@@ -90,6 +105,7 @@ export function LoginForm({ devHint }: Props) {
           <input
             type="checkbox"
             name="remember"
+            onChange={() => emitRobotEmotion("wink")}
             className="h-3.5 w-3.5 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
           />
           <span>Запам’ятати мене на цьому пристрої</span>

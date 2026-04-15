@@ -24,6 +24,21 @@ const patchSchema = z
     city: z.string().max(120).nullable().optional(),
     country: z.string().max(120).nullable().optional(),
     notes: z.string().max(20_000).nullable().optional(),
+    category: z
+      .enum([
+        "DESIGNER",
+        "CONSTRUCTION_COMPANY",
+        "MANAGER",
+        "DESIGN_STUDIO",
+        "END_CUSTOMER",
+        "ARCHITECT",
+        "SUPPLIER",
+        "OTHER",
+      ])
+      .optional(),
+    clientType: z.enum(["PERSON", "COMPANY"]).nullable().optional(),
+    clientName: z.string().max(300).nullable().optional(),
+    unlinkClient: z.boolean().optional(),
   })
   .strict();
 
@@ -82,7 +97,17 @@ export async function PATCH(req: Request, ctx: Ctx) {
           }
         : {}),
     },
-    select: { id: true },
+    select: {
+      id: true,
+      clientId: true,
+      client: {
+        select: {
+          id: true,
+          name: true,
+          type: true,
+        },
+      },
+    },
   });
   if (!exists) {
     return NextResponse.json({ error: "Контакт не знайдено" }, { status: 404 });
@@ -96,24 +121,57 @@ export async function PATCH(req: Request, ctx: Ctx) {
         : patch.email;
 
   try {
-    const updated = await prisma.contact.update({
-      where: { id: contactId },
-      data: {
-        ...(patch.fullName !== undefined && { fullName: patch.fullName }),
-        ...(patch.firstName !== undefined && { firstName: patch.firstName }),
-        ...(patch.lastName !== undefined && { lastName: patch.lastName }),
-        ...(patch.phone !== undefined && { phone: patch.phone }),
-        ...(emailOut !== undefined && { email: emailOut }),
-        ...(patch.instagramHandle !== undefined && {
-          instagramHandle: patch.instagramHandle,
-        }),
-        ...(patch.telegramHandle !== undefined && {
-          telegramHandle: patch.telegramHandle,
-        }),
-        ...(patch.city !== undefined && { city: patch.city }),
-        ...(patch.country !== undefined && { country: patch.country }),
-        ...(patch.notes !== undefined && { notes: patch.notes }),
-      },
+    const updated = await prisma.$transaction(async (tx) => {
+      let nextClientId: string | null | undefined = undefined;
+
+      if (patch.unlinkClient) {
+        nextClientId = null;
+      } else if (patch.clientName !== undefined || patch.clientType !== undefined) {
+        const nextType = patch.clientType ?? exists.client?.type ?? "COMPANY";
+        const nextNameRaw = patch.clientName ?? exists.client?.name ?? null;
+        const nextName = nextNameRaw?.trim() || null;
+
+        if (!nextName) {
+          nextClientId = null;
+        } else if (exists.clientId && exists.client && exists.client.type === nextType) {
+          await tx.client.update({
+            where: { id: exists.clientId },
+            data: { name: nextName, type: nextType },
+          });
+          nextClientId = exists.clientId;
+        } else {
+          const client = await tx.client.create({
+            data: {
+              name: nextName,
+              type: nextType,
+            },
+            select: { id: true },
+          });
+          nextClientId = client.id;
+        }
+      }
+
+      return tx.contact.update({
+        where: { id: contactId },
+        data: {
+          ...(patch.fullName !== undefined && { fullName: patch.fullName }),
+          ...(patch.firstName !== undefined && { firstName: patch.firstName }),
+          ...(patch.lastName !== undefined && { lastName: patch.lastName }),
+          ...(patch.phone !== undefined && { phone: patch.phone }),
+          ...(emailOut !== undefined && { email: emailOut }),
+          ...(patch.instagramHandle !== undefined && {
+            instagramHandle: patch.instagramHandle,
+          }),
+          ...(patch.telegramHandle !== undefined && {
+            telegramHandle: patch.telegramHandle,
+          }),
+          ...(patch.city !== undefined && { city: patch.city }),
+          ...(patch.country !== undefined && { country: patch.country }),
+          ...(patch.notes !== undefined && { notes: patch.notes }),
+          ...(patch.category !== undefined && { category: patch.category }),
+          ...(nextClientId !== undefined && { clientId: nextClientId }),
+        },
+      });
     });
     return NextResponse.json({
       ok: true,
@@ -129,6 +187,8 @@ export async function PATCH(req: Request, ctx: Ctx) {
         city: updated.city,
         country: updated.country,
         notes: updated.notes,
+        category: updated.category,
+        clientId: updated.clientId,
         updatedAt: updated.updatedAt.toISOString(),
       },
     });

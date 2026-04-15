@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { ModuleWorkspace } from "../../../../components/module/ModuleWorkspace";
 
 export const metadata: Metadata = {
-  title: "My work · ENVER CRM",
+  title: "Моя робота · ENVER CRM",
 };
 
 export default function DashboardMyWorkPage() {

@@ -110,14 +110,14 @@ export function DealRightRail({ data, nextBestAction, aiSummary }: Props) {
         <p className="font-medium text-[var(--enver-text)]">{nextBestAction}</p>
         {smart.missingData.length > 0 ? (
           <p className="mt-2 text-[11px] text-slate-500">
-            Missing data: {smart.missingData.join(", ")}
+            Не вистачає даних: {smart.missingData.join(", ")}
           </p>
         ) : null}
       </div>
       {missingDealData.length > 0 ? (
         <div className="rounded-2xl border border-amber-200 bg-amber-50/80 p-3 text-xs shadow-sm">
           <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-900">
-            Missing data alerts
+            Сповіщення про неповні дані
           </p>
           <ul className="space-y-1.5 text-amber-900">
             {missingDealData.slice(0, 4).map((line) => (
@@ -126,7 +126,7 @@ export function DealRightRail({ data, nextBestAction, aiSummary }: Props) {
           </ul>
         </div>
       ) : null}
-      <SmartPanelSummaryCard context={smart} title="Smart Panel" />
+      <SmartPanelSummaryCard context={smart} title="Розумна панель" />
 
       {visibility.showMeasurementCalendar ? (
         <div className="rounded-2xl border border-slate-200 bg-[var(--enver-card)] p-3 text-xs shadow-sm">

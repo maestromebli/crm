@@ -125,8 +125,8 @@ export function SettingsMaterialsCatalogManager() {
               onChange={(e) => setMode(e.target.value as "append" | "replace")}
               className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
             >
-              <option value="append">Append (додати / оновити)</option>
-              <option value="replace">Replace (замінити всі позиції провайдера)</option>
+              <option value="append">Додати / оновити</option>
+              <option value="replace">Замінити всі позиції провайдера</option>
             </select>
           </label>
           <label className="text-xs">

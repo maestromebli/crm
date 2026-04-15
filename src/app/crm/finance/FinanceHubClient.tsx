@@ -197,25 +197,25 @@ export function FinanceHubClient() {
     if (data.enterprise.riskIndex >= riskConfig.riskIndexWarn) {
       alerts.push({
         key: `finance-risk-${data.enterprise.riskIndex}-${riskConfig.riskIndexWarn}`,
-        message: `Finance risk index ${data.enterprise.riskIndex}/100 перевищив поріг ${riskConfig.riskIndexWarn}.`,
+        message: `Індекс фінансового ризику ${data.enterprise.riskIndex}/100 перевищив поріг ${riskConfig.riskIndexWarn}.`,
       });
     }
     if (enterpriseSignals.arOutstanding >= riskConfig.arOutstandingWarn) {
       alerts.push({
         key: `finance-ar-${Math.round(enterpriseSignals.arOutstanding)}-${riskConfig.arOutstandingWarn}`,
-        message: `AR outstanding ${formatMoney(enterpriseSignals.arOutstanding)} ₴ перевищив поріг.`,
+        message: `Дебіторська заборгованість ${formatMoney(enterpriseSignals.arOutstanding)} ₴ перевищила поріг.`,
       });
     }
     if (enterpriseSignals.apOutstanding >= riskConfig.apOutstandingWarn) {
       alerts.push({
         key: `finance-ap-${Math.round(enterpriseSignals.apOutstanding)}-${riskConfig.apOutstandingWarn}`,
-        message: `AP outstanding ${formatMoney(enterpriseSignals.apOutstanding)} ₴ перевищив поріг.`,
+        message: `Кредиторська заборгованість ${formatMoney(enterpriseSignals.apOutstanding)} ₴ перевищила поріг.`,
       });
     }
     if (enterpriseSignals.worstWeekNet <= riskConfig.weekNetWarn) {
       alerts.push({
         key: `finance-net-${Math.round(enterpriseSignals.worstWeekNet)}-${riskConfig.weekNetWarn}`,
-        message: `Forecast worst weekly net ${formatMoney(enterpriseSignals.worstWeekNet)} ₴ нижче порогу.`,
+        message: `Найгірший прогнозний тижневий чистий потік ${formatMoney(enterpriseSignals.worstWeekNet)} ₴ нижче порогу.`,
       });
     }
     for (const alert of alerts) {
@@ -225,7 +225,7 @@ export function FinanceHubClient() {
         module: "finance",
         type: "ENTERPRISE_RISK_ALERT",
         message: alert.message,
-        actor: "AI Control",
+        actor: "AI-контроль",
         payload: { key: alert.key },
       });
       setAuditFeed((prev) => [`ALERT → ${alert.message}`, ...prev].slice(0, 80));
@@ -249,7 +249,7 @@ export function FinanceHubClient() {
       payload: { amount: invoiceForm.amount, productionOrder: invoiceForm.productionOrder || null },
     });
     setAuditFeed((prev) => [
-      `INV → ${invoiceForm.type} / ${invoiceForm.entity} / ${formatMoney(invoiceForm.amount)} ₴ / due ${invoiceForm.dueDate || "—"}`,
+      `INV → ${invoiceForm.type} / ${invoiceForm.entity} / ${formatMoney(invoiceForm.amount)} ₴ / строк ${invoiceForm.dueDate || "—"}`,
       ...prev,
     ]);
     setInvoiceForm({
@@ -267,7 +267,7 @@ export function FinanceHubClient() {
     addFinanceDocument({
       kind: "PLAN",
       direction: "OUTGOING",
-      entity: "Production plan",
+      entity: "План виробництва",
       amount: paymentPlanForm.amount,
       dueDate: paymentPlanForm.trancheDate,
       productionOrder: paymentPlanForm.productionOrder.trim(),
@@ -295,10 +295,10 @@ export function FinanceHubClient() {
       <header className="rounded-3xl border border-slate-200 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-800 p-5 text-slate-100 shadow-xl">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-cyan-300">ENVER · SaaS ERP · Finance</p>
+            <p className="text-xs uppercase tracking-[0.2em] text-cyan-300">ENVER · SaaS ERP · Фінанси</p>
             <h1 className="mt-2 text-2xl font-semibold tracking-tight">Фінансовий командний центр</h1>
             <p className="mt-1 text-sm text-slate-300">
-              Cash-flow, P&amp;L, платіжна дисципліна та фінансовий контроль виробничих замовлень.
+              Грошовий потік, P&amp;L, платіжна дисципліна та фінансовий контроль виробничих замовлень.
             </p>
             <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1.5 text-xs font-medium">
               <Link
@@ -339,7 +339,7 @@ export function FinanceHubClient() {
           </div>
           <div className="rounded-2xl border border-slate-700 bg-slate-900/70 px-4 py-3 text-right text-sm">
             <p className="text-slate-400">Фінансовий статус</p>
-            <p className="font-semibold text-emerald-300">MONITORING</p>
+            <p className="font-semibold text-emerald-300">МОНІТОРИНГ</p>
             <p className="text-xs text-slate-400">{nowLabel}</p>
           </div>
         </div>
@@ -351,21 +351,21 @@ export function FinanceHubClient() {
             hint="Відношення залишку коштів до місячних витрат — наскільки довго вистачить обороту"
           />
           <KpiCard
-            label="Margin (місяць)"
+            label="Маржа (місяць)"
             value={`${analytics.marginPct}%`}
             tone="ok"
             dark
             hint="Частка прибутку в доході за поточний місяць"
           />
           <KpiCard
-            label="Runway"
+            label="Фінансовий запас"
             value={`${analytics.runwayDays} днів`}
             tone="info"
             dark
             hint="Орієнтовна кількість днів роботи при поточних витратах"
           />
           <KpiCard
-            label="Burn-rate / день"
+            label="Витрати / день"
             value={`${formatMoney(analytics.burnRate)} ₴`}
             tone="warn"
             dark
@@ -379,7 +379,7 @@ export function FinanceHubClient() {
           <p className="rounded-lg border border-slate-700 bg-slate-900/60 px-2 py-1">
             ERP виробничі замовлення: {productionOrders.length}
           </p>
-          <p className="rounded-lg border border-slate-700 bg-slate-900/60 px-2 py-1">Audit trail: active</p>
+          <p className="rounded-lg border border-slate-700 bg-slate-900/60 px-2 py-1">Журнал аудиту: активний</p>
         </div>
       </header>
 
@@ -417,24 +417,24 @@ export function FinanceHubClient() {
             />
           </section>
           <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <KpiCard label="Enterprise Risk" value={`${data.enterprise.riskIndex}/100`} tone="warn" />
-            <KpiCard label="Risk label" value={data.enterprise.riskLabel} />
+            <KpiCard label="Корпоративний ризик" value={`${data.enterprise.riskIndex}/100`} tone="warn" />
+            <KpiCard label="Мітка ризику" value={data.enterprise.riskLabel} />
             <KpiCard
-              label="AR outstanding"
+              label="Дебіторка (залишок)"
               value={`${formatMoney(data.enterprise.arLedger.reduce((a, r) => a + r.outstanding, 0))} ₴`}
               tone="info"
             />
             <KpiCard
-              label="AP outstanding"
+              label="Кредиторка (залишок)"
               value={`${formatMoney(data.enterprise.apLedger.reduce((a, r) => a + r.outstanding, 0))} ₴`}
               tone="warn"
             />
           </section>
           <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <h2 className="text-sm font-semibold text-slate-900">Risk thresholds (керовані)</h2>
+            <h2 className="text-sm font-semibold text-slate-900">Пороги ризику (керовані)</h2>
             <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
               <label className="text-xs text-slate-600">
-                Risk index warn
+                Поріг індексу ризику
                 <input
                   type="number"
                   min={0}
@@ -447,7 +447,7 @@ export function FinanceHubClient() {
                 />
               </label>
               <label className="text-xs text-slate-600">
-                AR outstanding warn
+                Поріг дебіторки
                 <input
                   type="number"
                   min={0}
@@ -459,7 +459,7 @@ export function FinanceHubClient() {
                 />
               </label>
               <label className="text-xs text-slate-600">
-                AP outstanding warn
+                Поріг кредиторки
                 <input
                   type="number"
                   min={0}
@@ -471,7 +471,7 @@ export function FinanceHubClient() {
                 />
               </label>
               <label className="text-xs text-slate-600">
-                Worst week net warn
+                Поріг найгіршого тижневого net
                 <input
                   type="number"
                   className="mt-1 w-full rounded border border-slate-300 px-2 py-1"
@@ -509,7 +509,7 @@ export function FinanceHubClient() {
                 Зелений — надходження, червоний — витрати (масштаб по максимуму вікна).
               </p>
 
-              <h3 className="mt-4 text-xs font-semibold text-slate-700">Net flow (останні 7 днів)</h3>
+              <h3 className="mt-4 text-xs font-semibold text-slate-700">Чистий потік (останні 7 днів)</h3>
               <div className="mt-2 flex h-24 items-end gap-2 rounded-xl bg-slate-50 p-3">
                 {weeklyNet.map((value, index) => {
                   const positive = value >= 0;
@@ -530,7 +530,7 @@ export function FinanceHubClient() {
 
             <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <div className="rounded-2xl border border-violet-200/80 bg-gradient-to-br from-violet-50 to-white p-4">
-                <h2 className="text-sm font-semibold text-violet-900">AI: ризики та прогноз</h2>
+                <h2 className="text-sm font-semibold text-violet-900">ШІ: ризики та прогноз</h2>
                 <ul className="mt-3 space-y-2 text-sm text-slate-700">
                   <li>
                     <span className="font-medium text-slate-900">Ризик оплат: </span>
@@ -554,16 +554,16 @@ export function FinanceHubClient() {
           </section>
           <section className="grid gap-4 xl:grid-cols-[1.2fr_1fr]">
             <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <h2 className="text-sm font-semibold text-slate-900">Cashflow forecast · 8 тижнів</h2>
+              <h2 className="text-sm font-semibold text-slate-900">Прогноз грошового потоку · 8 тижнів</h2>
               <div className="mt-3 overflow-x-auto">
                 <table className="w-full text-left text-sm">
                   <thead>
                     <tr className="border-b border-slate-100 text-xs text-slate-500">
-                      <th className="py-2 pr-2">Week</th>
-                      <th className="py-2 pr-2">Inflow</th>
-                      <th className="py-2 pr-2">Outflow</th>
-                      <th className="py-2 pr-2">Net</th>
-                      <th className="py-2">Balance</th>
+                      <th className="py-2 pr-2">Тиждень</th>
+                      <th className="py-2 pr-2">Надходження</th>
+                      <th className="py-2 pr-2">Витрати</th>
+                      <th className="py-2 pr-2">Чистий потік</th>
+                      <th className="py-2">Баланс</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -583,14 +583,14 @@ export function FinanceHubClient() {
               </div>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <h2 className="text-sm font-semibold text-slate-900">AR / AP ledger</h2>
+              <h2 className="text-sm font-semibold text-slate-900">Реєстр дебіторки / кредиторки</h2>
               <div className="mt-3 grid gap-3">
                 <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-3">
                   <p className="text-xs font-semibold uppercase text-emerald-700">AR</p>
                   <ul className="mt-2 space-y-1 text-xs text-slate-700">
                     {data.enterprise.arLedger.slice(0, 6).map((row) => (
                       <li key={row.dealId}>
-                        {row.dealTitle}: due {formatMoney(row.outstanding)} ₴
+                        {row.dealTitle}: до сплати {formatMoney(row.outstanding)} ₴
                       </li>
                     ))}
                   </ul>
@@ -600,7 +600,7 @@ export function FinanceHubClient() {
                   <ul className="mt-2 space-y-1 text-xs text-slate-700">
                     {data.enterprise.apLedger.slice(0, 6).map((row) => (
                       <li key={row.purchaseOrderId}>
-                        {row.dealTitle}: due {formatMoney(row.outstanding)} ₴
+                        {row.dealTitle}: до сплати {formatMoney(row.outstanding)} ₴
                       </li>
                     ))}
                   </ul>
@@ -628,8 +628,8 @@ export function FinanceHubClient() {
                   }))
                 }
               >
-                <option value="INCOMING">INCOMING</option>
-                <option value="OUTGOING">OUTGOING</option>
+                <option value="INCOMING">Вхідний</option>
+                <option value="OUTGOING">Вихідний</option>
               </select>
               <input
                 className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
@@ -746,7 +746,7 @@ export function FinanceHubClient() {
                 type="submit"
                 className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100"
               >
-                Додати в payment plan
+                Додати в платіжний план
               </button>
             </form>
           </section>
@@ -770,7 +770,7 @@ export function FinanceHubClient() {
 
             <div className="space-y-4">
               <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                <h2 className="text-sm font-semibold text-slate-900">Finance approvals (ERP bridge)</h2>
+                <h2 className="text-sm font-semibold text-slate-900">Погодження фіндокументів (ERP-міст)</h2>
                 <ul className="mt-2 space-y-2 text-xs">
                   {financeDocuments.slice(0, 6).map((doc) => (
                     <li key={doc.id} className="rounded border border-slate-200 bg-slate-50 px-2 py-1.5">
@@ -784,7 +784,7 @@ export function FinanceHubClient() {
                             className="rounded border border-slate-300 bg-white px-2 py-0.5 text-[11px] text-slate-700"
                             onClick={() => approveFinanceDocument(doc.id, "CFO")}
                           >
-                            Approve
+                            Погодити
                           </button>
                         ) : null}
                         {doc.status === "APPROVED" ? (
@@ -793,7 +793,7 @@ export function FinanceHubClient() {
                             className="rounded border border-slate-300 bg-white px-2 py-0.5 text-[11px] text-slate-700"
                             onClick={() => markFinanceDocumentPaid(doc.id, "Treasury")}
                           >
-                            Mark paid
+                            Позначити оплаченим
                           </button>
                         ) : null}
                       </div>
@@ -805,8 +805,8 @@ export function FinanceHubClient() {
               <div className="grid gap-2">
               <QuickLink href="/crm/production" title="Виробничий контур" subtitle="готовність замовлень і ризики строків" />
               <QuickLink href="/warehouse" title="Склад WMS" subtitle="залишки, резерви, оцінка запасів" />
-              <QuickLink href="/crm/procurement" title="Контур закупівлі" subtitle="PO, постачальники, склад" />
-              <QuickLink href="/crm/erp" title="Global ERP Command" subtitle="approval trail і наскрізний timeline" />
+              <QuickLink href="/crm/procurement" title="Контур закупівель" subtitle="PO, постачальники, склад" />
+              <QuickLink href="/crm/erp" title="Глобальний ERP-командний центр" subtitle="ланцюжок погоджень і наскрізна стрічка подій" />
               </div>
             </div>
           </section>

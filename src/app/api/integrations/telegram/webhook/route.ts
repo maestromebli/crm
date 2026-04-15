@@ -30,7 +30,7 @@ export async function POST(req: Request) {
   const expectedSecret = process.env.TELEGRAM_WEBHOOK_SECRET?.trim();
   const providedSecret = req.headers.get("x-telegram-bot-api-secret-token")?.trim();
   if (expectedSecret && providedSecret !== expectedSecret) {
-    return NextResponse.json({ error: "Invalid telegram secret" }, { status: 401 });
+    return NextResponse.json({ error: "Некоректний telegram secret" }, { status: 401 });
   }
   if (ownerHint) {
     await markChannelHealth({
@@ -44,7 +44,7 @@ export async function POST(req: Request) {
   try {
     payload = (await req.json()) as TelegramWebhook;
   } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    return NextResponse.json({ error: "Некоректний JSON" }, { status: 400 });
   }
 
   const message = payload.message;

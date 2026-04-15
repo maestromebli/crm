@@ -7,8 +7,11 @@ type LeadActionsProps = {
   lead: LeadDetailRow;
   tel: string | null;
   canConvertToDeal: boolean;
+  canArchiveLead: boolean;
+  archiving: boolean;
   converting: boolean;
   onConvert: () => void;
+  onArchive: () => void;
   onCallNavigate: () => void;
 };
 
@@ -16,8 +19,11 @@ export function LeadActions({
   lead,
   tel,
   canConvertToDeal,
+  canArchiveLead,
+  archiving,
   converting,
   onConvert,
+  onArchive,
   onCallNavigate,
 }: LeadActionsProps) {
   return (
@@ -47,6 +53,16 @@ export function LeadActions({
       >
         Задача
       </Link>
+      {canArchiveLead ? (
+        <button
+          type="button"
+          disabled={archiving}
+          onClick={() => onArchive()}
+          className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-800 hover:bg-[var(--enver-hover)] disabled:opacity-50"
+        >
+          {archiving ? "…" : "В архів"}
+        </button>
+      ) : null}
       {lead.linkedDeal ? (
         <Link
           href={`/deals/${lead.linkedDeal.id}/workspace`}

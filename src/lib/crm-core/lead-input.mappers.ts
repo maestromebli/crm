@@ -93,6 +93,7 @@ export function mapLeadDetailRowToCoreInput(lead: LeadDetailRow): LeadCoreInput 
   const stageKey = resolveLeadStageKey(lead.stage.slug, {
     isFinal: lead.stage.isFinal,
     finalType: lead.stage.finalType,
+    stageName: lead.stage.name,
   });
 
   const estimates = mapEstimates(lead);
@@ -163,6 +164,10 @@ export function mapLeadDetailRowToCoreInput(lead: LeadDetailRow): LeadCoreInput 
       daysSinceActivity,
     },
     meetings: buildMeetings(lead),
+    communication: {
+      messageCount: lead.communication?.messageCount ?? 0,
+      lastMessageAt: lead.communication?.lastMessageAt ?? null,
+    },
     nextStepText: lead.nextStep,
     nextContactAt: lead.nextContactAt,
     projectAgreed: lead.projectAgreed === true,

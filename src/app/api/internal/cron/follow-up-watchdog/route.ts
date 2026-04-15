@@ -13,7 +13,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "DATABASE_URL не задано" }, { status: 503 });
   }
   if (!authorized(req)) {
-    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    return NextResponse.json({ error: "Заборонено" }, { status: 403 });
   }
 
   const url = new URL(req.url);

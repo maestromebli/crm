@@ -1,4 +1,4 @@
-import type { ContactLifecycle, Prisma } from "@prisma/client";
+import type { ContactCategory, ContactLifecycle, Prisma } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
 import type { ContactListView } from "../../lib/contacts-route";
 import type { AccessContext } from "../../lib/authz/data-scope";
@@ -11,11 +11,13 @@ import {
 export type ContactListRow = {
   id: string;
   fullName: string;
+  category: ContactCategory;
   phone: string | null;
   email: string | null;
   city: string | null;
   lifecycle: ContactLifecycle;
   clientName: string | null;
+  clientType: "COMPANY" | "PERSON" | null;
   leadsCount: number;
   dealsCount: number;
   updatedAt: Date;
@@ -24,12 +26,13 @@ export type ContactListRow = {
 const listSelect = {
   id: true,
   fullName: true,
+  category: true,
   phone: true,
   email: true,
   city: true,
   lifecycle: true,
   updatedAt: true,
-  client: { select: { name: true } },
+  client: { select: { name: true, type: true } },
   _count: {
     select: {
       leads: true,
@@ -105,7 +108,7 @@ export async function listContactsByView(
   view: ContactListView,
   ctx: AccessContext,
 ): Promise<{ rows: ContactListRow[]; error: string | null }> {
-  if (view === "segments" || view === "activity") {
+  if (view === "activity") {
     return { rows: [], error: null };
   }
 
@@ -127,11 +130,16 @@ export async function listContactsByView(
       rows: rows.map((r) => ({
         id: r.id,
         fullName: r.fullName,
+        category: r.category,
         phone: r.phone,
         email: r.email,
         city: r.city,
         lifecycle: r.lifecycle,
         clientName: r.client?.name ?? null,
+        clientType:
+          r.client?.type === "COMPANY" || r.client?.type === "PERSON"
+            ? r.client.type
+            : null,
         leadsCount: r._count.leads,
         dealsCount: r._count.deals,
         updatedAt: r.updatedAt,
@@ -173,6 +181,7 @@ export type ContactDetailRow = {
   firstName: string | null;
   lastName: string | null;
   fullName: string;
+  category: ContactCategory;
   phone: string | null;
   email: string | null;
   instagramHandle: string | null;
@@ -187,10 +196,33 @@ export type ContactDetailRow = {
   leads: ContactDetailLead[];
   deals: ContactDetailDeal[];
   linkedLeads: ContactDetailLinkedLead[];
+  companyContacts: Array<{
+    id: string;
+    fullName: string;
+    category: ContactCategory;
+    phone: string | null;
+    email: string | null;
+  }>;
 };
 
 const detailInclude = {
-  client: { select: { id: true, name: true, type: true } },
+  client: {
+    select: {
+      id: true,
+      name: true,
+      type: true,
+      contacts: {
+        orderBy: { updatedAt: "desc" as const },
+        select: {
+          id: true,
+          fullName: true,
+          category: true,
+          phone: true,
+          email: true,
+        },
+      },
+    },
+  },
   leads: {
     orderBy: { updatedAt: "desc" as const },
     take: 30,
@@ -253,6 +285,7 @@ export async function getContactById(
       firstName: row.firstName,
       lastName: row.lastName,
       fullName: row.fullName,
+      category: row.category,
       phone: row.phone,
       email: row.email,
       instagramHandle: row.instagramHandle,
@@ -284,6 +317,16 @@ export async function getContactById(
         client: d.client,
       })),
       linkedLeads,
+      companyContacts:
+        row.client?.contacts
+          .filter((c) => c.id !== row.id)
+          .map((c) => ({
+            id: c.id,
+            fullName: c.fullName,
+            category: c.category,
+            phone: c.phone,
+            email: c.email,
+          })) ?? [],
     };
   } catch (e) {
     logPrismaError("getContactById", e);

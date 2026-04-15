@@ -5,12 +5,12 @@ import {
   forbidUnlessLeadAccess,
   forbidUnlessPermission,
   requireSessionUser,
-} from "../../../../../../../lib/authz/api-guard";
-import { P } from "../../../../../../../lib/authz/permissions";
-import { renderLeadProposalPdfFromModel } from "../../../../../../../lib/estimates/render-lead-proposal-pdf";
-import { buildQuotePrintModelFromEntities } from "../../../../../../../lib/leads/lead-proposal-document";
-import { prisma } from "../../../../../../../lib/prisma";
-import { saveLeadBufferPrivate } from "../../../../../../../lib/uploads/lead-disk-upload";
+} from "@/lib/authz/api-guard";
+import { P } from "@/lib/authz/permissions";
+import { renderLeadProposalPdfFromModel } from "@/lib/estimates/render-lead-proposal-pdf";
+import { buildQuotePrintModelFromEntities } from "@/lib/leads/lead-proposal-document";
+import { prisma } from "@/lib/prisma";
+import { saveLeadBufferPrivate } from "@/lib/uploads/lead-disk-upload";
 
 type Ctx = { params: Promise<{ leadId: string; proposalId: string }> };
 

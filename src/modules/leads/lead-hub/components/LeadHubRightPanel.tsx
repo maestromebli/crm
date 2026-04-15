@@ -1,71 +1,78 @@
 "use client";
-
-import type { ReactNode } from "react";
 import type { LeadDetailRow } from "../../../../features/leads/queries";
-import { LeadAiOperationsPanel } from "../../../../features/ai";
-import { AiV2InsightCard } from "../../../../features/ai-v2";
-import { LeadReadinessBlockersCard } from "./LeadReadinessBlockersCard";
-import { LeadHubSmartInsightsCard } from "./LeadHubSmartInsightsCard";
-import { LeadHubTimelineStrip } from "./LeadHubTimelineStrip";
-import {
-  buildLeadSmartPanelContext,
-  resolveLeadUiVisibilityRules,
-} from "../../../../lib/dynamic-layer";
-import { SmartPanelSummaryCard } from "../../../../components/dynamic/SmartPanelSummaryCard";
+import { buildLeadSmartPanelContext } from "../../../../lib/dynamic-layer";
 
 type Props = {
   lead: LeadDetailRow;
-  /** Дзеркало швидких дій з шапки (дзвінок, нотатки, файл, замір, стрічка). */
-  quickActions?: ReactNode;
+  mode?: "new" | "contacted" | "proposal" | "closing" | "stuck";
 };
 
 /**
  * Смарт-панель: швидкі дії, ризики / підказки, перевірки, AI, таймлайн.
  * Головний CTA — у липкій шапці центральної колонки.
  */
-export function LeadHubRightPanel({ lead, quickActions }: Props) {
+export function LeadHubRightPanel({
+  lead,
+  mode = "contacted",
+}: Props) {
   const smart = buildLeadSmartPanelContext(lead);
-  const visibility = resolveLeadUiVisibilityRules(lead);
+  const topRisks = smart.risks.slice(0, mode === "stuck" ? 4 : 3);
+  const checklist = smart.checklist.slice(0, 6);
+  const hints = smart.aiHints.slice(0, 4);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <SmartPanelSummaryCard context={smart} title="Smart Panel" />
-      {quickActions ? (
-        <section
-          className="rounded-[12px] border border-[var(--enver-border)] bg-[var(--enver-card)] p-3 shadow-[var(--enver-shadow)]"
-          aria-label="Швидкі дії"
-        >
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--enver-muted)]">
-            Швидкі дії
+    <aside className="rounded-[10px] bg-[var(--enver-bg)]/70 px-3 py-3">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--enver-muted)]">
+        Context Panel
+      </p>
+      <p className="mt-0.5 text-[12px] text-[var(--enver-text-muted)]">
+        Ризики, чекліст і AI-підказки в єдиному спокійному блоці.
+      </p>
+
+      <div className="mt-3 space-y-3">
+        <section>
+          <p className="text-[11px] font-semibold text-[var(--enver-text)]">
+            Ризики ({smart.riskMeter}%)
           </p>
-          <div className="mt-2">{quickActions}</div>
+          {topRisks.length ? (
+            <ul className="mt-1 space-y-1">
+              {topRisks.map((risk) => (
+                <li key={risk} className="text-[11px] text-[var(--enver-text-muted)]">
+                  • {risk}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-1 text-[11px] text-emerald-700">Критичних ризиків не знайдено.</p>
+          )}
         </section>
-      ) : null}
-      <LeadHubSmartInsightsCard lead={lead} />
-      {visibility.showMeasurementCalendar ? (
-        <section className="rounded-[12px] border border-[var(--enver-border)] bg-[var(--enver-card)] p-3 shadow-[var(--enver-shadow)]">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--enver-muted)]">
-            Умовний блок
-          </p>
-          <p className="mt-1 text-[11px] text-[var(--enver-text)]">
-            Потрібен замір: показуємо блок календаря для планування виїзду.
-          </p>
+
+        <section>
+          <p className="text-[11px] font-semibold text-[var(--enver-text)]">Чекліст</p>
+          <ul className="mt-1 space-y-1">
+            {checklist.map((item) => (
+              <li key={item.id} className="text-[11px] text-[var(--enver-text-muted)]">
+                {item.done ? "✓" : "○"} {item.label}
+              </li>
+            ))}
+          </ul>
         </section>
-      ) : null}
-      {visibility.showPartnerPercent ? (
-        <section className="rounded-[12px] border border-[var(--enver-border)] bg-[var(--enver-card)] p-3 shadow-[var(--enver-shadow)]">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--enver-muted)]">
-            Партнерський блок
-          </p>
-          <p className="mt-1 text-[11px] text-[var(--enver-text)]">
-            Джерело «designer»: показуємо поле партнерського відсотка.
-          </p>
+
+        <section>
+          <p className="text-[11px] font-semibold text-[var(--enver-text)]">AI insights</p>
+          {hints.length ? (
+            <ul className="mt-1 space-y-1">
+              {hints.map((hint) => (
+                <li key={hint} className="text-[11px] text-[var(--enver-text-muted)]">
+                  • {hint}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-1 text-[11px] text-[var(--enver-text-muted)]">Поки без нових інсайтів.</p>
+          )}
         </section>
-      ) : null}
-      <LeadReadinessBlockersCard lead={lead} />
-      <AiV2InsightCard context="lead" leadId={lead.id} />
-      <LeadAiOperationsPanel leadId={lead.id} />
-      <LeadHubTimelineStrip leadId={lead.id} />
-    </div>
+      </div>
+    </aside>
   );
 }

@@ -38,8 +38,11 @@ export function LeadNextActionCard({
   const saving = leadActions.isPending;
 
   useEffect(() => {
-    setNextStep(lead.nextStep ?? "");
-    setNextStepDate(dateToNextStepDateString(lead.nextContactAt) ?? "");
+    const timer = window.setTimeout(() => {
+      setNextStep(lead.nextStep ?? "");
+      setNextStepDate(dateToNextStepDateString(lead.nextContactAt) ?? "");
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [lead.nextStep, lead.nextContactAt, lead.updatedAt]);
 
   const risk = (() => {

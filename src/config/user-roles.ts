@@ -3,6 +3,7 @@ export const CRM_ROLES_PRIMARY = [
   "SUPER_ADMIN",
   "ADMIN",
   "DIRECTOR",
+  "DIRECTOR_PRODUCTION",
   "HEAD_MANAGER",
   "TEAM_LEAD",
   "SALES_MANAGER",
@@ -36,6 +37,7 @@ export const ROLE_LABELS: Record<CrmRole, string> = {
   PROCUREMENT_MANAGER: "Закупівлі",
   ACCOUNTANT: "Бухгалтер",
   DIRECTOR: "Директор",
+  DIRECTOR_PRODUCTION: "Директор виробництва",
   MANAGER: "Менеджер (legacy → як головний менеджер)",
   USER: "Користувач (legacy → як менеджер з продажів)",
 };

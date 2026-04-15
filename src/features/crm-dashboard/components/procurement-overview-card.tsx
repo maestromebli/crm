@@ -34,19 +34,19 @@ export function ProcurementOverviewCard({
       <div className="mt-4 flex flex-wrap gap-2">
         <Link
           href="/crm/procurement"
-          className="rounded-lg bg-[var(--enver-accent)] px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:brightness-110"
+          className="rounded-lg border border-[var(--enver-border)] bg-white px-3 py-1.5 text-sm font-semibold !text-slate-900 shadow-sm hover:bg-slate-50"
         >
           Закупівлі
         </Link>
         <Link
           href="/crm/procurement"
-          className="rounded-lg border border-[var(--enver-border)] bg-[var(--enver-surface)] px-3 py-1.5 text-xs font-semibold hover:bg-[var(--enver-hover)]"
+          className="rounded-lg border border-[var(--enver-border)] bg-[var(--enver-surface)] px-3 py-1.5 text-sm font-semibold text-[var(--enver-text)] hover:bg-[var(--enver-hover)]"
         >
           Створити PO
         </Link>
         <Link
           href="/crm/procurement"
-          className="rounded-lg border border-[var(--enver-border)] bg-[var(--enver-surface)] px-3 py-1.5 text-xs font-semibold hover:bg-[var(--enver-hover)]"
+          className="rounded-lg border border-[var(--enver-border)] bg-[var(--enver-surface)] px-3 py-1.5 text-sm font-semibold text-[var(--enver-text)] hover:bg-[var(--enver-hover)]"
         >
           Затримки
         </Link>

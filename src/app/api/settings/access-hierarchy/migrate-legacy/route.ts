@@ -66,7 +66,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       ok: true,
       migrated: false,
-      message: "Legacy-ієрархію не знайдено",
+      message: "Застарілу ієрархію не знайдено",
       processedHeads: 0,
       assignedMembers: 0,
     });

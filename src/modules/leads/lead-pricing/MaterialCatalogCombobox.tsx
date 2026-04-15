@@ -373,7 +373,6 @@ export function MaterialCatalogCombobox({
             className,
           )}
           placeholder="Введіть назву — підказки з прайсу…"
-          title="Введіть щонайменше 2 символи, щоб з’явився список з бази прайсів. Клік по рядку заповнить ціну та одиницю."
         />
       </div>
       {showHelpHint ? (

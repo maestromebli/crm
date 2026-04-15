@@ -174,6 +174,8 @@ export function buildQuotePrintModelFromEntities(args: {
       imageUrls: urls,
     };
   });
+  const rowsTotal = rows.reduce((sum, row) => sum + row.lineTotal, 0);
+  const roundedRowsTotal = Math.round(rowsTotal * 100) / 100;
 
   const currency =
     snap?.currency ??
@@ -195,7 +197,7 @@ export function buildQuotePrintModelFromEntities(args: {
       deliveryCost: snap?.deliveryCost ?? est?.deliveryCost ?? null,
       installationCost:
         snap?.installationCost ?? est?.installationCost ?? null,
-      total: snap?.total ?? est?.totalPrice ?? null,
+      total: roundedRowsTotal,
     },
     summary:
       args.proposal.summary?.trim() ||

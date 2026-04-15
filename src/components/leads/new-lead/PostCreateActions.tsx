@@ -132,7 +132,7 @@ export function PostCreateActions({
               ✓
             </span>
             <span className="text-xs font-semibold">Задача</span>
-            <span className="text-[10px] text-slate-500">Follow-up</span>
+            <span className="text-[10px] text-slate-500">Повторний контакт</span>
           </Link>
         ) : null}
 
@@ -156,7 +156,7 @@ export function PostCreateActions({
           <span className="text-lg" aria-hidden>
             🧭
           </span>
-          <span className="text-xs font-semibold">Lead Hub</span>
+          <span className="text-xs font-semibold">Хаб ліда</span>
           <span className="text-[10px] text-slate-500">Робочий простір</span>
         </Link>
 

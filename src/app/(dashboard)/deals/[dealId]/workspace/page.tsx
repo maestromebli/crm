@@ -38,7 +38,13 @@ export default async function DealWorkspacePage({ params }: Props) {
 
   return (
     <Suspense fallback={<WorkspaceFallback />}>
-      <DealWorkspaceShell data={data} viewerRole={access.role} />
+      <DealWorkspaceShell
+        data={data}
+        viewerRole={access.role}
+        viewerPermissionKeys={access.permissionKeys}
+        viewerRealRole={access.realRole}
+        viewerImpersonatorId={access.impersonatorId}
+      />
     </Suspense>
   );
 }

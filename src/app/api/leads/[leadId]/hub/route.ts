@@ -25,6 +25,7 @@ type Ctx = { params: Promise<{ leadId: string }> };
 /**
  * Агрегатор Hub за контрактом addon (`GET /api/leads/:id/hub`).
  * Дублює/розширює hub-summary одним read-model для клієнтів.
+ * DUPLICATE PRICING - TO BE REFACTORED
  */
 export async function GET(_req: Request, ctx: Ctx) {
   if (!process.env.DATABASE_URL?.trim()) {

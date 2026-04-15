@@ -30,7 +30,7 @@ export default async function FinanceOverviewPage({ searchParams }: Props) {
       <main className="mx-auto max-w-[min(100%,1680px)] space-y-6 px-4 py-5 sm:px-6">
         <PageHeader
           title="Фінанси"
-          subtitle="Live ERP hub: реєстри, документи та контроль грошових потоків у реальному часі."
+          subtitle="Оперативний ERP-хаб: реєстри, документи та контроль грошових потоків у реальному часі."
           actionsSlot={
             <div className="inline-flex rounded-lg border border-[var(--enver-border)] bg-[var(--enver-bg)] p-1">
               <Link
@@ -40,7 +40,7 @@ export default async function FinanceOverviewPage({ searchParams }: Props) {
                 Аналітичний огляд
               </Link>
               <span className="rounded-md bg-[var(--enver-accent-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--enver-accent-hover)]">
-                Live hub
+                Оперативний хаб
               </span>
             </div>
           }
@@ -57,7 +57,7 @@ export default async function FinanceOverviewPage({ searchParams }: Props) {
             штаб виробництва
           </Link>
           <Link href="/crm/production/workshop" className="text-sky-700 underline-offset-2 hover:underline">
-            Kanban цеху
+            Канбан цеху
           </Link>
           <Link href="/crm/procurement" className="text-sky-700 underline-offset-2 hover:underline">
             закупівлі
@@ -98,7 +98,7 @@ export default async function FinanceOverviewPage({ searchParams }: Props) {
                 href="/crm/finance?view=hub"
                 className="rounded-md px-3 py-1.5 text-xs font-medium text-[var(--enver-muted)] hover:bg-[var(--enver-hover)]"
               >
-                Live hub
+                Оперативний хаб
               </Link>
             </div>
             {canAccess(role, "FINANCE_FULL") || canAccess(role, "FINANCE_SUMMARY") ? (
@@ -120,7 +120,7 @@ export default async function FinanceOverviewPage({ searchParams }: Props) {
           штаб виробництва
         </Link>
         <Link href="/crm/production/workshop" className="text-sky-700 underline-offset-2 hover:underline">
-          Kanban цеху
+          Канбан цеху
         </Link>
         <Link href="/crm/procurement" className="text-sky-700 underline-offset-2 hover:underline">
           закупівлі
@@ -200,11 +200,11 @@ export default async function FinanceOverviewPage({ searchParams }: Props) {
       <FinanceKpiCards kpi={data.kpi} />
       <SectionCard
         title="SaaS бухгалтерський контроль"
-        subtitle="Aging, cash runway, покриття зобовʼязань і концентрація постачальників"
+        subtitle="Старіння боргів, фінансовий запас, покриття зобовʼязань і концентрація постачальників"
       >
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-xl border border-slate-200/90 bg-white p-4 shadow-sm">
-            <p className="text-xs font-medium text-slate-500">Cash runway</p>
+            <p className="text-xs font-medium text-slate-500">Фінансовий запас</p>
             <p className="mt-1.5 text-xl font-semibold tabular-nums tracking-tight text-[var(--enver-text)]">
               {data.saasAccounting.cashRunwayDays} днів
             </p>
@@ -231,7 +231,7 @@ export default async function FinanceOverviewPage({ searchParams }: Props) {
             </p>
           </div>
           <div className="rounded-xl border border-slate-200/90 bg-white p-4 shadow-sm">
-            <p className="text-xs font-medium text-slate-500">Risk index</p>
+            <p className="text-xs font-medium text-slate-500">Індекс ризику</p>
             <p className="mt-1.5 text-xl font-semibold tabular-nums tracking-tight text-[var(--enver-text)]">
               {data.saasAccounting.riskIndex}/100
             </p>
@@ -250,7 +250,7 @@ export default async function FinanceOverviewPage({ searchParams }: Props) {
       </SectionCard>
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-6">
-          <SectionCard title="Aging боргів" subtitle="Дебіторка та кредиторка за часовими кошиками">
+          <SectionCard title="Старіння боргів" subtitle="Дебіторка та кредиторка за часовими кошиками">
             <div className="grid gap-3 md:grid-cols-2">
               <div className="rounded-lg border border-emerald-200 p-3">
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-emerald-700">
@@ -276,7 +276,7 @@ export default async function FinanceOverviewPage({ searchParams }: Props) {
               </div>
             </div>
           </SectionCard>
-          <SectionCard title="Health по проєктах" subtitle="Маржа, борги та сигнали ризику">
+          <SectionCard title="Стан проєктів" subtitle="Маржа, борги та сигнали ризику">
             <div className="overflow-x-auto">
               <table className="min-w-full text-left text-sm">
                 <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
@@ -311,16 +311,16 @@ export default async function FinanceOverviewPage({ searchParams }: Props) {
               </table>
             </div>
           </SectionCard>
-          <SectionCard title="Cashflow forecast · 8 тижнів" subtitle="Плановий рух коштів (inflow/outflow/net)">
+          <SectionCard title="Прогноз грошового потоку · 8 тижнів" subtitle="Плановий рух коштів (надходження/витрати/чистий потік)">
             <div className="overflow-x-auto">
               <table className="min-w-full text-left text-sm">
                 <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                   <tr>
                     <th className="px-2 py-2">Тиждень</th>
-                    <th className="px-2 py-2">Inflow</th>
-                    <th className="px-2 py-2">Outflow</th>
-                    <th className="px-2 py-2">Net</th>
-                    <th className="px-2 py-2">Balance</th>
+                    <th className="px-2 py-2">Надходження</th>
+                    <th className="px-2 py-2">Витрати</th>
+                    <th className="px-2 py-2">Чистий потік</th>
+                    <th className="px-2 py-2">Баланс</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -345,14 +345,14 @@ export default async function FinanceOverviewPage({ searchParams }: Props) {
             <div className="grid gap-3 md:grid-cols-2">
               <div className="rounded-lg border border-emerald-200 p-3">
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-emerald-700">
-                  AR (Accounts Receivable)
+                  Дебіторка (AR)
                 </p>
                 <div className="max-h-64 space-y-1 overflow-y-auto text-xs">
                   {data.saasAccounting.arLedger.slice(0, 8).map((row) => (
                     <div key={row.projectId} className="rounded border border-emerald-100 bg-emerald-50/40 p-2">
                       <p className="font-medium text-slate-900">{row.projectCode} · {row.clientName}</p>
                       <p className="text-slate-600">
-                        Invoice {formatMoneyUa(row.invoiced)} · Paid {formatMoneyUa(row.received)} · Due {formatMoneyUa(row.outstanding)}
+                        Виставлено {formatMoneyUa(row.invoiced)} · Оплачено {formatMoneyUa(row.received)} · До сплати {formatMoneyUa(row.outstanding)}
                       </p>
                     </div>
                   ))}
@@ -360,14 +360,14 @@ export default async function FinanceOverviewPage({ searchParams }: Props) {
               </div>
               <div className="rounded-lg border border-rose-200 p-3">
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-rose-700">
-                  AP (Accounts Payable)
+                  Кредиторка (AP)
                 </p>
                 <div className="max-h-64 space-y-1 overflow-y-auto text-xs">
                   {data.saasAccounting.apLedger.slice(0, 8).map((row) => (
                     <div key={row.purchaseOrderId} className="rounded border border-rose-100 bg-rose-50/40 p-2">
                       <p className="font-medium text-slate-900">{row.orderNumber} · {row.supplierName}</p>
                       <p className="text-slate-600">
-                        Total {formatMoneyUa(row.total)} · Paid {formatMoneyUa(row.paid)} · Due {formatMoneyUa(row.outstanding)}
+                        Всього {formatMoneyUa(row.total)} · Оплачено {formatMoneyUa(row.paid)} · До сплати {formatMoneyUa(row.outstanding)}
                       </p>
                     </div>
                   ))}

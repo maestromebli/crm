@@ -62,14 +62,14 @@ export function CriticalAlertsPanel({ initialAlerts }: Props) {
         </h2>
         <div className="flex items-center gap-2">
           <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-medium text-rose-700">
-            Unread: {unread.length}
+            Непрочитані: {unread.length}
           </span>
           <button
             type="button"
             onClick={() => setMode((m) => (m === "unread" ? "all" : "unread"))}
             className="rounded border border-slate-200 bg-[var(--enver-card)] px-2 py-0.5 text-[10px] text-slate-700"
           >
-            {mode === "unread" ? "Show all" : "Show unread"}
+            {mode === "unread" ? "Показати всі" : "Показати непрочитані"}
           </button>
           <button
             type="button"
@@ -77,13 +77,13 @@ export function CriticalAlertsPanel({ initialAlerts }: Props) {
             disabled={unread.length === 0}
             className="rounded border border-rose-200 bg-[var(--enver-card)] px-2 py-0.5 text-[10px] text-rose-700 disabled:opacity-50"
           >
-            Ack all
+            Підтвердити всі
           </button>
         </div>
       </div>
       {viewItems.length === 0 ? (
         <p className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-xs text-slate-600">
-          Критичних alert-подій немає.
+          Критичних подій-сповіщень немає.
         </p>
       ) : (
         <div className="space-y-2">
@@ -103,7 +103,7 @@ export function CriticalAlertsPanel({ initialAlerts }: Props) {
                   </p>
                   <p className="mt-0.5">{a.message}</p>
                   <p className="mt-0.5 text-[10px] opacity-80">
-                    Count: {a.count} · {new Date(a.createdAt).toLocaleString()}
+                    Кількість: {a.count} · {new Date(a.createdAt).toLocaleString("uk-UA")}
                   </p>
                 </div>
                 {!a.readAt ? (
@@ -112,7 +112,7 @@ export function CriticalAlertsPanel({ initialAlerts }: Props) {
                     onClick={() => void acknowledge(a.id)}
                     className="rounded border border-rose-200 bg-[var(--enver-card)] px-2 py-1 text-[10px] font-medium text-rose-700"
                   >
-                    Ack
+                    Підтвердити
                   </button>
                 ) : null}
               </div>

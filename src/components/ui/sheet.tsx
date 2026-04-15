@@ -21,7 +21,7 @@ const SheetContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "enver-sheet-panel fixed z-50 flex h-full w-72 flex-col border-l border-slate-200 bg-[var(--enver-card)] p-4 shadow-2xl transition-transform",
+        "enver-sheet-panel fixed z-50 flex h-full w-72 flex-col border-l border-[var(--enver-border)] bg-[var(--enver-surface-elevated)] p-4 shadow-2xl transition-transform",
         side === "left" ? "inset-y-0 left-0" : "inset-y-0 right-0",
         className,
       )}

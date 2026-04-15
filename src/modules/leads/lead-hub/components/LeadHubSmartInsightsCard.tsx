@@ -24,7 +24,7 @@ export function LeadHubSmartInsightsCard({ lead }: Props) {
   }
 
   return (
-    <section className="rounded-[12px] border border-[var(--enver-border)] bg-[var(--enver-card)] p-4 shadow-[var(--enver-shadow)]">
+    <section className="rounded-[14px] border border-[var(--enver-border)]/80 bg-gradient-to-br from-[var(--enver-card)] to-[var(--enver-surface)] p-4 shadow-[0_10px_24px_rgba(15,23,42,0.08)]">
       <div className="flex items-center gap-2 text-[var(--enver-text)]">
         <Sparkles className="h-4 w-4 shrink-0 text-[var(--enver-accent)]" aria-hidden />
         <h3 className="text-[12px] font-medium uppercase tracking-wide text-[var(--enver-muted)]">
@@ -38,7 +38,7 @@ export function LeadHubSmartInsightsCard({ lead }: Props) {
             <li
               key={x.flag}
               className={cn(
-                "flex gap-2 rounded-lg border px-2.5 py-2 text-[11px] leading-snug",
+                "flex gap-2 rounded-lg border px-2.5 py-2 text-[11px] leading-snug shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]",
                 x.severity === "high"
                   ? "border-[var(--enver-danger)]/35 bg-[var(--enver-danger-soft)] text-[var(--enver-text)]"
                   : x.severity === "medium"

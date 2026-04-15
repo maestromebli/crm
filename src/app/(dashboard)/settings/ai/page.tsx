@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { SettingsShell } from "../../../../components/settings/SettingsShell";
 import { SettingsCard } from "../../../../components/settings/SettingsCard";
 
@@ -210,6 +211,21 @@ export default function SettingsAiPage() {
             критичні елементи.
           </li>
         </ul>
+      </SettingsCard>
+
+      <SettingsCard
+        title="Адмін-чат з AI"
+        description="Окремий системний чат для адміністратора: аудит CRM, пропозиції покращень, шаблони промптів та план розвитку."
+      >
+        <p className="text-[11px] text-slate-700">
+          Для стратегічної роботи з системою відкрийте AI-архітектора CRM у налаштуваннях.
+        </p>
+        <Link
+          href="/settings/ai/admin"
+          className="mt-2 inline-flex rounded-full border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-[11px] font-semibold text-indigo-900 hover:bg-indigo-100"
+        >
+          Відкрити AI-архітектора CRM
+        </Link>
       </SettingsCard>
 
       <div className="flex items-center justify-between pt-2 text-[11px]">

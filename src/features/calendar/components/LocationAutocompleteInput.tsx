@@ -46,7 +46,7 @@ function loadGoogleMapsPlaces(apiKey: string): Promise<void> {
         }
       }, 0);
     };
-    s.onerror = () => reject(new Error("Google Maps script failed"));
+    s.onerror = () => reject(new Error("Не вдалося завантажити скрипт Google Maps"));
     document.head.appendChild(s);
   });
 

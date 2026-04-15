@@ -4,7 +4,7 @@ import type { Supplier } from "../types/models";
 
 export function SuppliersTable({ rows }: { rows: Supplier[] }) {
   return (
-    <DataTableShell columns={["Назва", "Тип", "Контакт", "Телефон", "Email", "Умови оплати", "Активний"]}>
+    <DataTableShell columns={["Назва", "Тип", "Контакт", "Телефон", "Електронна пошта", "Умови оплати", "Активний"]}>
       {rows.map((r) => (
         <tr key={r.id} className="border-t border-slate-100">
           <td className="px-3 py-2 text-slate-800">{r.name}</td>

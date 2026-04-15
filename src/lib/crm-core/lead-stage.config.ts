@@ -35,7 +35,7 @@ export const LEAD_STAGE_GROUPS: { key: LeadStageGroup; labelUa: string }[] = [
 export const LEAD_STAGE_CONFIG: Record<LeadStageKey, StageConfigEntry> = {
   NEW: {
     key: "NEW",
-    labelUa: "Нові",
+    labelUa: "Новий лід",
     descriptionUa: "Лід щойно потрапив у CRM — потрібен перший контакт.",
     group: "intake",
     dominantCta: {
@@ -52,7 +52,7 @@ export const LEAD_STAGE_CONFIG: Record<LeadStageKey, StageConfigEntry> = {
   },
   CONTACT: {
     key: "CONTACT",
-    labelUa: "Контакт",
+    labelUa: "Контакт з клієнтом",
     descriptionUa: "Йде діалог: збираємо запит, домовляємось про замір або розрахунок.",
     group: "qualification",
     dominantCta: {
@@ -61,20 +61,21 @@ export const LEAD_STAGE_CONFIG: Record<LeadStageKey, StageConfigEntry> = {
       routePattern: "/leads/:leadId",
       anchorSection: "meetings",
     },
-    requiredChecks: [
+    requiredChecks: ["next_step_text"],
+    softChecks: [
+      "measurement_decision_recorded",
       "needs_summary",
       "furniture_or_object_type",
-      "next_step_text",
-      "measurement_decision_recorded",
+      "budget_range_documented",
+      "next_contact_date",
     ],
-    softChecks: ["budget_range_documented", "next_contact_date"],
     allowedNext: ["MEASUREMENT", "CALCULATION", "LOST", "ARCHIVED"],
     riskProfile: ["early_funnel", "pricing"],
     aiHintProfile: ["qual_incomplete", "budget_missing"],
   },
   MEASUREMENT: {
     key: "MEASUREMENT",
-    labelUa: "Замір",
+    labelUa: "Первинний замір",
     descriptionUa: "Візит на об’єкт: фіксуємо розміри та матеріали для прорахунку.",
     group: "site_work",
     dominantCta: {
@@ -130,11 +131,11 @@ export const LEAD_STAGE_CONFIG: Record<LeadStageKey, StageConfigEntry> = {
   },
   QUOTE_SENT: {
     key: "QUOTE_SENT",
-    labelUa: "Надіслані КП",
+    labelUa: "КП надіслано",
     descriptionUa: "КП у клієнта — чекаємо зворотний зв’язок.",
     group: "proposal",
     dominantCta: {
-      labelUa: "Запланувати follow-up",
+      labelUa: "Запланувати наступний контакт",
       actionKey: "schedule_followup",
       routePattern: "/leads/:leadId",
       anchorSection: "next-action",
@@ -147,7 +148,7 @@ export const LEAD_STAGE_CONFIG: Record<LeadStageKey, StageConfigEntry> = {
   },
   APPROVED: {
     key: "APPROVED",
-    labelUa: "Погоджені",
+    labelUa: "Погоджене КП",
     descriptionUa: "Умови КП прийняті — готуємо конверсію в угоду.",
     group: "closing",
     dominantCta: {
@@ -158,20 +159,13 @@ export const LEAD_STAGE_CONFIG: Record<LeadStageKey, StageConfigEntry> = {
     },
     requiredChecks: ["proposal_approved", "approved_amount_documented"],
     softChecks: ["contact_channel", "owner_assigned"],
-    allowedNext: [
-      "CLIENT",
-      "CONTRACT",
-      "DEAL",
-      "PRODUCTION_READY",
-      "LOST",
-      "ARCHIVED",
-    ],
+    allowedNext: ["DEAL", "LOST", "ARCHIVED"],
     riskProfile: ["closing"],
     aiHintProfile: ["pre_conversion", "approved_check_deal"],
   },
   CLIENT: {
     key: "CLIENT",
-    labelUa: "Клієнти",
+    labelUa: "Клієнт",
     descriptionUa: "Постійний контакт після узгодження умов.",
     group: "closing",
     dominantCta: {
@@ -205,7 +199,7 @@ export const LEAD_STAGE_CONFIG: Record<LeadStageKey, StageConfigEntry> = {
   },
   CONTRACT: {
     key: "CONTRACT",
-    labelUa: "Договори",
+    labelUa: "Договір",
     descriptionUa: "Юридичне оформлення перед виробництвом.",
     group: "closing",
     dominantCta: {

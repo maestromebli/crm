@@ -1,0 +1,80 @@
+name: E2E Contracts Portal Happy Path
+
+on:
+  schedule:
+    - cron: "0 5 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-contracts-portal-happy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  contracts-portal-happy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Check required happy-path secrets
+        id: preflight
+        shell: bash
+        env:
+          SCREENSHOT_BASE_URL: ${{ secrets.SCREENSHOT_BASE_URL }}
+          SCREENSHOT_CONTRACT_PORTAL_TOKEN: ${{ secrets.SCREENSHOT_CONTRACT_PORTAL_TOKEN }}
+          SCREENSHOT_EMAIL: ${{ secrets.SCREENSHOT_EMAIL }}
+          SCREENSHOT_PASSWORD: ${{ secrets.SCREENSHOT_PASSWORD }}
+        run: |
+          missing=0
+          for key in SCREENSHOT_BASE_URL SCREENSHOT_CONTRACT_PORTAL_TOKEN SCREENSHOT_EMAIL SCREENSHOT_PASSWORD; do
+            if [ -z "${!key}" ]; then
+              echo "::warning::Missing secret: $key"
+              missing=1
+            fi
+          done
+
+          if [ "$missing" -eq 1 ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install Playwright browser
+        if: steps.preflight.outputs.ready == 'true'
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run Contracts Portal happy-path E2E
+        if: steps.preflight.outputs.ready == 'true'
+        run: pnpm exec playwright test tests/e2e/contracts-portal-signing-happy-path.spec.ts tests/e2e/contracts-portal-status-transitions.spec.ts tests/e2e/contracts-portal-manager-sync.spec.ts tests/e2e/contracts-manager-document-generation.spec.ts --reporter=github,html --trace=retain-on-failure --video=retain-on-failure --screenshot=only-on-failure
+        env:
+          SCREENSHOT_SKIP_SERVER: "1"
+          SCREENSHOT_BASE_URL: ${{ secrets.SCREENSHOT_BASE_URL }}
+          SCREENSHOT_EMAIL: ${{ secrets.SCREENSHOT_EMAIL }}
+          SCREENSHOT_PASSWORD: ${{ secrets.SCREENSHOT_PASSWORD }}
+          SCREENSHOT_CONTRACT_PORTAL_TOKEN: ${{ secrets.SCREENSHOT_CONTRACT_PORTAL_TOKEN }}
+
+      - name: Upload Playwright report and artifacts
+        if: always() && steps.preflight.outputs.ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: contracts-portal-happy-playwright-${{ github.run_id }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Skip notice
+        if: steps.preflight.outputs.ready != 'true'
+        run: echo "Contracts portal happy-path E2E skipped because required secrets are not configured."

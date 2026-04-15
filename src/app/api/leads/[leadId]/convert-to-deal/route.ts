@@ -1,14 +1,11 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import {
-  getOrCreateRequestId,
   jsonError,
   jsonSuccess,
 } from "../../../../../lib/api/http";
-import { appendActivityLog } from "../../../../../lib/deal-api/audit";
 import {
   forbidUnlessLeadAccess,
-  forbidUnlessPermission,
   requireSessionUser,
 } from "../../../../../lib/authz/api-guard";
 import { P } from "../../../../../lib/authz/permissions";
@@ -26,11 +23,20 @@ import {
 import { prisma } from "../../../../../lib/prisma";
 import { publishCrmEvent, CRM_EVENT_TYPES } from "@/lib/events/crm-events";
 import { recordWorkflowEvent, WORKFLOW_EVENT_TYPES } from "@/features/event-system";
+import {
+  claimIdempotencyKey,
+  enforcePolicy,
+  getRequestContext,
+  readIdempotencyKey,
+  writePlatformAudit,
+} from "@/lib/platform";
+import { logError, logInfo } from "@/lib/observability/logger";
 
 type Ctx = { params: Promise<{ leadId: string }> };
 
 export async function POST(req: Request, ctx: Ctx) {
-  const requestId = getOrCreateRequestId(req);
+  const requestCtx = getRequestContext(req);
+  const requestId = requestCtx.requestId;
   if (!process.env.DATABASE_URL?.trim()) {
     return jsonError(requestId, "DATABASE_URL не задано", 503);
   }
@@ -38,7 +44,7 @@ export async function POST(req: Request, ctx: Ctx) {
   const user = await requireSessionUser();
   if (user instanceof NextResponse) return user;
 
-  const dealPermDenied = forbidUnlessPermission(user, P.DEALS_CREATE);
+  const dealPermDenied = enforcePolicy(user, P.DEALS_CREATE);
   if (dealPermDenied) return dealPermDenied;
 
   const { leadId } = await ctx.params;
@@ -75,6 +81,34 @@ export async function POST(req: Request, ctx: Ctx) {
 
   if (!lead) {
     return jsonError(requestId, "Лід не знайдено", 404);
+  }
+
+  const idempotencyKey = readIdempotencyKey(req);
+  if (idempotencyKey) {
+    const claim = await claimIdempotencyKey({
+      key: `lead-convert:${lead.id}:${idempotencyKey}`,
+      entityType: "LEAD",
+      entityId: lead.id,
+      userId: user.id,
+      requestId,
+    });
+    if (!claim.accepted) {
+      logInfo({
+        module: "api.leads.convert-to-deal",
+        message: "Виявлено дубльований ідемпотентний запит",
+        requestId: requestCtx.requestId,
+        correlationId: requestCtx.correlationId,
+        details: { leadId: lead.id, userId: user.id },
+      });
+      return jsonSuccess(
+        requestId,
+        {
+          alreadyProcessed: true,
+          idempotencyEventId: claim.eventId,
+        },
+        { status: 200 },
+      );
+    }
   }
 
   const denied = await forbidUnlessLeadAccess(user, P.LEADS_UPDATE, lead);
@@ -163,11 +197,13 @@ export async function POST(req: Request, ctx: Ctx) {
       { maxWait: 10_000, timeout: 25_000 },
     );
 
-    await appendActivityLog({
+    await writePlatformAudit({
       entityType: "DEAL",
       entityId: result.deal.id,
       type: "DEAL_CREATED",
       actorUserId: actorId,
+      requestId: requestCtx.requestId,
+      correlationId: requestCtx.correlationId,
       data: {
         fromLeadId: lead.id,
         title: result.deal.title,
@@ -177,11 +213,13 @@ export async function POST(req: Request, ctx: Ctx) {
       },
     });
 
-    await appendActivityLog({
+    await writePlatformAudit({
       entityType: "LEAD",
       entityId: lead.id,
       type: "LEAD_UPDATED",
       actorUserId: actorId,
+      requestId: requestCtx.requestId,
+      correlationId: requestCtx.correlationId,
       data: { convertedToDealId: result.deal.id },
     });
     await publishCrmEvent({
@@ -222,7 +260,16 @@ export async function POST(req: Request, ctx: Ctx) {
       contactsLinked: result.contactsLinked,
     });
   } catch (e) {
-    console.error("[POST convert-to-deal]", e);
+    logError({
+      module: "api.leads.convert-to-deal",
+      message: "Не вдалося конвертувати лід в угоду",
+      requestId: requestCtx.requestId,
+      correlationId: requestCtx.correlationId,
+      details: {
+        leadId,
+        error: e instanceof Error ? e.message : String(e),
+      },
+    });
     return jsonError(requestId, "Не вдалося створити угоду", 500);
   }
 }

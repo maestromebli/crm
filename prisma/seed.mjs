@@ -327,6 +327,197 @@ async function migrateLegacyRoles() {
   });
 }
 
+async function ensureConstructorHubSeed(prisma, { ownerId }) {
+  const deal = await prisma.deal.findFirst({
+    where: { ownerId },
+    include: {
+      productionFlow: true,
+      constructorWorkspace: true,
+    },
+    orderBy: { updatedAt: "desc" },
+  });
+  if (!deal?.productionFlow) return;
+
+  const workspace =
+    deal.constructorWorkspace ??
+    (await prisma.constructorWorkspace.create({
+      data: {
+        dealId: deal.id,
+        productionFlowId: deal.productionFlow.id,
+        assignedByUserId: ownerId,
+        assignedConstructorUserId: ownerId,
+        status: "UNDER_REVIEW",
+        priority: "HIGH",
+        dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+        startedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+      },
+    }));
+
+  await prisma.constructorTechSpec.upsert({
+    where: { workspaceId: workspace.id },
+    update: {
+      generalInfoJson: { projectType: "kitchen+wardrobe+dressing" },
+      zonesJson: [{ key: "kitchen", progress: 100 }, { key: "wardrobe", progress: 60 }, { key: "dressing", progress: 20 }],
+      materialsJson: { approved: ["Egger W1000", "ABS 1mm"] },
+      approvedDataSnapshotJson: { quoteVersion: "V3", measurementsApproved: true },
+      updatedByUserId: ownerId,
+    },
+    create: {
+      workspaceId: workspace.id,
+      generalInfoJson: { projectType: "kitchen+wardrobe+dressing" },
+      zonesJson: [{ key: "kitchen", progress: 100 }, { key: "wardrobe", progress: 60 }, { key: "dressing", progress: 20 }],
+      materialsJson: { approved: ["Egger W1000", "ABS 1mm"] },
+      approvedDataSnapshotJson: { quoteVersion: "V3", measurementsApproved: true },
+      createdByUserId: ownerId,
+      updatedByUserId: ownerId,
+    },
+  });
+
+  const existingQuestions = await prisma.constructorQuestion.count({
+    where: { workspaceId: workspace.id },
+  });
+  if (existingQuestions === 0) {
+    await prisma.constructorQuestion.createMany({
+      data: [
+        {
+          workspaceId: workspace.id,
+          createdByUserId: ownerId,
+          category: "MATERIALS",
+          priority: "MEDIUM",
+          status: "CLOSED",
+          title: "Подтвердите декор корпуса",
+          description: "Утвердите финальный декор Egger W1000",
+          answerText: "Подтверждено",
+          answeredByUserId: ownerId,
+          answeredAt: new Date(Date.now() - 6 * 60 * 60 * 1000),
+          closedAt: new Date(Date.now() - 5 * 60 * 60 * 1000),
+        },
+        {
+          workspaceId: workspace.id,
+          createdByUserId: ownerId,
+          category: "FITTINGS",
+          priority: "HIGH",
+          status: "CLOSED",
+          title: "Список фурнитуры финальный?",
+          description: "Петли/направляющие согласованы?",
+          answerText: "Да, список финальный",
+          answeredByUserId: ownerId,
+          answeredAt: new Date(Date.now() - 4 * 60 * 60 * 1000),
+          closedAt: new Date(Date.now() - 3 * 60 * 60 * 1000),
+        },
+        {
+          workspaceId: workspace.id,
+          createdByUserId: ownerId,
+          category: "DIMENSIONS",
+          priority: "CRITICAL",
+          status: "OPEN",
+          title: "Ниша 2600 или 2580 мм?",
+          description: "Критический вопрос по нише холодильника",
+          isCritical: true,
+          isPinned: true,
+        },
+      ],
+    });
+  }
+
+  const existingVersions = await prisma.constructorVersion.findMany({
+    where: { workspaceId: workspace.id },
+    orderBy: { versionNumber: "asc" },
+  });
+  if (existingVersions.length === 0) {
+    const v1 = await prisma.constructorVersion.create({
+      data: {
+        workspaceId: workspace.id,
+        versionNumber: 1,
+        versionCode: "V1",
+        type: "DRAFT",
+        status: "CHANGES_REQUESTED",
+        summary: "Первый черновик, возвращен на доработку.",
+        isCurrent: false,
+        submittedByUserId: ownerId,
+        submittedAt: new Date(Date.now() - 26 * 60 * 60 * 1000),
+      },
+    });
+    const v2 = await prisma.constructorVersion.create({
+      data: {
+        workspaceId: workspace.id,
+        versionNumber: 2,
+        versionCode: "V2",
+        type: "REVIEW",
+        status: "UNDER_REVIEW",
+        summary: "Уточнены размеры, обновлены чертежи и спецификация.",
+        isCurrent: true,
+        submittedByUserId: ownerId,
+        submittedAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
+      },
+    });
+    await prisma.constructorReview.create({
+      data: {
+        workspaceId: workspace.id,
+        versionId: v1.id,
+        reviewedByUserId: ownerId,
+        decision: "RETURN_FOR_REVISION",
+        comment: "Нужно уточнить нишу и добавить список фурнитуры.",
+        severity: "MAJOR",
+        checklistJson: { dimensionsVerified: false, materialsVerified: true },
+        remarksJson: ["Уточнить нишу", "Добавить фурнитуру"],
+      },
+    });
+    await prisma.constructorFile.createMany({
+      data: [
+        {
+          workspaceId: workspace.id,
+          versionId: v1.id,
+          uploadedByUserId: ownerId,
+          fileUrl: "https://example.com/draft-v1.pdf",
+          originalName: "draft-v1.pdf",
+          mimeType: "application/pdf",
+          extension: "pdf",
+          fileCategory: "CONSTRUCTOR_DRAFT",
+          versionLabel: "V1",
+          isCurrent: false,
+          isArchived: true,
+        },
+        {
+          workspaceId: workspace.id,
+          versionId: v2.id,
+          uploadedByUserId: ownerId,
+          fileUrl: "https://example.com/review-v2.pdf",
+          originalName: "review-v2.pdf",
+          mimeType: "application/pdf",
+          extension: "pdf",
+          fileCategory: "DRAWING",
+          versionLabel: "V2",
+          isCurrent: true,
+          isImportant: true,
+        },
+      ],
+    });
+    await prisma.constructorAIInsight.createMany({
+      data: [
+        {
+          workspaceId: workspace.id,
+          versionId: v2.id,
+          type: "MISMATCH",
+          severity: "HIGH",
+          title: "Несоответствие замера",
+          description: "Ниша 2600 мм вместо 2580 мм",
+        },
+        {
+          workspaceId: workspace.id,
+          versionId: v2.id,
+          type: "MISSING_DATA",
+          severity: "MEDIUM",
+          title: "Нет списка фурнитуры",
+          description: "Отсутствует финальный fittings list",
+        },
+      ],
+    });
+  }
+
+  console.log("Seed: Constructor Hub demo workspace готов.");
+}
+
 async function main() {
   const adminPasswordHash = await bcrypt.hash("admin123", 10);
   const demoPasswordHash = await bcrypt.hash("demo123", 10);
@@ -610,6 +801,8 @@ async function main() {
     const { seedJourneys } = await import("./seeds/journeys.seed.mjs");
     await seedJourneys(prisma, bcrypt);
   }
+
+  await ensureConstructorHubSeed(prisma, { ownerId: user.id });
 
    
   console.log(

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { CommunicationsSettingsClient } from "../CommunicationsSettingsClient";
 
 type ApiUser = {
@@ -94,6 +95,20 @@ export function UsersCommunicationsManager({
           managerCardTitle="Контакти співробітника"
           managerCardDescription="Номер телефону та відображуване імʼя саме цього співробітника."
           saveHint="Зміни застосовуються тільки до вибраного співробітника."
+          hiddenChannels={["instagram", "facebook"]}
+          footerNote={
+            <>
+              Instagram/Facebook Direct підключаються як спільна сторінка компанії в
+              глобальних налаштуваннях:{" "}
+              <Link
+                href="/settings/communications"
+                className="underline underline-offset-2"
+              >
+                /settings/communications
+              </Link>
+              .
+            </>
+          }
         />
       ) : null}
     </div>

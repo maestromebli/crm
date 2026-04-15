@@ -1,4 +1,4 @@
 "use client";
 
-export { DealEstimateWorkspace as EstimateWorkspacePage } from "../../../modules/estimate-workspace/DealEstimateWorkspace";
-export type { DealEstimateWorkspaceProps as EstimateWorkspacePageProps } from "../../../modules/estimate-workspace/DealEstimateWorkspace";
+export { CalculationPage as EstimateWorkspacePage } from "../../calculation-ui/CalculationPage";
+export type { CalculationPageProps as EstimateWorkspacePageProps } from "../../calculation-ui/CalculationPage";

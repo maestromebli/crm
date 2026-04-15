@@ -49,7 +49,7 @@ export async function GET(req: Request) {
   if (mode === "subscribe" && expected && token === expected && challenge) {
     return new NextResponse(challenge, { status: 200 });
   }
-  return NextResponse.json({ error: "Verification failed" }, { status: 403 });
+  return NextResponse.json({ error: "Верифікацію не пройдено" }, { status: 403 });
 }
 
 export async function POST(req: Request) {
@@ -61,14 +61,14 @@ export async function POST(req: Request) {
     appSecret: process.env.WHATSAPP_APP_SECRET,
   });
   if (!validSignature) {
-    return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+    return NextResponse.json({ error: "Некоректний підпис" }, { status: 401 });
   }
 
   let payload: WhatsAppPayload;
   try {
     payload = JSON.parse(rawBody) as WhatsAppPayload;
   } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    return NextResponse.json({ error: "Некоректний JSON" }, { status: 400 });
   }
 
   const incoming: WhatsAppMessage[] = [];

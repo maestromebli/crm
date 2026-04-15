@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/options";
 import { prisma } from "../prisma";
 import { normalizeRole, type EffectiveRole } from "./roles";
+import type { MenuAccessState } from "../navigation-access";
 import {
   hasEffectivePermission,
   type Phase1Permission,
@@ -19,6 +20,7 @@ export type SessionUser = {
   /** Ефективна роль (цільовий користувач при імпersonації). */
   dbRole: string;
   permissionKeys: string[];
+  menuAccess?: MenuAccessState | null;
   /** Роль облікового запису після логіну. */
   realRole: string;
   impersonatorId?: string;
@@ -39,6 +41,7 @@ export async function requireSessionUser(): Promise<
     role: normalizeRole(session.user.role),
     dbRole: session.user.role,
     permissionKeys: session.user.permissionKeys ?? [],
+    menuAccess: session.user.menuAccess ?? null,
     realRole: session.user.realRole ?? session.user.role,
     impersonatorId: session.user.impersonatorId,
   };

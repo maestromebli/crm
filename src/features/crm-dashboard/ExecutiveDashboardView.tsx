@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense } from "react";
+import dynamic from "next/dynamic";
 import type { EffectiveRole } from "../../lib/authz/roles";
 import type { ExecutiveDashboardPerms } from "../dashboard/queries";
 import type { ExecutiveDashboardPayload } from "./executive-types";
@@ -19,16 +20,28 @@ import { FinanceOverviewCard } from "./components/finance-overview-card";
 import { ProductionOverviewCard } from "./components/production-overview-card";
 import { ProcurementOverviewCard } from "./components/procurement-overview-card";
 import { ScheduleWidget } from "./components/schedule-widget";
-import { DirectorAiPanel } from "./components/director-ai-panel";
 import { BehaviorEngineCard } from "./components/behavior-engine-card";
 import { DailyOperatingCard } from "./components/daily-operating-card";
 import { DashboardRealtimePill } from "../realtime/dashboard-realtime-pill";
+
+const DirectorAiPanel = dynamic(
+  () => import("./components/director-ai-panel").then((m) => m.DirectorAiPanel),
+  {
+    loading: () => (
+      <div className="h-56 animate-pulse rounded-2xl bg-[var(--enver-surface)]" />
+    ),
+  },
+);
 
 export type ExecutiveDashboardViewProps = {
   role: EffectiveRole;
   perms: ExecutiveDashboardPerms;
   data: ExecutiveDashboardPayload;
 };
+
+function cardAppearStyle(index: number) {
+  return { animationDelay: `${Math.min(index, 10) * 40}ms` };
+}
 
 function FinanceRangeTabsSuspense() {
   return (
@@ -60,12 +73,12 @@ export function ExecutiveDashboardView({
         subtitle={data.error}
         controls={<FinanceRangeTabsSuspense />}
       >
-        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-6 text-rose-900">
+        <div className="rounded-2xl border border-[var(--enver-danger)]/30 bg-[var(--enver-danger-soft)] px-4 py-6 text-[var(--enver-danger)]">
           <p className="font-medium">Помилка даних</p>
           <p className="mt-1 text-sm">{data.error}</p>
           <button
             type="button"
-            className="mt-4 rounded-lg bg-rose-800 px-4 py-2 text-sm font-semibold text-white"
+            className="mt-4 rounded-lg bg-[var(--enver-danger)] px-4 py-2 text-sm font-semibold text-white"
             onClick={() => window.location.reload()}
           >
             Повторити
@@ -115,9 +128,15 @@ export function ExecutiveDashboardView({
       </Suspense>
 
       {data.kpis.length > 0 ? (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
-          {data.kpis.map((k) => (
-            <KpiCard key={k.id} kpi={k} />
+        <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+          {data.kpis.map((k, index) => (
+            <div
+              key={k.id}
+              className="enver-card-appear"
+              style={cardAppearStyle(index)}
+            >
+              <KpiCard kpi={k} />
+            </div>
           ))}
         </div>
       ) : (
@@ -128,43 +147,81 @@ export function ExecutiveDashboardView({
 
       <div className="grid gap-6 xl:grid-cols-12">
         <div className="space-y-6 xl:col-span-7 2xl:col-span-8">
-          {perms.leadsView ? <FunnelCard stages={data.funnel} /> : null}
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--enver-text-muted)]">
+            Комерція та операції
+          </p>
+          {perms.leadsView ? (
+            <div className="enver-card-appear" style={cardAppearStyle(0)}>
+              <FunnelCard stages={data.funnel} />
+            </div>
+          ) : null}
           <Suspense
             fallback={
               <div className="h-56 animate-pulse rounded-2xl bg-[var(--enver-surface)]" />
             }
           >
-            <RevenueTrendCard
-              points={data.trend}
-              trendRange={data.query.trendRange}
-              metric={data.query.trendMetric}
-            />
+            <div className="enver-card-appear" style={cardAppearStyle(1)}>
+              <RevenueTrendCard
+                points={data.trend}
+                trendRange={data.query.trendRange}
+                metric={data.query.trendMetric}
+              />
+            </div>
           </Suspense>
-          <CashflowCard data={data.cashflow} />
+          <div className="enver-card-appear" style={cardAppearStyle(2)}>
+            <CashflowCard data={data.cashflow} />
+          </div>
           {perms.paymentsView || perms.marginView ? (
-            <FinanceOverviewCard
-              data={data.finance}
-              financeRange={data.query.financeRange}
-            />
+            <div className="enver-card-appear" style={cardAppearStyle(3)}>
+              <FinanceOverviewCard
+                data={data.finance}
+                financeRange={data.query.financeRange}
+              />
+            </div>
           ) : null}
           {perms.productionView ? (
-            <ProductionOverviewCard data={data.production} />
+            <div className="enver-card-appear" style={cardAppearStyle(4)}>
+              <ProductionOverviewCard data={data.production} />
+            </div>
           ) : null}
           {perms.procurementView ? (
-            <ProcurementOverviewCard data={data.procurement} />
+            <div className="enver-card-appear" style={cardAppearStyle(5)}>
+              <ProcurementOverviewCard data={data.procurement} />
+            </div>
           ) : null}
         </div>
 
         <div className="space-y-6 xl:col-span-5 2xl:col-span-4">
-          <NextBestActionsCard items={data.nextActions} />
-          <DailyOperatingCard data={data.daily} />
-          <BehaviorEngineCard data={data.behavior} />
-          {perms.dealsView ? <RiskCenterCard rows={data.risks} /> : null}
-          {data.layout !== "sales" ? (
-            <TeamPerformanceCard data={data.team} />
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--enver-text-muted)]">
+            Рішення та контроль
+          </p>
+          <div className="enver-card-appear" style={cardAppearStyle(0)}>
+            <NextBestActionsCard items={data.nextActions} />
+          </div>
+          <div className="enver-card-appear" style={cardAppearStyle(1)}>
+            <DailyOperatingCard data={data.daily} />
+          </div>
+          <div className="enver-card-appear" style={cardAppearStyle(2)}>
+            <BehaviorEngineCard data={data.behavior} />
+          </div>
+          {perms.dealsView ? (
+            <div className="enver-card-appear" style={cardAppearStyle(3)}>
+              <RiskCenterCard rows={data.risks} />
+            </div>
           ) : null}
-          {data.schedule ? <ScheduleWidget data={data.schedule} /> : null}
-          <DirectorAiPanel initial={data.directorAi} aiContextText={aiContext} />
+          {data.layout !== "sales" ? (
+            <div className="enver-card-appear" style={cardAppearStyle(4)}>
+              <TeamPerformanceCard data={data.team} />
+            </div>
+          ) : null}
+          {data.schedule ? (
+            <div className="enver-card-appear" style={cardAppearStyle(5)}>
+              <ScheduleWidget data={data.schedule} />
+            </div>
+          ) : null}
+          <div className="enver-card-appear" style={cardAppearStyle(6)}>
+            <DirectorAiPanel initial={data.directorAi} aiContextText={aiContext} />
+          </div>
         </div>
       </div>
     </DashboardShell>

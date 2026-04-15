@@ -8,7 +8,6 @@ export type LeadCommercialStep =
   | "hub"
   | "contact"
   | "pricing"
-  | "kp"
   | "deal";
 
 type Props = {
@@ -35,13 +34,13 @@ type StepDef = {
 };
 
 const STEP_DEFS: StepDef[] = [
-  { id: "hub", label: "Hub", complete: () => true },
+  { id: "hub", label: "Хаб", complete: () => true },
   { id: "contact", label: "Контакт", complete: contactFilled },
-  { id: "pricing", label: "Розрахунок", complete: (l) => l.estimates.length > 0 },
   {
-    id: "kp",
-    label: "КП",
-    complete: (l) => l.proposals.length > 0 || !!l.activeProposalId,
+    id: "pricing",
+    label: "Розрахунок / КП",
+    complete: (l) =>
+      l.estimates.length > 0 || l.proposals.length > 0 || !!l.activeProposalId,
   },
   {
     id: "deal",
@@ -59,7 +58,6 @@ function hrefForStep(
   if (stepId === "hub") return `/leads/${leadId}`;
   if (stepId === "contact") return `/leads/${leadId}/contact`;
   if (stepId === "pricing") return `/leads/${leadId}/pricing`;
-  if (stepId === "kp") return `/leads/${leadId}/kp`;
   if (stepId === "deal" && lead.dealId) {
     return `/deals/${lead.dealId}/workspace`;
   }
@@ -101,7 +99,6 @@ export function LeadCommercialProcessStepper({
                     "cursor-default",
                     isActive && "text-[var(--enver-text)]",
                   )}
-                  title="Після конверсії"
                 >
                   {step.label}
                 </span>

@@ -12,6 +12,7 @@ export type ScopeUser = { id: string; role: string };
 /** Базові ролі менеджерів продажу (цільова видимість для HEAD_MANAGER). */
 const SALES_TEAM_ROLES = ["SALES_MANAGER", "USER"] as const;
 const COMPANY_OPERATIONS_ROLES = [
+  "DIRECTOR_PRODUCTION",
   "ACCOUNTANT",
   "PROCUREMENT_MANAGER",
   "PRODUCTION_WORKER",

@@ -8,9 +8,17 @@ type NextBestActionsCardProps = {
 };
 
 const urgencyStyle = {
-  high: "border-rose-200/80 bg-rose-50/80 text-rose-900",
-  medium: "border-amber-200/80 bg-amber-50/80 text-amber-900",
-  low: "border-[var(--enver-border)] bg-[var(--enver-surface)] text-[var(--enver-text)]",
+  high: "border-rose-200/80 bg-rose-50/80 text-slate-900",
+  medium: "border-amber-200/80 bg-amber-50/80 text-slate-900",
+  low: "border-[var(--enver-border)] bg-[var(--enver-surface)] text-slate-900",
+};
+
+const urgencyCtaStyle = {
+  high: "bg-white text-slate-900 ring-[var(--enver-border)] hover:bg-slate-50",
+  medium:
+    "bg-white text-slate-900 ring-[var(--enver-border)] hover:bg-slate-50",
+  low:
+    "bg-white text-slate-900 ring-[var(--enver-border)] hover:bg-slate-50",
 };
 
 export function NextBestActionsCard({ items }: NextBestActionsCardProps) {
@@ -28,10 +36,10 @@ export function NextBestActionsCard({ items }: NextBestActionsCardProps) {
   }
 
   return (
-    <div className="rounded-2xl border border-[var(--enver-border)] bg-[var(--enver-card)] p-5 shadow-[var(--enver-shadow)]">
+    <div className="rounded-2xl border border-[var(--enver-border)] bg-[var(--enver-card)] p-5 !text-slate-900 shadow-[var(--enver-shadow)]">
       <div className="flex items-center gap-2">
         <Zap className="h-4 w-4 text-amber-500" aria-hidden />
-        <h2 className="text-sm font-semibold text-[var(--enver-text)]">
+        <h2 className="!text-slate-900 text-sm font-semibold">
           Пріоритетні дії
         </h2>
       </div>
@@ -40,17 +48,22 @@ export function NextBestActionsCard({ items }: NextBestActionsCardProps) {
           <li key={a.id}>
             <div
               className={cn(
-                "flex flex-col gap-2 rounded-xl border p-3 sm:flex-row sm:items-center sm:justify-between",
+                "flex flex-col gap-2.5 rounded-xl border p-3 sm:flex-row sm:items-center sm:justify-between",
                 urgencyStyle[a.urgency],
               )}
             >
               <div className="min-w-0">
-                <p className="text-sm font-medium">{a.title}</p>
-                <p className="text-xs opacity-80">{a.reason}</p>
+                <p className="!text-slate-900 text-sm font-semibold">{a.title}</p>
+                <p className="!text-slate-900 text-sm font-medium leading-snug">
+                  {a.reason}
+                </p>
               </div>
               <Link
                 href={a.href}
-                className="inline-flex shrink-0 items-center justify-center gap-1 rounded-lg bg-white/70 px-3 py-1.5 text-xs font-semibold shadow-sm ring-1 ring-black/5 transition hover:bg-white"
+                className={cn(
+                  "inline-flex shrink-0 items-center justify-center gap-1 rounded-lg px-3 py-1.5 !text-slate-900 text-sm font-semibold shadow-sm ring-1 transition",
+                  urgencyCtaStyle[a.urgency],
+                )}
               >
                 {a.ctaLabel}
                 <ArrowRight className="h-3.5 w-3.5" />

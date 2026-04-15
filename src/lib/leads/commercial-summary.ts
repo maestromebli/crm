@@ -33,7 +33,7 @@ export function deriveCommercialWarnings(lead: LeadDetailRow): CommercialWarning
     if (days > 3) {
       out.push({
         key: "stale_proposal_followup",
-        message: "КП надіслано більше 3 днів тому — заплануйте follow-up.",
+        message: "КП надіслано більше 3 днів тому — заплануйте повторний контакт.",
         tone: "info",
       });
     }
@@ -85,7 +85,7 @@ export function deriveCommercialNextActions(
   if (prop?.status === "SENT" || prop?.status === "CLIENT_REVIEWING") {
     actions.push({
       key: "follow_up",
-      label: "Follow-up після КП",
+      label: "Повторний контакт після КП",
       reason: "Зафіксуйте відповідь або наступний контакт.",
     });
   }

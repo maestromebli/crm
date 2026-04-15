@@ -30,17 +30,17 @@ export function BehaviorEngineCard({ data }: BehaviorEngineCardProps) {
           {data.weakManagers.slice(0, 4).map((manager) => (
             <li
               key={manager.userId}
-              className="rounded-xl border border-amber-200/70 bg-amber-50/70 px-3 py-2"
+              className="rounded-xl border border-amber-300/80 bg-amber-50 px-3 py-2"
             >
               <div className="flex items-center justify-between gap-2">
-                <p className="text-sm font-medium text-[var(--enver-text)]">
+                <p className="text-sm font-semibold text-amber-950">
                   {manager.name}
                 </p>
                 <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-amber-800">
                   {manager.score}/100
                 </span>
               </div>
-              <p className="mt-1 text-xs text-amber-900">
+              <p className="mt-1 text-sm text-amber-900">
                 Основна проблема: {manager.primaryIssue}
               </p>
             </li>
@@ -63,7 +63,7 @@ export function BehaviorEngineCard({ data }: BehaviorEngineCardProps) {
           </ul>
           <Link
             href="/crm/dashboard?view=issues"
-            className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-[var(--enver-accent-hover)] hover:underline"
+            className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-[var(--enver-accent-hover)] hover:underline"
           >
             <Gauge className="h-3.5 w-3.5" />
             Відкрити risk view

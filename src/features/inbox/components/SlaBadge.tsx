@@ -16,7 +16,7 @@ const slaConfig: Record<
       "bg-emerald-50 text-emerald-700 border-emerald-100",
   },
   warning: {
-    label: "Soon overdue",
+    label: "Скоро прострочення",
     className:
       "bg-amber-50 text-amber-700 border-amber-100",
   },

@@ -7,7 +7,7 @@ type Ctx = { params: Promise<{ token: string; attachmentId: string }> };
 export async function GET(_req: Request, ctx: Ctx) {
   const { token, attachmentId } = await ctx.params;
   const payload = verifyClientPortalToken(token);
-  if (!payload) return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+  if (!payload) return NextResponse.json({ error: "Некоректний токен" }, { status: 401 });
 
   const file = await prisma.attachment.findFirst({
     where: {

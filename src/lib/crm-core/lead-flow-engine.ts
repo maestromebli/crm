@@ -20,14 +20,16 @@ export const LEAD_FUNNEL_LINEAR: readonly LeadStageKey[] = [
   "QUOTE_DRAFT",
   "QUOTE_SENT",
   "APPROVED",
-  "CLIENT",
-  "CONTROL_MEASUREMENT",
-  "CONTRACT",
   "DEAL",
   "PRODUCTION_READY",
 ] as const;
 
 const FUNNEL_LINEAR: LeadStageKey[] = [...LEAD_FUNNEL_LINEAR];
+const LEGACY_POST_APPROVED_STAGES = new Set<LeadStageKey>([
+  "CLIENT",
+  "CONTROL_MEASUREMENT",
+  "CONTRACT",
+]);
 
 /**
  * Наступний канонічний етап у лінійній воронці (для підказок і CTA).
@@ -35,6 +37,9 @@ const FUNNEL_LINEAR: LeadStageKey[] = [...LEAD_FUNNEL_LINEAR];
  */
 export function getNextStage(stage: LeadStageKey): LeadStageKey | null {
   if (isTerminalStageKey(stage)) return null;
+  if (LEGACY_POST_APPROVED_STAGES.has(stage)) {
+    return "DEAL";
+  }
   const i = FUNNEL_LINEAR.indexOf(stage);
   if (i < 0) return null;
   const next = FUNNEL_LINEAR[i + 1];

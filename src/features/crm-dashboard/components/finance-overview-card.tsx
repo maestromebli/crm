@@ -92,7 +92,7 @@ export function FinanceOverviewCard({
             >
               <Link
                 href={`/deals/${d.dealId}`}
-                className="truncate hover:underline"
+                className="truncate text-[var(--enver-text)] hover:underline"
               >
                 {d.title}
               </Link>
@@ -107,15 +107,15 @@ export function FinanceOverviewCard({
         <Link
           href="/crm/finance"
           className={cn(
-            "rounded-lg bg-[var(--enver-accent)] px-3 py-1.5 text-xs font-semibold text-white shadow-sm",
-            "hover:brightness-110",
+            "rounded-lg border border-[var(--enver-border)] bg-white px-3 py-1.5 text-sm font-semibold !text-slate-900 shadow-sm",
+            "hover:bg-slate-50",
           )}
         >
           Відкрити фінанси
         </Link>
         <Link
           href="/crm/finance"
-          className="rounded-lg border border-[var(--enver-border)] bg-[var(--enver-surface)] px-3 py-1.5 text-xs font-semibold text-[var(--enver-text)] hover:bg-[var(--enver-hover)]"
+          className="rounded-lg border border-[var(--enver-border)] bg-[var(--enver-surface)] px-3 py-1.5 text-sm font-semibold text-[var(--enver-text)] hover:bg-[var(--enver-hover)]"
         >
           Переглянути прострочення
         </Link>
@@ -142,7 +142,14 @@ function Mini({
           : "border-[var(--enver-border)] bg-[var(--enver-surface)]",
       )}
     >
-      <p className="text-[11px] text-[var(--enver-muted)]">{label}</p>
+      <p
+        className={cn(
+          "text-xs font-medium",
+          warn ? "text-rose-800" : "text-[var(--enver-muted)]",
+        )}
+      >
+        {label}
+      </p>
       <p
         className={cn(
           "mt-0.5 text-sm font-semibold tabular-nums",

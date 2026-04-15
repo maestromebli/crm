@@ -60,12 +60,15 @@ export function AssistantPanel({
   const [detailsOpen, setDetailsOpen] = useState(false);
 
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(DETAILS_OPEN_STORAGE_KEY);
-      setDetailsOpen(raw === "1");
-    } catch {
-      setDetailsOpen(false);
-    }
+    const timer = window.setTimeout(() => {
+      try {
+        const raw = window.localStorage.getItem(DETAILS_OPEN_STORAGE_KEY);
+        setDetailsOpen(raw === "1");
+      } catch {
+        setDetailsOpen(false);
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   const toggleDetails = () => {

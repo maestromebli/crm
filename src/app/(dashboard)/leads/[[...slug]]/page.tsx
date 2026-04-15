@@ -10,6 +10,7 @@ import {
 } from "../../../../features/leads/queries";
 import { canViewLeadsKpiStrip } from "../../../../lib/leads/lead-kpi-eligibility";
 import {
+  canDeleteLeadByRole,
   hasEffectivePermission,
   P,
 } from "../../../../lib/authz/permissions";
@@ -21,10 +22,11 @@ import {
   resolveNavContext,
 } from "../../../../lib/navigation-resolve";
 
+export const dynamic = "force-dynamic";
+
 const LEAD_DETAIL_TABS = new Set([
   "overview",
   "pricing",
-  "kp",
   "contact",
   "messages",
   "tasks",
@@ -76,11 +78,17 @@ export default async function LeadsPage({ params }: PageProps) {
     const description = navCtx?.subItem?.description;
     const permCtx = {
       realRole: access.realRole,
+      dbRole: access.dbRole,
       impersonatorId: access.impersonatorId,
     };
     const canUploadLeadFiles = hasEffectivePermission(
       access.permissionKeys,
       P.FILES_UPLOAD,
+      permCtx,
+    );
+    const canCreateLead = hasEffectivePermission(
+      access.permissionKeys,
+      P.LEADS_CREATE,
       permCtx,
     );
 
@@ -96,6 +104,7 @@ export default async function LeadsPage({ params }: PageProps) {
         rows={rows}
         hint={error}
         canUploadLeadFiles={canUploadLeadFiles}
+        canCreateLead={canCreateLead}
         kpiCounts={kpiCounts ?? undefined}
         showKpiStrip={showKpi && kpiCounts != null}
       />
@@ -103,6 +112,9 @@ export default async function LeadsPage({ params }: PageProps) {
   }
 
   if (parsed.kind === "detail") {
+    if (parsed.tab === "kp") {
+      redirect(`/leads/${parsed.leadId}/pricing`);
+    }
     const lead = await getLeadById(parsed.leadId, ctx);
     if (!lead) {
       notFound();
@@ -112,15 +124,23 @@ export default async function LeadsPage({ params }: PageProps) {
     }
     const permCtx = {
       realRole: access.realRole,
+      dbRole: access.dbRole,
       impersonatorId: access.impersonatorId,
     };
     const caps = buildLeadDetailCapabilityFlags(access.permissionKeys, permCtx);
+    const allowedTabs = buildAllowedLeadTabs(caps);
+    if (parsed.tab && !allowedTabs.has(parsed.tab)) {
+      redirect(`/leads/${parsed.leadId}`);
+    }
     return (
       <LeadDetailView
         lead={lead}
         tab={parsed.tab}
         canUpdateLead={caps.canUpdateLead}
+        canDeleteLead={caps.canDeleteLead}
+        canViewMessages={caps.canViewMessages}
         canConvertToDeal={caps.canConvertToDeal}
+        canViewLeadFiles={caps.canViewLeadFiles}
         canUploadLeadFiles={caps.canUploadLeadFiles}
         canSearchContacts={caps.canSearchContacts}
         canViewTasks={caps.canViewTasks}
@@ -140,6 +160,7 @@ export default async function LeadsPage({ params }: PageProps) {
 
 type LeadPermCtx = {
   realRole: string;
+  dbRole: string;
   impersonatorId?: string | null;
 };
 
@@ -147,6 +168,7 @@ function buildLeadDetailCapabilityFlags(
   permissionKeys: string[],
   permCtx: LeadPermCtx,
 ) {
+  const canDeleteLead = canDeleteLeadByRole(permCtx);
   const canUpdateLead = hasEffectivePermission(
     permissionKeys,
     P.LEADS_UPDATE,
@@ -154,9 +176,20 @@ function buildLeadDetailCapabilityFlags(
   );
   return {
     canUpdateLead,
+    canDeleteLead,
+    canViewMessages: hasEffectivePermission(
+      permissionKeys,
+      P.NOTIFICATIONS_VIEW,
+      permCtx,
+    ),
     canConvertToDeal:
       canUpdateLead &&
       hasEffectivePermission(permissionKeys, P.DEALS_CREATE, permCtx),
+    canViewLeadFiles: hasEffectivePermission(
+      permissionKeys,
+      P.FILES_VIEW,
+      permCtx,
+    ),
     canUploadLeadFiles: hasEffectivePermission(
       permissionKeys,
       P.FILES_UPLOAD,
@@ -196,4 +229,17 @@ function buildLeadDetailCapabilityFlags(
       hasEffectivePermission(permissionKeys, P.ESTIMATES_UPDATE, permCtx),
     canViewCost: hasEffectivePermission(permissionKeys, P.COST_VIEW, permCtx),
   };
+}
+
+function buildAllowedLeadTabs(
+  caps: ReturnType<typeof buildLeadDetailCapabilityFlags>,
+): Set<string> {
+  const tabs = new Set<string>(["overview", "contact", "activity", "ai"]);
+  if (caps.canViewMessages) tabs.add("messages");
+  if (caps.canViewTasks) tabs.add("tasks");
+  if (caps.canViewLeadFiles) tabs.add("files");
+  if (caps.canViewEstimates) {
+    tabs.add("pricing");
+  }
+  return tabs;
 }

@@ -10,6 +10,10 @@ import { cn } from "../../../../lib/utils";
 type Props = {
   lead: LeadDetailRow;
   onSchedule: () => void;
+  canUpdateLead: boolean;
+  measurementNotRequired: boolean;
+  onMarkMeasurementNotRequired: () => void;
+  markingMeasurementNotRequired: boolean;
 };
 
 const TYPE_UA: Record<string, string> = {
@@ -20,7 +24,14 @@ const TYPE_UA: Record<string, string> = {
   OTHER: "Інше",
 };
 
-export function LeadMeetingsCard({ lead, onSchedule }: Props) {
+export function LeadMeetingsCard({
+  lead,
+  onSchedule,
+  canUpdateLead,
+  measurementNotRequired,
+  onMarkMeasurementNotRequired,
+  markingMeasurementNotRequired,
+}: Props) {
   const now = new Date();
   const upcoming = lead.calendarEvents.filter(
     (e) => new Date(e.startAt) >= now,
@@ -107,6 +118,19 @@ export function LeadMeetingsCard({ lead, onSchedule }: Props) {
           >
             Календар
           </Link>
+          <button
+            type="button"
+            disabled={!canUpdateLead || measurementNotRequired || markingMeasurementNotRequired}
+            onClick={() => onMarkMeasurementNotRequired()}
+            className={cn(
+              "rounded-[12px] border px-3 py-2 text-[12px] font-medium transition duration-200",
+              !canUpdateLead || measurementNotRequired || markingMeasurementNotRequired
+                ? "cursor-not-allowed border-[var(--enver-border)] bg-[var(--enver-card)] text-[var(--enver-muted)]"
+                : "border-amber-300 bg-amber-50 text-amber-900 hover:border-amber-400",
+            )}
+          >
+            {measurementNotRequired ? "Позначено: замір не потрібен" : "Попередній замір не потрібен"}
+          </button>
         </div>
       </div>
 
@@ -150,7 +174,21 @@ export function LeadMeetingsCard({ lead, onSchedule }: Props) {
         ) : (
           <p className="mt-2 text-[12px] text-[var(--enver-muted)]">
             Ще немає завершених замірів — після виїзду фіксуйте матеріали у
-            вкладці «Файли» та розрахунок у «Розрахунок».
+            {" "}
+            <Link
+              href={`/leads/${lead.id}/files`}
+              className="font-medium text-[var(--enver-accent)] transition duration-200 hover:underline"
+            >
+              вкладці «Файли»
+            </Link>
+            {" "}та розрахунок у{" "}
+            <Link
+              href={`/leads/${lead.id}/pricing`}
+              className="font-medium text-[var(--enver-accent)] transition duration-200 hover:underline"
+            >
+              «Розрахунок»
+            </Link>
+            .
           </p>
         )}
       </div>

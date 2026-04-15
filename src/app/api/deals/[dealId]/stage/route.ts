@@ -1,26 +1,24 @@
 import { revalidatePath } from "next/cache";
-import type { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../../lib/prisma";
-import { appendActivityLog } from "../../../../../lib/deal-api/audit";
 import {
   forbidUnlessDealAccess,
   requireSessionUser,
 } from "../../../../../lib/authz/api-guard";
 import { P } from "../../../../../lib/authz/permissions";
-import { canMoveToNextStage } from "@/lib/deal-os/flow-engine";
 import { publishCrmEvent, CRM_EVENT_TYPES } from "@/lib/events/crm-events";
-import { evaluateDealStageTransitionGuard } from "@/lib/workflow/stage-policy";
 import { recordWorkflowEvent, WORKFLOW_EVENT_TYPES } from "@/features/event-system";
+import { getRequestContext, writePlatformAudit } from "@/lib/platform";
+import { logError } from "@/lib/observability/logger";
+import {
+  isStageTransitionFailure,
+  transitionDealStage,
+} from "@/lib/deals/stage-transition";
 
 type Ctx = { params: Promise<{ dealId: string }> };
 
-function parseMeta(raw: Prisma.JsonValue | null): Record<string, unknown> {
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
-  return raw as Record<string, unknown>;
-}
-
 export async function PATCH(req: Request, ctx: Ctx) {
+  const requestCtx = getRequestContext(req);
   if (!process.env.DATABASE_URL?.trim()) {
     return NextResponse.json(
       { error: "DATABASE_URL не задано" },
@@ -76,119 +74,47 @@ export async function PATCH(req: Request, ctx: Ctx) {
 
     const userId = user.id;
 
-    const nextStage = await prisma.pipelineStage.findFirst({
-      where: { id: body.stageId, pipelineId: deal.pipelineId },
+    const transition = await transitionDealStage({
+      dealId,
+      stageId: body.stageId,
+      changedById: userId,
     });
-    if (!nextStage) {
-      return NextResponse.json(
-        { error: "Стадія не знайдена у цій воронці" },
-        { status: 400 },
-      );
-    }
-
-    if (deal.stageId === nextStage.id) {
-      return NextResponse.json({ ok: true, stageId: nextStage.id });
-    }
-
-    const isForward = nextStage.sortOrder > deal.stage.sortOrder;
-    if (isForward && nextStage.sortOrder !== deal.stage.sortOrder + 1) {
+    if (isStageTransitionFailure(transition)) {
       return NextResponse.json(
         {
-          error: "Дозволено перехід лише на наступний етап.",
+          error: transition.error,
+          checklist: transition.checklist,
+          blockers: transition.blockers,
+          stage: transition.stage,
+          nextStage: transition.nextStage,
         },
-        { status: 400 },
+        { status: transition.status },
       );
     }
 
-    if (isForward) {
-      const paymentIncome = await prisma.moneyTransaction.aggregate({
-        where: { dealId, type: "INCOME", status: "PAID" },
-        _sum: { amount: true },
-      });
-      const paid = Number(paymentIncome._sum.amount ?? 0);
-      const total = Number(deal.value ?? 0);
-      const percentPaid = total > 0 ? (paid / total) * 100 : 0;
-
-      const meta = parseMeta(deal.workspaceMeta);
-      const proposalSent = meta.proposalSent === true;
-      const executionChecklist =
-        meta.executionChecklist &&
-        typeof meta.executionChecklist === "object" &&
-        !Array.isArray(meta.executionChecklist)
-          ? (meta.executionChecklist as Record<string, unknown>)
-          : {};
-
-      const validation = canMoveToNextStage({
-        currentStageName: deal.stage.name,
-        currentStageSlug: deal.stage.slug,
-        hasEstimate: deal._count.estimates > 0,
-        hasQuote: proposalSent,
-        quoteApproved: executionChecklist.estimateApproved === true,
-        contractSigned: deal.contract?.status === "FULLY_SIGNED",
-        payment70Done: percentPaid >= 70,
-        procurementCreated: deal._count.dealPurchaseOrders > 0,
-        productionStarted: Boolean(deal.productionFlow),
-      });
-      const guard = evaluateDealStageTransitionGuard({
-        currentStageSlug: deal.stage.slug,
-        nextStageSlug: nextStage.slug,
-        hasEstimate: deal._count.estimates > 0,
-        hasQuote: proposalSent,
-        contractSigned: deal.contract?.status === "FULLY_SIGNED",
-        payment70Done: percentPaid >= 70,
-        productionStarted: Boolean(deal.productionFlow),
-      });
-
-      if (!validation.ok || !guard.ok) {
-        return NextResponse.json(
-          {
-            error: "Перехід заблоковано Flow Engine.",
-            checklist: validation.checklist,
-            blockers: [
-              ...validation.blockers,
-              ...guard.blockers.map((x) => ({ id: x.code, label: x.message })),
-            ],
-            stage: validation.stage,
-            nextStage: validation.nextStage,
-          },
-          { status: 409 },
-        );
-      }
-    }
-
-    await prisma.$transaction([
-      prisma.deal.update({
-        where: { id: dealId },
-        data: { stageId: nextStage.id },
-      }),
-      prisma.dealStageHistory.create({
-        data: {
-          dealId,
-          fromStageId: deal.stageId,
-          toStageId: nextStage.id,
-          changedById: userId,
-        },
-      }),
-    ]);
-
-    await appendActivityLog({
+    await writePlatformAudit({
       entityType: "DEAL",
       entityId: dealId,
       type: "DEAL_STAGE_CHANGED",
       actorUserId: userId,
-      data: { toStageId: nextStage.id, toStageName: nextStage.name },
+      requestId: requestCtx.requestId,
+      correlationId: requestCtx.correlationId,
+      data: {
+        toStageId: transition.toStageId,
+        toStageName: transition.toStageName,
+      },
     });
     await publishCrmEvent({
       type: CRM_EVENT_TYPES.STAGE_CHANGED,
       dealId,
       payload: {
-        fromStageId: deal.stageId,
-        toStageId: nextStage.id,
-        toStageName: nextStage.name,
+        fromStageId: transition.fromStageId,
+        toStageId: transition.toStageId,
+        toStageName: transition.toStageName,
       },
-      dedupeKey: `stage:${dealId}:${deal.stageId}:${nextStage.id}:${Date.now()}`,
+      dedupeKey: `stage:${dealId}:${transition.fromStageId}:${transition.toStageId}:${Date.now()}`,
     });
-    if (nextStage.slug.toLowerCase().includes("production")) {
+    if (transition.toStageSlug.toLowerCase().includes("production")) {
       await recordWorkflowEvent(
         WORKFLOW_EVENT_TYPES.PRODUCTION_TRANSFERRED,
         { dealId },
@@ -197,7 +123,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
           entityId: dealId,
           dealId,
           userId,
-          dedupeKey: `production-transferred:${dealId}:${nextStage.id}`,
+          dedupeKey: `production-transferred:${dealId}:${transition.toStageId}`,
         },
       );
     }
@@ -205,12 +131,17 @@ export async function PATCH(req: Request, ctx: Ctx) {
     revalidatePath(`/deals/${dealId}/workspace`);
     return NextResponse.json({
       ok: true,
-      stageId: nextStage.id,
-      stageName: nextStage.name,
+      stageId: transition.toStageId,
+      stageName: transition.toStageName,
     });
   } catch (e) {
-     
-    console.error("[PATCH deal stage]", e);
+    logError({
+      module: "api.deals.stage",
+      message: "Не вдалося оновити етап угоди",
+      requestId: requestCtx.requestId,
+      correlationId: requestCtx.correlationId,
+      details: { dealId, error: e instanceof Error ? e.message : String(e) },
+    });
     return NextResponse.json({ error: "Помилка збереження" }, { status: 500 });
   }
 }

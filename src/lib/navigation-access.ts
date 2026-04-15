@@ -1,10 +1,16 @@
 import { NAV_SECTIONS } from "../config/navigation";
 import type { Phase1Permission } from "./authz/permissions";
+import {
+  hasEffectiveAnyPermission,
+  hasEffectivePermission,
+} from "./authz/permissions";
 
 export type NavSubManifest = {
   id: string;
   label: string;
   href: string;
+  permission: Phase1Permission | null;
+  anyPermissions: Phase1Permission[];
 };
 
 export type NavSectionManifest = {
@@ -31,6 +37,8 @@ export function buildNavManifest(): NavSectionManifest[] {
       id: sub.id,
       label: sub.label,
       href: sub.href,
+      permission: sub.permission ?? null,
+      anyPermissions: sub.anyPermissions ?? [],
     })),
   }));
 }
@@ -122,12 +130,50 @@ export function isExactNavPathAllowed(
 
 export function filterNavSubItemsForUser(
   sectionId: string,
-  subItems: readonly { id: string; label: string; href: string }[],
+  subItems: readonly {
+    id: string;
+    label: string;
+    href: string;
+    permission?: Phase1Permission;
+    anyPermissions?: readonly Phase1Permission[];
+  }[],
   menuAccess: MenuAccessState | null | undefined,
+  permissionContext?: {
+    permissionKeys: string[] | undefined;
+    realRole?: string;
+    impersonatorId?: string | null;
+  },
 ): { id: string; label: string; href: string }[] {
-  if (!menuAccess) return [...subItems];
+  const byPermissions = subItems.filter((sub) => {
+    if (!permissionContext) return true;
+    if (
+      sub.permission &&
+      !hasEffectivePermission(permissionContext.permissionKeys, sub.permission, {
+        realRole: permissionContext.realRole,
+        impersonatorId: permissionContext.impersonatorId ?? undefined,
+      })
+    ) {
+      return false;
+    }
+    if (
+      sub.anyPermissions?.length &&
+      !hasEffectiveAnyPermission(
+        permissionContext.permissionKeys,
+        [...sub.anyPermissions],
+        {
+          realRole: permissionContext.realRole,
+          impersonatorId: permissionContext.impersonatorId ?? undefined,
+        },
+      )
+    ) {
+      return false;
+    }
+    return true;
+  });
+
+  if (!menuAccess) return [...byPermissions];
   const rule = menuAccess[sectionId];
-  if (rule === undefined || rule === "all") return [...subItems];
+  if (rule === undefined || rule === "all") return [...byPermissions];
   const allow = new Set(rule);
-  return subItems.filter((s) => allow.has(s.id));
+  return byPermissions.filter((s) => allow.has(s.id));
 }

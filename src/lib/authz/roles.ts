@@ -5,6 +5,7 @@
 export type EffectiveRole =
   | "SUPER_ADMIN"
   | "DIRECTOR"
+  | "DIRECTOR_PRODUCTION"
   | "HEAD_MANAGER"
   | "TEAM_LEAD"
   | "SALES_MANAGER"
@@ -22,6 +23,8 @@ export function normalizeRole(role: string): EffectiveRole {
     case "DIRECTOR":
     case "ADMIN":
       return "DIRECTOR";
+    case "DIRECTOR_PRODUCTION":
+      return "DIRECTOR_PRODUCTION";
     case "HEAD_MANAGER":
     case "MANAGER":
       return "HEAD_MANAGER";
@@ -43,7 +46,7 @@ export function normalizeRole(role: string): EffectiveRole {
 
 /** Повний доступ до даних по компанії (ліди/угоди без фільтра власника). */
 export function hasUnrestrictedDataScope(role: EffectiveRole): boolean {
-  return role === "SUPER_ADMIN" || role === "DIRECTOR";
+  return role === "SUPER_ADMIN" || role === "DIRECTOR" || role === "DIRECTOR_PRODUCTION";
 }
 
 /**
@@ -53,6 +56,7 @@ export function hasTaskAssignScope(role: EffectiveRole): boolean {
   return (
     role === "SUPER_ADMIN" ||
     role === "DIRECTOR" ||
+    role === "DIRECTOR_PRODUCTION" ||
     role === "HEAD_MANAGER" ||
     role === "TEAM_LEAD"
   );
@@ -63,6 +67,7 @@ export function isSalesPipelineRole(role: EffectiveRole): boolean {
   return (
     role === "SUPER_ADMIN" ||
     role === "DIRECTOR" ||
+    role === "DIRECTOR_PRODUCTION" ||
     role === "HEAD_MANAGER" ||
     role === "TEAM_LEAD" ||
     role === "SALES_MANAGER"
@@ -74,6 +79,7 @@ export function hasCompanyOperationsScope(role: EffectiveRole): boolean {
   return (
     role === "SUPER_ADMIN" ||
     role === "DIRECTOR" ||
+    role === "DIRECTOR_PRODUCTION" ||
     role === "TEAM_LEAD" ||
     role === "PROCUREMENT_MANAGER" ||
     role === "ACCOUNTANT"

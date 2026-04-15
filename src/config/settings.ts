@@ -122,11 +122,32 @@ export const SETTINGS_ITEMS: SettingsItem[] = [
     path: "/settings/ai",
   },
   {
+    id: "ai-admin-chat",
+    section: "ШІ",
+    label: "AI‑архітектор CRM (чат)",
+    access: "admin",
+    path: "/settings/ai/admin",
+  },
+  {
     id: "branding",
     section: "Брендинг",
     label: "Брендинг / UI",
     access: "admin",
     path: "/settings/branding",
+  },
+  {
+    id: "materials",
+    section: "Матеріали та постачальники",
+    label: "База матеріалів",
+    access: "admin",
+    path: "/settings/materials",
+  },
+  {
+    id: "suppliers",
+    section: "Матеріали та постачальники",
+    label: "Постачальники",
+    access: "admin",
+    path: "/settings/suppliers",
   },
   {
     id: "integrations",

@@ -8,6 +8,22 @@ import {
 } from "./commercial-snapshot";
 import { seedDealPaymentPlan7030 } from "./payment-milestones";
 
+async function getDealColumnNames(
+  tx: Prisma.TransactionClient,
+): Promise<Set<string>> {
+  try {
+    const rows = await tx.$queryRaw<Array<{ column_name: string }>>`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = current_schema()
+        AND table_name IN ('Deal', 'deal')
+    `;
+    return new Set(rows.map((r) => r.column_name));
+  } catch {
+    return new Set<string>();
+  }
+}
+
 /**
  * Після створення угоди: знімок КП + графік 70/30, якщо активне КП у статусі APPROVED.
  */
@@ -20,6 +36,9 @@ export async function applyCommercialSnapshotFromApprovedProposal(
   },
 ): Promise<void> {
   if (!args.activeProposalId) return;
+  const dealColumnNames = await getDealColumnNames(tx);
+  const supportsColumn = (name: string): boolean =>
+    dealColumnNames.size === 0 || dealColumnNames.has(name);
 
   const proposal = await tx.leadProposal.findUnique({
     where: { id: args.activeProposalId },
@@ -66,16 +85,34 @@ export async function applyCommercialSnapshotFromApprovedProposal(
     ...(payment ? { payment } : {}),
   };
 
+  const dealUpdateData: Prisma.DealUpdateInput = {
+    ...(supportsColumn("commercialSnapshotJson")
+      ? {
+          commercialSnapshotJson:
+            commercial as unknown as Prisma.InputJsonValue,
+        }
+      : {}),
+    ...(supportsColumn("commercialSnapshotSourceProposalId")
+      ? { commercialSnapshotSourceProposalId: proposal.id }
+      : {}),
+    ...(supportsColumn("commercialSnapshotFrozenAt")
+      ? { commercialSnapshotFrozenAt: frozenAt }
+      : {}),
+    ...(total != null &&
+    total > 0 &&
+    supportsColumn("value") &&
+    supportsColumn("currency")
+      ? { value: total, currency: cur }
+      : {}),
+    ...(supportsColumn("workspaceMeta") ? { workspaceMeta: merged } : {}),
+  };
+
+  if (Object.keys(dealUpdateData).length === 0) {
+    return;
+  }
+
   await tx.deal.update({
     where: { id: args.dealId },
-    data: {
-      commercialSnapshotJson: commercial as unknown as Prisma.InputJsonValue,
-      commercialSnapshotSourceProposalId: proposal.id,
-      commercialSnapshotFrozenAt: frozenAt,
-      ...(total != null && total > 0
-        ? { value: total, currency: cur }
-        : {}),
-      workspaceMeta: merged,
-    },
+    data: dealUpdateData,
   });
 }

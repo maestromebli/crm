@@ -7,3 +7,9 @@ export {
   calculateEstimateSummary,
   recalculateEstimateItem,
 } from "../../features/estimate";
+export {
+  calculateItem,
+  calculateSummary,
+  calculateMargin,
+  calculateEstimateTotalsFromLines,
+} from "../../features/estimate-core";

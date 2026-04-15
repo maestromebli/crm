@@ -3,17 +3,17 @@
 /**
  * Таблиця розрахунку меблів (структура Excel-КП по зонах).
  */
-import { Copy, Plus, Trash2 } from "lucide-react";
-import { Fragment, useMemo } from "react";
+import { Camera, ChevronDown, ChevronUp, Copy, Plus, Trash2 } from "lucide-react";
+import { Fragment, useMemo, useState } from "react";
 import {
   KITCHEN_CLIENT_PRICE_MULTIPLIER,
   KITCHEN_MARKUP_PERCENT_LABEL,
   sumKitchenDraftLines,
 } from "../../../lib/estimates/kitchen-cost-sheet-template";
 import { cn } from "../../../lib/utils";
-import type { MaterialSearchHit } from "../../../lib/materials/material-provider";
+import type { SupplierItem } from "../../../features/suppliers/core/supplierTypes";
+import { SupplierSearchDropdown } from "../../../features/suppliers/ui/SupplierSearchDropdown";
 import type { EstimateLineDraft } from "./estimate-line-draft";
-import { MaterialCatalogCombobox } from "./MaterialCatalogCombobox";
 
 function formatNum(n: number, maxFrac = 2): string {
   return new Intl.NumberFormat("uk-UA", {
@@ -45,10 +45,17 @@ export function KitchenCostSheetTable({
   onRemoveLine,
   onDuplicateLine,
   onAddMaterialRow,
+  onAddManualRow,
   onAddMaterialRowToGroup,
   onTableTitleChange,
-  onCatalogLinePick,
+  onSupplierItemPick,
+  supplierPriceAlerts,
+  onApplySupplierPrice,
   onKitchenPricingChange,
+  onOpenObjectPhotoWindow,
+  objectPhotoCount = 0,
+  collapsed,
+  onCollapsedChange,
   /** Лише клієнтський коефіцієнт; % націнки лишається поточним (якщо не передано onKitchenPricingChange). */
   onClientMultiplierChange,
 }: {
@@ -62,6 +69,8 @@ export function KitchenCostSheetTable({
   onRemoveLine: (id: string) => void;
   onDuplicateLine: (li: EstimateLineDraft) => void;
   onAddMaterialRow: () => void;
+  /** Додає ручний рядок без участі у множнику матеріалів (роль measurement). */
+  onAddManualRow?: () => void;
   onAddMaterialRowToGroup: (
     groupId: string,
     groupLabel: string,
@@ -69,15 +78,26 @@ export function KitchenCostSheetTable({
   ) => void;
   /** Редагування заголовка таблиці (назва зберігається в рядках смети) */
   onTableTitleChange?: (title: string) => void;
-  /** Вибір позиції з бази прайсів (підставляє назву, ціну, од. виміру, категорію) */
-  onCatalogLinePick?: (lineId: string, hit: MaterialSearchHit) => void;
+  /** Вибір позиції з бази постачальників (підставляє назву, ціну, од. виміру, категорію) */
+  onSupplierItemPick?: (lineId: string, item: SupplierItem) => void;
+  supplierPriceAlerts?: Record<
+    string,
+    { currentPrice: number; currency: "UAH"; updatedAt: string }
+  >;
+  onApplySupplierPrice?: (lineId: string, currentPrice: number) => void;
   /** Редагування клієнтського коефіцієнта та % націнки на матеріали */
   onKitchenPricingChange?: (
     clientMultiplier: number,
     markupPercent: number,
   ) => void;
+  onOpenObjectPhotoWindow?: () => void;
+  objectPhotoCount?: number;
+  collapsed?: boolean;
+  onCollapsedChange?: (collapsed: boolean) => void;
   onClientMultiplierChange?: (clientMultiplier: number) => void;
 }) {
+  const [internalCollapsed, setInternalCollapsed] = useState(false);
+  const isCollapsed = collapsed ?? internalCollapsed;
   const customTableTitle = lines
     .map((l) => l.tableTitle?.trim())
     .find((t) => t);
@@ -99,6 +119,7 @@ export function KitchenCostSheetTable({
     return v ?? KITCHEN_MARKUP_PERCENT_LABEL;
   }, [lines]);
 
+  // DUPLICATE PRICING - TO BE REFACTORED
   const markupIntermediate =
     Math.round(materialSubtotal * (markupPercent / 100) * 100) / 100;
   const finalClient =
@@ -149,65 +170,133 @@ export function KitchenCostSheetTable({
 
   const tableText =
     density === "compact"
-      ? "text-[10px]"
+      ? "text-[11px]"
       : density === "pro"
-        ? "text-[12px]"
-        : "text-[11px]";
+        ? "text-[13px]"
+        : "text-[12px]";
   const minTable =
     density === "compact"
       ? "min-w-[880px]"
       : density === "pro"
         ? "min-w-[1040px]"
         : "min-w-[980px]";
+  const controlHeightClass =
+    density === "compact" ? "py-0.5" : density === "pro" ? "py-1.5" : "py-1";
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-[var(--enver-card)] shadow-md ring-1 ring-slate-900/5">
-      <div className="border-b border-slate-200/80 bg-gradient-to-br from-slate-50 via-white to-sky-50/40 px-4 py-3">
-        {canUpdate && onTableTitleChange ? (
-          <input
-            type="text"
-            value={displayTableTitle}
-            onChange={(e) => onTableTitleChange(e.target.value)}
-            aria-label="Назва розрахункової таблиці"
-            title="Назва таблиці (зберігається разом із сметою)"
-            placeholder={sheetTitle}
-            className={cn(
-              "w-full rounded-lg border border-transparent bg-white/60 px-2 py-1.5 text-center font-semibold tracking-tight text-[var(--enver-text)] shadow-sm outline-none backdrop-blur-sm placeholder:font-normal placeholder:text-slate-400 focus:border-sky-300 focus:bg-white focus:ring-2 focus:ring-sky-200/60",
-              density === "pro" ? "text-lg" : "text-base",
+    <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-[var(--enver-card)] shadow-sm ring-1 ring-slate-900/5">
+      <div className="border-b border-slate-200/80 bg-gradient-to-b from-[var(--enver-surface)] to-white px-4 py-3">
+        <div className="flex items-center gap-2">
+          <div className="min-w-0 flex-1">
+            {canUpdate && onTableTitleChange ? (
+              <input
+                type="text"
+                value={displayTableTitle}
+                onChange={(e) => onTableTitleChange(e.target.value)}
+                aria-label="Назва розрахункової таблиці"
+                placeholder={sheetTitle}
+                className={cn(
+                  "w-full rounded-lg border border-sky-200/80 bg-sky-50/70 px-2 py-1.5 text-center font-semibold tracking-tight text-[var(--enver-text)] shadow-sm outline-none backdrop-blur-sm placeholder:font-normal placeholder:text-sky-500/80 focus:border-sky-400 focus:bg-white focus:ring-2 focus:ring-sky-200/70",
+                  density === "pro" ? "text-lg" : "text-base",
+                )}
+              />
+            ) : (
+              <div
+                className={cn(
+                  "text-center font-semibold tracking-tight text-[var(--enver-text)]",
+                  density === "pro" ? "text-lg" : "text-base",
+                )}
+              >
+                {displayTableTitle}
+              </div>
             )}
-          />
-        ) : (
-          <div
-            className={cn(
-              "text-center font-semibold tracking-tight text-[var(--enver-text)]",
-              density === "pro" ? "text-lg" : "text-base",
-            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const nextCollapsed = !isCollapsed;
+              onCollapsedChange?.(nextCollapsed);
+              if (collapsed === undefined) {
+                setInternalCollapsed(nextCollapsed);
+              }
+            }}
+            className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+            aria-label={isCollapsed ? "Розгорнути таблицю" : "Згорнути таблицю"}
           >
-            {displayTableTitle}
-          </div>
+            {isCollapsed ? (
+              <>
+                <ChevronDown className="h-3.5 w-3.5" />
+                Розгорнути
+              </>
+            ) : (
+              <>
+                <ChevronUp className="h-3.5 w-3.5" />
+                Згорнути
+              </>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={onOpenObjectPhotoWindow}
+            className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-sky-300 bg-sky-50 px-2.5 text-xs font-semibold text-sky-800 shadow-sm hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={!onOpenObjectPhotoWindow}
+            aria-label="Фото об'єкта"
+          >
+            <Camera className="h-3.5 w-3.5" />
+            Фото об&apos;єкта
+            {objectPhotoCount > 0 ? (
+              <span className="rounded-full bg-sky-200 px-1.5 py-0 text-[10px] text-sky-900">
+                {objectPhotoCount}
+              </span>
+            ) : null}
+          </button>
+        </div>
+        <div className="mt-2 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[11px] text-slate-700">
+          <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2 py-0.5">
+            Рядків: <strong className="ml-1 font-semibold text-slate-900">{lines.length}</strong>
+          </span>
+          <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2 py-0.5">
+            Груп: <strong className="ml-1 font-semibold text-slate-900">{grouped.length}</strong>
+          </span>
+          <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5">
+            Підсумок:{" "}
+            <strong className="ml-1 font-semibold tabular-nums text-emerald-900">
+              {formatMoney(finalClient)} грн
+            </strong>
+          </span>
+        </div>
+        {!isCollapsed ? (
+          <>
+            <p className="mt-1.5 text-center text-[11px] leading-snug text-slate-600">
+              {canUpdate && onSupplierItemPick
+                ? "За зонами (як у Excel-КП). У «Найменуванні» — пошук по прайсу або введення вручну. Коеф. — запас / норма на одиницю."
+                : "Перегляд розрахунку по зонах матеріалів і робіт"}
+            </p>
+            {canUpdate ? (
+              <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={onAddMaterialRow}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50/90 px-3 py-1.5 text-[11px] font-semibold text-emerald-900 shadow-sm transition hover:bg-emerald-100"
+                >
+                  <Plus className="h-3.5 w-3.5 shrink-0" />
+                  Додати свою позицію
+                </button>
+                <span className="hidden text-[10px] text-slate-500 sm:inline">
+                  (у кінець таблиці, група «Інше»)
+                </span>
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <p className="mt-1 text-center text-[12px] text-slate-600">
+            Таблицю згорнуто. Натисніть <strong>«Розгорнути»</strong>, щоб побачити поля редагування.
+          </p>
         )}
-        <p className="mt-1.5 text-center text-[11px] leading-snug text-slate-600">
-          {canUpdate && onCatalogLinePick
-            ? "За зонами (як у Excel-КП). У «Найменуванні» — пошук по прайсу або введення вручну. Коеф. — запас / норма на одиницю."
-            : "Перегляд розрахунку по зонах матеріалів і робіт"}
-        </p>
-        {canUpdate ? (
-          <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
-            <button
-              type="button"
-              onClick={onAddMaterialRow}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50/90 px-3 py-1.5 text-[11px] font-semibold text-emerald-900 shadow-sm transition hover:bg-emerald-100"
-            >
-              <Plus className="h-3.5 w-3.5 shrink-0" />
-              Додати свою позицію
-            </button>
-            <span className="hidden text-[10px] text-slate-500 sm:inline">
-              (у кінець таблиці, група «Інше»)
-            </span>
-          </div>
-        ) : null}
       </div>
 
+      {!isCollapsed ? (
+        <>
       {canEditClientMultiplier && lines.length > 0 ? (
         <div className="border-b border-amber-200/80 bg-amber-50/60 px-3 py-2 text-center text-[11px] leading-snug text-amber-950">
           У жовтому рядку підсумку таблиці нижче можна змінити{" "}
@@ -222,41 +311,40 @@ export function KitchenCostSheetTable({
         </div>
       ) : null}
 
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto bg-white/70">
         <table
           className={cn("w-full border-collapse text-left", tableText, minTable)}
         >
           <thead>
-            <tr className="sticky top-0 z-10 bg-gradient-to-b from-[#4a6fc4] to-[#3f66b8] text-white shadow-md">
-              <th className="border border-white/25 px-1.5 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wide">
+            <tr className="sticky top-0 z-10 bg-[#4a6fc4] text-white">
+              <th className="border border-white/25 px-1.5 py-2.5 text-center text-[11px] font-semibold uppercase tracking-wide">
                 № п/п
               </th>
-              <th className="border border-white/25 px-2 py-2.5 text-[10px] font-semibold uppercase tracking-wide">
+              <th className="border border-white/25 px-2 py-2.5 text-[11px] font-semibold uppercase tracking-wide">
                 Найменування матеріалів і робіт
               </th>
               <th
-                className="border border-white/25 px-1 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wide"
+                className="border border-white/25 px-1 py-2.5 text-center text-[11px] font-semibold uppercase tracking-wide"
                 colSpan={4}
               >
                 Розрахунок
               </th>
             </tr>
-            <tr className="sticky top-[38px] z-10 bg-[#3a5daa] text-white/95">
+            <tr className="sticky top-[40px] z-10 bg-[#4469b9] text-white/95">
               <th className="border border-white/20" />
               <th className="border border-white/20" />
-              <th className="border border-white/20 px-1 py-1.5 text-center text-[10px] font-medium">
+              <th className="border border-white/20 px-1 py-1.5 text-center text-[11px] font-medium">
                 Кіл-ть
               </th>
               <th
-                className="border border-white/20 px-1 py-1.5 text-center text-[10px] font-medium"
-                title="Множник (норма, запас, площа тощо)"
+                className="border border-white/20 px-1 py-1.5 text-center text-[11px] font-medium"
               >
                 Коеф.
               </th>
-              <th className="border border-white/20 px-1 py-1.5 text-center text-[10px] font-medium">
+              <th className="border border-white/20 px-1 py-1.5 text-center text-[11px] font-medium">
                 Ціна, грн
               </th>
-              <th className="border border-white/20 px-1 py-1.5 text-center text-[10px] font-medium">
+              <th className="border border-white/20 px-1 py-1.5 text-center text-[11px] font-medium">
                 Сума, грн
               </th>
             </tr>
@@ -274,7 +362,7 @@ export function KitchenCostSheetTable({
                         <span className="text-base leading-none" aria-hidden>
                           {group.icon}
                         </span>
-                        <span>{group.label}</span>
+                        <span className="tracking-wide">{group.label}</span>
                       </span>
                       {canUpdate ? (
                         <button
@@ -287,7 +375,6 @@ export function KitchenCostSheetTable({
                             )
                           }
                           className="inline-flex items-center gap-1 rounded-md border border-sky-300/80 bg-white px-2 py-1 text-[10px] font-semibold text-sky-800 shadow-sm hover:bg-sky-50"
-                          title="Додати рядок у цю групу"
                         >
                           <Plus className="h-3 w-3" />
                           У групу
@@ -296,17 +383,12 @@ export function KitchenCostSheetTable({
                     </span>
                   </td>
                 </tr>
-                <tr
-                  className={cn(
-                    "bg-slate-100/95 text-slate-700",
-                    density === "pro" ? "text-[11px]" : "text-[10px]",
-                  )}
-                >
+                <tr className={cn("bg-slate-100/95 text-slate-700", density === "pro" ? "text-[11px]" : "text-[10px]")}>
                   <td className="border border-slate-200 px-1 py-1.5 text-center font-bold">
                     №
                   </td>
                   <td className="border border-slate-200 px-2 py-1.5 align-bottom font-bold">
-                    {canUpdate && onCatalogLinePick ? (
+                    {canUpdate && onSupplierItemPick ? (
                       <span className="block">
                         <span className="block uppercase tracking-wide">
                           Найменування
@@ -343,22 +425,22 @@ export function KitchenCostSheetTable({
                         "transition-colors",
                         tan && "bg-[#fce4d6]",
                         orange && "bg-orange-100",
-                        !tan && !orange && "bg-[var(--enver-card)] hover:bg-slate-50/80",
+                        !tan &&
+                          !orange &&
+                          "bg-[var(--enver-card)] hover:bg-slate-50/80",
                       )}
                     >
                       <td className="border border-slate-200 px-1 py-1 text-center tabular-nums text-slate-800">
                         {lines.findIndex((x) => x.id === li.id) + 1}
                       </td>
                       <td className="border border-slate-200 px-2 py-1 align-top">
-                        {canUpdate && onCatalogLinePick ? (
-                          <MaterialCatalogCombobox
+                        {canUpdate && onSupplierItemPick ? (
+                          <SupplierSearchDropdown
                             value={li.productName}
                             onChange={(next) =>
                               onUpdateLine(li.id, { productName: next })
                             }
-                            onCatalogPick={(hit) =>
-                              onCatalogLinePick(li.id, hit)
-                            }
+                            onSelect={(item) => onSupplierItemPick(li.id, item)}
                             disabled={!canUpdate}
                             className={tableText}
                           />
@@ -372,7 +454,7 @@ export function KitchenCostSheetTable({
                             }
                             disabled={!canUpdate}
                             className={cn(
-                              "w-full min-w-[16rem] rounded-md border border-transparent bg-transparent px-1 py-0.5 hover:border-slate-300 focus:border-slate-400 focus:bg-white focus:outline-none",
+                              "w-full min-w-[16rem] rounded-md border border-transparent bg-transparent px-1.5 py-1 hover:border-slate-300 focus:border-slate-400 focus:bg-white focus:outline-none",
                               tableText,
                             )}
                           />
@@ -388,15 +470,14 @@ export function KitchenCostSheetTable({
                             onUpdateLine(li.id, {
                               qty: Math.max(
                                 0,
-                                parseFloat(
-                                  e.target.value.replace(",", "."),
-                                ) || 0,
+                                parseFloat(e.target.value.replace(",", ".")) || 0,
                               ),
                             })
                           }
                           disabled={!canUpdate}
                           className={cn(
-                            "w-full min-w-[3.5rem] rounded-md border border-slate-200 bg-white/90 px-1 py-0.5 text-right shadow-inner focus:border-sky-400 focus:outline-none focus:ring-1 focus:ring-sky-200",
+                            "w-full min-w-[4.25rem] rounded-md border border-slate-300 bg-white px-1.5 text-right tabular-nums shadow-inner focus:border-sky-400 focus:outline-none focus:ring-1 focus:ring-sky-200",
+                            controlHeightClass,
                             tableText,
                           )}
                         />
@@ -406,7 +487,6 @@ export function KitchenCostSheetTable({
                           type="number"
                           step="0.05"
                           min={0}
-                          title="Коефіцієнт (запас, норма)"
                           value={coeff}
                           onChange={(e) =>
                             onUpdateLine(li.id, {
@@ -418,7 +498,8 @@ export function KitchenCostSheetTable({
                           }
                           disabled={!canUpdate}
                           className={cn(
-                            "w-full min-w-[3.25rem] rounded-md border border-slate-200 bg-amber-50/50 px-1 py-0.5 text-right font-medium tabular-nums focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-200",
+                            "w-full min-w-[4rem] rounded-md border border-amber-300 bg-amber-50 px-1.5 text-right font-semibold tabular-nums focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-200",
+                            controlHeightClass,
                             tableText,
                           )}
                         />
@@ -433,15 +514,14 @@ export function KitchenCostSheetTable({
                             onUpdateLine(li.id, {
                               salePrice: Math.max(
                                 0,
-                                parseFloat(
-                                  e.target.value.replace(",", "."),
-                                ) || 0,
+                                parseFloat(e.target.value.replace(",", ".")) || 0,
                               ),
                             })
                           }
                           disabled={!canUpdate}
                           className={cn(
-                            "w-full min-w-[4rem] rounded-md border border-slate-200 bg-white/90 px-1 py-0.5 text-right focus:border-sky-400 focus:outline-none focus:ring-1 focus:ring-sky-200",
+                            "w-full min-w-[5rem] rounded-md border border-slate-300 bg-white px-1.5 text-right tabular-nums focus:border-sky-400 focus:outline-none focus:ring-1 focus:ring-sky-200",
+                            controlHeightClass,
                             tableText,
                           )}
                         />
@@ -458,7 +538,6 @@ export function KitchenCostSheetTable({
                                     | "measurement",
                                 })
                               }
-                              title="Матеріали входять у націнку; «Замір» — окремо (без множника)"
                               className="max-w-[7.5rem] rounded border border-slate-200 bg-white py-0.5 pl-1 text-[9px] font-medium text-slate-700 focus:border-sky-400 focus:outline-none"
                             >
                               <option value="material">Матеріали</option>
@@ -467,13 +546,26 @@ export function KitchenCostSheetTable({
                           ) : null}
                           <span className="inline-flex items-center gap-1">
                             <span>{formatMoney(li.amountSale)}</span>
+                            {supplierPriceAlerts?.[li.id] ? (
+                              <button
+                                type="button"
+                                className="rounded border border-amber-300 bg-amber-50 px-1 py-0.5 text-[9px] font-medium text-amber-900 hover:bg-amber-100"
+                                onClick={() =>
+                                  onApplySupplierPrice?.(
+                                    li.id,
+                                    supplierPriceAlerts[li.id].currentPrice,
+                                  )
+                                }
+                              >
+                                Ціна оновлена у постачальника · Оновити ціну
+                              </button>
+                            ) : null}
                             {canUpdate ? (
                               <span className="inline-flex shrink-0">
                                 <button
                                   type="button"
                                   onClick={() => onDuplicateLine(li)}
                                   className="rounded-md p-0.5 text-slate-400 hover:bg-sky-50 hover:text-sky-700"
-                                  title="Дублювати"
                                 >
                                   <Copy className="h-3 w-3" />
                                 </button>
@@ -481,7 +573,6 @@ export function KitchenCostSheetTable({
                                   type="button"
                                   onClick={() => onRemoveLine(li.id)}
                                   className="rounded-md p-0.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
-                                  title="Видалити"
                                 >
                                   <Trash2 className="h-3 w-3" />
                                 </button>
@@ -510,7 +601,7 @@ export function KitchenCostSheetTable({
             ))}
           </tbody>
           <tfoot>
-            <tr className="bg-amber-100/90">
+            <tr className="bg-gradient-to-r from-amber-100/95 to-amber-50/95">
               <td
                 colSpan={5}
                 className="border border-slate-300 px-2 py-2.5 text-right text-xs font-semibold text-[var(--enver-text)]"
@@ -531,7 +622,6 @@ export function KitchenCostSheetTable({
                     max={10}
                     value={clientMultiplier}
                     aria-label="Клієнтський коефіцієнт (множник до суми матеріалів)"
-                    title="Типово 2,1 — сума матеріалів × коеф. + рядки «Замір»"
                     onChange={(e) => {
                       const v = parseFloat(
                         e.target.value.replace(",", "."),
@@ -566,7 +656,6 @@ export function KitchenCostSheetTable({
                       max={500}
                       value={markupPercent}
                       aria-label="Націнка на матеріали у відсотках"
-                      title="% від суми матеріалів для проміжного рядка"
                       onChange={(e) => {
                         const v = parseFloat(
                           e.target.value.replace(",", "."),
@@ -589,7 +678,7 @@ export function KitchenCostSheetTable({
                 {formatMoney(markupIntermediate)}
               </td>
             </tr>
-            <tr className="bg-amber-200/95">
+            <tr className="bg-gradient-to-r from-amber-200/95 to-amber-100/95">
               <td
                 colSpan={5}
                 className="border border-slate-300 px-2 py-2.5 text-right text-xs font-bold text-[var(--enver-text)]"
@@ -607,16 +696,18 @@ export function KitchenCostSheetTable({
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-slate-50/90 px-4 py-2.5">
           <button
             type="button"
-            onClick={onAddMaterialRow}
+            onClick={onAddManualRow ?? onAddMaterialRow}
             className="inline-flex items-center gap-1.5 rounded-lg border border-sky-200 bg-white px-3 py-1.5 text-xs font-semibold text-sky-800 shadow-sm hover:bg-sky-50"
           >
             <Plus className="h-3.5 w-3.5" />
-            Додати рядок (кінець таблиці)
+            Додати ручний рядок (без ×)
           </button>
           <p className="text-[10px] text-slate-500">
             Рядки «Замір / без ×» не множаться на клієнтський коефіцієнт у підсумку.
           </p>
         </div>
+      ) : null}
+        </>
       ) : null}
     </div>
   );

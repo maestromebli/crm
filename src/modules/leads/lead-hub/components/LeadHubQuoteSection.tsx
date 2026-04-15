@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { format } from "date-fns";
 import { uk } from "date-fns/locale";
-import { postJson } from "../../../../lib/api/patch-json";
+import { patchJson, postJson } from "../../../../lib/api/patch-json";
 import type { LeadDetailRow } from "../../../../features/leads/queries";
 import { leadProposalStatusUa } from "../../../../lib/leads/lead-proposal-labels";
 import { cn } from "../../../../lib/utils";
@@ -28,6 +28,7 @@ export function LeadHubQuoteSection({ lead, canManageEstimates }: Props) {
   const router = useRouter();
   const latest = lead.proposals[0];
   const [pdfBusy, setPdfBusy] = useState(false);
+  const [statusBusy, setStatusBusy] = useState<"sent" | "approved" | null>(null);
 
   const generatePdf = async () => {
     if (!latest || !canManageEstimates) return;
@@ -42,6 +43,25 @@ export function LeadHubQuoteSection({ lead, canManageEstimates }: Props) {
       /* surface via UI — keep minimal */
     } finally {
       setPdfBusy(false);
+    }
+  };
+
+  const updateProposalStatus = async (
+    status: "SENT" | "APPROVED",
+    busyKey: "sent" | "approved",
+  ) => {
+    if (!latest || !canManageEstimates) return;
+    setStatusBusy(busyKey);
+    try {
+      await patchJson<{ ok?: boolean }>(
+        `/api/leads/${lead.id}/proposals/${latest.id}`,
+        { status },
+      );
+      router.refresh();
+    } catch {
+      // keep UI quiet; statuses are non-critical action buttons
+    } finally {
+      setStatusBusy(null);
     }
   };
 
@@ -113,6 +133,28 @@ export function LeadHubQuoteSection({ lead, canManageEstimates }: Props) {
                 className="enver-press rounded-[12px] bg-[#2563EB] px-4 py-2.5 text-[14px] font-semibold text-white transition duration-200 hover:bg-[#1D4ED8] disabled:opacity-50"
               >
                 {pdfBusy ? "Генерація…" : "Згенерувати PDF КП"}
+              </button>
+            ) : null}
+            {canManageEstimates && latest.status !== "SENT" && latest.status !== "APPROVED" ? (
+              <button
+                type="button"
+                disabled={statusBusy != null}
+                onClick={() => void updateProposalStatus("SENT", "sent")}
+                className="rounded-[12px] border border-sky-200 bg-sky-50 px-4 py-2.5 text-[13px] font-semibold text-sky-800 transition duration-200 hover:bg-sky-100 disabled:opacity-50"
+              >
+                {statusBusy === "sent" ? "Оновлення…" : "Позначити: надіслано"}
+              </button>
+            ) : null}
+            {canManageEstimates && latest.status !== "APPROVED" ? (
+              <button
+                type="button"
+                disabled={statusBusy != null}
+                onClick={() => void updateProposalStatus("APPROVED", "approved")}
+                className="rounded-[12px] border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-[13px] font-semibold text-emerald-800 transition duration-200 hover:bg-emerald-100 disabled:opacity-50"
+              >
+                {statusBusy === "approved"
+                  ? "Оновлення…"
+                  : "Підтверджено клієнтом"}
               </button>
             ) : null}
             {latest.hasPdf && latest.pdfFileUrl ? (

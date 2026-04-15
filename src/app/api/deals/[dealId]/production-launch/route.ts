@@ -1,7 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { appendActivityLog } from "@/lib/deal-api/audit";
 import { persistReadinessSnapshot } from "@/lib/deal-api/persist-readiness";
 import { dispatchDealAutomationTrigger } from "@/lib/automation/dispatch";
 import {
@@ -16,10 +15,13 @@ import {
   CRM_EVENT_TYPES,
   CORE_EVENT_TYPES,
 } from "@/lib/events/crm-events";
+import { getRequestContext, writePlatformAudit } from "@/lib/platform";
+import { logError } from "@/lib/observability/logger";
 
 type Ctx = { params: Promise<{ dealId: string }> };
 
-export async function POST(_req: Request, ctx: Ctx) {
+export async function POST(req: Request, ctx: Ctx) {
+  const requestCtx = getRequestContext(req);
   if (!process.env.DATABASE_URL?.trim()) {
     return NextResponse.json(
       { error: "DATABASE_URL не задано" },
@@ -51,11 +53,13 @@ export async function POST(_req: Request, ctx: Ctx) {
       defaultChiefUserId: user.id,
     });
 
-    await appendActivityLog({
+    await writePlatformAudit({
       entityType: "DEAL",
       entityId: dealId,
       type: "DEAL_UPDATED",
       actorUserId: user.id,
+      requestId: requestCtx.requestId,
+      correlationId: requestCtx.correlationId,
       data: { productionFlowId: flow.id, handoffImportedFileCount },
     });
 
@@ -92,7 +96,13 @@ export async function POST(_req: Request, ctx: Ctx) {
       handoffImportedFileCount,
     });
   } catch (e) {
-    console.error("[POST production-launch]", e);
+    logError({
+      module: "api.deals.production-launch",
+      message: "Не вдалося запустити виробничий потік",
+      requestId: requestCtx.requestId,
+      correlationId: requestCtx.correlationId,
+      details: { dealId, error: e instanceof Error ? e.message : String(e) },
+    });
     return NextResponse.json(
       { error: "Помилка створення виробничого замовлення" },
       { status: 500 },
@@ -100,7 +110,8 @@ export async function POST(_req: Request, ctx: Ctx) {
   }
 }
 
-export async function GET(_req: Request, ctx: Ctx) {
+export async function GET(req: Request, ctx: Ctx) {
+  const requestCtx = getRequestContext(req);
   if (!process.env.DATABASE_URL?.trim()) {
     return NextResponse.json(
       { error: "DATABASE_URL не задано" },
@@ -145,7 +156,13 @@ export async function GET(_req: Request, ctx: Ctx) {
       error: null,
     });
   } catch (e) {
-    console.error("[GET production-launch]", e);
+    logError({
+      module: "api.deals.production-launch",
+      message: "Не вдалося прочитати стан запуску виробництва",
+      requestId: requestCtx.requestId,
+      correlationId: requestCtx.correlationId,
+      details: { dealId, error: e instanceof Error ? e.message : String(e) },
+    });
     return NextResponse.json({ error: "Помилка завантаження" }, { status: 500 });
   }
 }

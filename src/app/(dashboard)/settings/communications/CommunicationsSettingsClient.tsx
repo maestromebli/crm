@@ -74,11 +74,18 @@ function SecretInput({
   );
 }
 
+function createQuickVerifyToken() {
+  const random = Math.random().toString(36).slice(2, 10);
+  return `ig-${Date.now().toString(36)}-${random}`;
+}
+
 type Props = {
   apiBasePath?: string;
   managerCardTitle?: string;
   managerCardDescription?: string;
   saveHint?: string;
+  hiddenChannels?: Array<keyof CommunicationsIntegrationsSafe["channels"]>;
+  footerNote?: React.ReactNode;
 };
 
 export function CommunicationsSettingsClient({
@@ -86,6 +93,8 @@ export function CommunicationsSettingsClient({
   managerCardTitle = "Менеджер",
   managerCardDescription = "Публічний телефон та імʼя для клієнтів (кнопки «зателефонувати», підпис у месенджерах).",
   saveHint = "Потрібні права «Налаштування: керування». Секрети не повертаються в API після збереження — лише мітка «збережено».",
+  hiddenChannels = [],
+  footerNote = null,
 }: Props) {
   const [load, setLoad] = useState<LoadState>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -182,6 +191,8 @@ export function CommunicationsSettingsClient({
         notes: i.notes,
         pageId: i.pageId,
         instagramBusinessAccountId: i.instagramBusinessAccountId,
+        webhookUrl: i.webhookUrl,
+        verifyToken: i.verifyToken,
         ...(igToken.trim() ? { pageAccessToken: igToken.trim() } : {}),
       };
 
@@ -271,6 +282,29 @@ export function CommunicationsSettingsClient({
   }
 
   const ch = data.channels;
+  const hidden = new Set(hiddenChannels);
+
+  function applyQuickInstagramSetup() {
+    if (typeof window === "undefined") return;
+    const origin = window.location.origin;
+    const webhookUrl = `${origin}/api/integrations/instagram/webhook`;
+    const verifyToken = ch.instagram.verifyToken?.trim() || createQuickVerifyToken();
+    setData({
+      ...data,
+      channels: {
+        ...data.channels,
+        instagram: {
+          ...ch.instagram,
+          enabled: true,
+          webhookUrl,
+          verifyToken,
+          notes:
+            ch.instagram.notes ??
+            "Швидке підключення: вкажіть webhook URL і verify token у Meta App → Webhooks (Instagram).",
+        },
+      },
+    });
+  }
 
   return (
     <div className="space-y-4">
@@ -317,9 +351,10 @@ export function CommunicationsSettingsClient({
         </div>
       </SettingsCard>
 
+      {!hidden.has("telegram") ? (
       <SettingsCard
         title="Telegram"
-        description="Bot API та вебхук. Для персонального маршруту використовуйте webhook URL з userId (наприклад: /api/integrations/telegram/webhook?userId=<ваш_id>). Токен не показується після збереження."
+        description="Bot API та вебхук. Для персонального маршруту використовуйте URL вебхука з userId (наприклад: /api/integrations/telegram/webhook?userId=<ваш_id>). Токен не показується після збереження."
       >
         <label className="flex items-center gap-2 text-[11px] text-slate-700">
           <input
@@ -339,7 +374,7 @@ export function CommunicationsSettingsClient({
         </label>
         <SecretInput
           id="tg-token"
-          label="Bot token"
+          label="Токен бота"
           configured={ch.telegram.botTokenSet}
           value={tgToken}
           onChange={setTgToken}
@@ -405,7 +440,9 @@ export function CommunicationsSettingsClient({
           />
         </div>
       </SettingsCard>
+      ) : null}
 
+      {!hidden.has("whatsapp") ? (
       <SettingsCard
         title="WhatsApp (Meta Cloud API)"
         description="Токени з Meta for Developers."
@@ -427,7 +464,7 @@ export function CommunicationsSettingsClient({
           Канал увімкнено
         </label>
         <div className="space-y-1.5">
-          <FieldLabel>Cloud API URL (за замовчуванням graph.facebook.com)</FieldLabel>
+          <FieldLabel>URL Cloud API (за замовчуванням graph.facebook.com)</FieldLabel>
           <TextInput
             value={ch.whatsapp.cloudApiUrl ?? ""}
             onChange={(e) =>
@@ -444,20 +481,20 @@ export function CommunicationsSettingsClient({
         </div>
         <SecretInput
           id="wa-token"
-          label="Access token"
+          label="Токен доступу"
           configured={ch.whatsapp.accessTokenSet}
           value={waToken}
           onChange={setWaToken}
         />
         <SecretInput
           id="wa-appsec"
-          label="App secret"
+          label="Секрет застосунку"
           configured={ch.whatsapp.appSecretSet}
           value={waSecret}
           onChange={setWaSecret}
         />
         <div className="space-y-1.5">
-          <FieldLabel>Phone number ID</FieldLabel>
+          <FieldLabel>ID номера телефону</FieldLabel>
           <TextInput
             value={ch.whatsapp.phoneNumberId ?? ""}
             onChange={(e) =>
@@ -472,7 +509,7 @@ export function CommunicationsSettingsClient({
           />
         </div>
         <div className="space-y-1.5">
-          <FieldLabel>Business account ID</FieldLabel>
+          <FieldLabel>ID бізнес-акаунта</FieldLabel>
           <TextInput
             value={ch.whatsapp.businessAccountId ?? ""}
             onChange={(e) =>
@@ -505,7 +542,9 @@ export function CommunicationsSettingsClient({
           />
         </div>
       </SettingsCard>
+      ) : null}
 
+      {!hidden.has("viber") ? (
       <SettingsCard title="Viber" description="Партнерський API Viber.">
         <label className="flex items-center gap-2 text-[11px] text-slate-700">
           <input
@@ -525,13 +564,13 @@ export function CommunicationsSettingsClient({
         </label>
         <SecretInput
           id="viber-tok"
-          label="Auth token"
+          label="Токен авторизації"
           configured={ch.viber.authTokenSet}
           value={viberToken}
           onChange={setViberToken}
         />
         <div className="space-y-1.5">
-          <FieldLabel>Webhook URL</FieldLabel>
+          <FieldLabel>URL вебхука</FieldLabel>
           <TextInput
             value={ch.viber.webhookUrl ?? ""}
             onChange={(e) =>
@@ -561,11 +600,27 @@ export function CommunicationsSettingsClient({
           />
         </div>
       </SettingsCard>
+      ) : null}
 
+      {!hidden.has("instagram") || !hidden.has("facebook") ? (
       <SettingsCard
         title="Instagram / Facebook"
         description="Токени сторінки та Instagram Business."
       >
+        {!hidden.has("instagram") ? (
+          <>
+        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-2">
+          <p className="text-[11px] text-emerald-900">
+            Швидке підключення Instagram Direct
+          </p>
+          <button
+            type="button"
+            onClick={applyQuickInstagramSetup}
+            className="mt-2 rounded-full border border-emerald-600 px-3 py-1 text-[11px] font-medium text-emerald-800 hover:bg-emerald-100"
+          >
+            Заповнити webhook і verify token
+          </button>
+        </div>
         <label className="flex items-center gap-2 text-[11px] text-slate-700">
           <input
             type="checkbox"
@@ -584,13 +639,13 @@ export function CommunicationsSettingsClient({
         </label>
         <SecretInput
           id="ig-tok"
-          label="Page / Instagram access token"
+          label="Токен доступу сторінки / Instagram"
           configured={ch.instagram.pageAccessTokenSet}
           value={igToken}
           onChange={setIgToken}
         />
         <div className="space-y-1.5">
-          <FieldLabel>Page ID</FieldLabel>
+          <FieldLabel>ID сторінки</FieldLabel>
           <TextInput
             value={ch.instagram.pageId ?? ""}
             onChange={(e) =>
@@ -605,7 +660,7 @@ export function CommunicationsSettingsClient({
           />
         </div>
         <div className="space-y-1.5">
-          <FieldLabel>Instagram Business Account ID</FieldLabel>
+          <FieldLabel>ID бізнес-акаунта Instagram</FieldLabel>
           <TextInput
             value={ch.instagram.instagramBusinessAccountId ?? ""}
             onChange={(e) =>
@@ -623,6 +678,38 @@ export function CommunicationsSettingsClient({
           />
         </div>
         <div className="space-y-1.5">
+          <FieldLabel>Webhook URL (для Meta Webhooks)</FieldLabel>
+          <TextInput
+            value={ch.instagram.webhookUrl ?? ""}
+            onChange={(e) =>
+              setData({
+                ...data,
+                channels: {
+                  ...data.channels,
+                  instagram: { ...ch.instagram, webhookUrl: e.target.value || null },
+                },
+              })
+            }
+            placeholder="https://crm.example.com/api/integrations/instagram/webhook"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <FieldLabel>Verify token (Meta Webhooks)</FieldLabel>
+          <TextInput
+            value={ch.instagram.verifyToken ?? ""}
+            onChange={(e) =>
+              setData({
+                ...data,
+                channels: {
+                  ...data.channels,
+                  instagram: { ...ch.instagram, verifyToken: e.target.value || null },
+                },
+              })
+            }
+            placeholder="ig-verify-token"
+          />
+        </div>
+        <div className="space-y-1.5">
           <FieldLabel>Нотатки (Instagram)</FieldLabel>
           <TextInput
             value={ch.instagram.notes ?? ""}
@@ -637,7 +724,15 @@ export function CommunicationsSettingsClient({
             }
           />
         </div>
+          </>
+        ) : (
+          <p className="text-[11px] text-slate-500">
+            Instagram налаштовується на цій сторінці окремо.
+          </p>
+        )}
 
+        {!hidden.has("facebook") ? (
+          <>
         <p className="pt-2 text-[10px] font-medium uppercase tracking-wide text-slate-500">
           Facebook Messenger (окремо)
         </p>
@@ -659,20 +754,20 @@ export function CommunicationsSettingsClient({
         </label>
         <SecretInput
           id="fb-tok"
-          label="Page access token"
+          label="Токен доступу сторінки"
           configured={ch.facebook.pageAccessTokenSet}
           value={fbToken}
           onChange={setFbToken}
         />
         <SecretInput
           id="fb-sec"
-          label="App secret"
+          label="Секрет застосунку"
           configured={ch.facebook.appSecretSet}
           value={fbSecret}
           onChange={setFbSecret}
         />
         <div className="space-y-1.5">
-          <FieldLabel>Page ID</FieldLabel>
+          <FieldLabel>ID сторінки</FieldLabel>
           <TextInput
             value={ch.facebook.pageId ?? ""}
             onChange={(e) =>
@@ -701,8 +796,12 @@ export function CommunicationsSettingsClient({
             }
           />
         </div>
+          </>
+        ) : null}
       </SettingsCard>
+      ) : null}
 
+      {!hidden.has("sms") ? (
       <SettingsCard
         title="SMS"
         description="Провайдер SMS: API URL, ключі, імʼя відправника."
@@ -740,7 +839,7 @@ export function CommunicationsSettingsClient({
           />
         </div>
         <div className="space-y-1.5">
-          <FieldLabel>API base URL</FieldLabel>
+          <FieldLabel>Базовий URL API</FieldLabel>
           <TextInput
             value={ch.sms.apiUrl ?? ""}
             onChange={(e) =>
@@ -756,14 +855,14 @@ export function CommunicationsSettingsClient({
         </div>
         <SecretInput
           id="sms-key"
-          label="API key"
+          label="API-ключ"
           configured={ch.sms.apiKeySet}
           value={smsKey}
           onChange={setSmsKey}
         />
         <SecretInput
           id="sms-sec"
-          label="API secret"
+          label="Секрет API"
           configured={ch.sms.apiSecretSet}
           value={smsSecret}
           onChange={setSmsSecret}
@@ -814,7 +913,9 @@ export function CommunicationsSettingsClient({
           />
         </div>
       </SettingsCard>
+      ) : null}
 
+      {!hidden.has("phone") ? (
       <SettingsCard
         title="Телефонія (SIP / VoIP / хмарна АТС)"
         description="API оператора: дзвінки click-to-call, маршрутизація. Вкажіть провайдера вручну."
@@ -852,7 +953,7 @@ export function CommunicationsSettingsClient({
           />
         </div>
         <div className="space-y-1.5">
-          <FieldLabel>API URL</FieldLabel>
+          <FieldLabel>URL API</FieldLabel>
           <TextInput
             value={ch.phone.apiUrl ?? ""}
             onChange={(e) =>
@@ -868,20 +969,20 @@ export function CommunicationsSettingsClient({
         </div>
         <SecretInput
           id="ph-key"
-          label="API key / SID"
+          label="API-ключ / SID"
           configured={ch.phone.apiKeySet}
           value={phoneKey}
           onChange={setPhoneKey}
         />
         <SecretInput
           id="ph-sec"
-          label="API secret / token"
+          label="Секрет API / токен"
           configured={ch.phone.apiSecretSet}
           value={phoneSecret}
           onChange={setPhoneSecret}
         />
         <div className="space-y-1.5">
-          <FieldLabel>SIP domain</FieldLabel>
+          <FieldLabel>SIP-домен</FieldLabel>
           <TextInput
             value={ch.phone.sipDomain ?? ""}
             onChange={(e) =>
@@ -926,7 +1027,7 @@ export function CommunicationsSettingsClient({
           />
         </div>
         <div className="space-y-1.5">
-          <FieldLabel>From number (E.164)</FieldLabel>
+          <FieldLabel>Номер відправника (E.164)</FieldLabel>
           <TextInput
             value={ch.phone.fromNumber ?? ""}
             onChange={(e) =>
@@ -956,6 +1057,7 @@ export function CommunicationsSettingsClient({
           />
         </div>
       </SettingsCard>
+      ) : null}
 
       <div className="flex flex-wrap items-center gap-2">
         <button
@@ -970,6 +1072,11 @@ export function CommunicationsSettingsClient({
           {saveHint}
         </p>
       </div>
+      {footerNote ? (
+        <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-600">
+          {footerNote}
+        </div>
+      ) : null}
     </div>
   );
 }

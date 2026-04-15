@@ -1,5 +1,6 @@
 import { prisma } from "../../lib/prisma";
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+import type { DealContractStatus } from "@prisma/client";
 import { loadDealPaymentMilestonesForWorkspace } from "../../lib/deals/deal-payment-milestone-load";
 import { logPrismaError, userFacingPrismaMessage } from "../../lib/prisma-errors";
 import type { AccessContext } from "../../lib/authz/data-scope";
@@ -9,7 +10,11 @@ import type { DealWorkspaceMeta, DealWorkspacePayload } from "../../lib/deal-cor
 import { parseDealCommercialSnapshot } from "../../lib/deals/commercial-snapshot";
 import { parseDealControlMeasurement } from "../../lib/deals/control-measurement";
 import { parseHandoffManifest } from "../../lib/deals/document-templates";
-import { mapPrismaConstructorRoomToWorkspacePayload } from "../../lib/constructor-room/workspace-room-map";
+import {
+  dealConstructorRoomApiSelect,
+  type PrismaRoomRow,
+  mapPrismaConstructorRoomToWorkspacePayload,
+} from "../../lib/constructor-room/workspace-room-map";
 import { deriveDealListWarningBadge } from "./deal-workspace-warnings";
 
 /** Фільтр списку угод (бокове меню / статичні маршрути). */
@@ -53,6 +58,46 @@ function dealWhereForListView(
 function parseMeta(raw: Prisma.JsonValue | null): DealWorkspaceMeta {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
   return raw as DealWorkspaceMeta;
+}
+
+function isMissingTableError(error: unknown, tableName: string): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2021" &&
+    error.message.includes(tableName)
+  );
+}
+
+function isMissingColumnError(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2022"
+  );
+}
+
+async function ensureDealHandoff(dealId: string) {
+  const existing = await prisma.dealHandoff.findUnique({
+    where: { dealId },
+  });
+  if (existing) return existing;
+
+  try {
+    return await prisma.dealHandoff.create({
+      data: { dealId },
+    });
+  } catch (error) {
+    // Конкурентний create для того ж dealId: повертаємо вже створений запис.
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      const row = await prisma.dealHandoff.findUnique({
+        where: { dealId },
+      });
+      if (row) return row;
+    }
+    throw error;
+  }
 }
 
 export async function listDealsForTable(
@@ -224,7 +269,27 @@ export async function getDealWorkspacePayload(
   try {
     const deal = await prisma.deal.findUnique({
       where: { id: dealId },
-      include: {
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        status: true,
+        pipelineId: true,
+        stageId: true,
+        leadId: true,
+        clientId: true,
+        primaryContactId: true,
+        ownerId: true,
+        productionManagerId: true,
+        installationDate: true,
+        expectedCloseDate: true,
+        value: true,
+        currency: true,
+        workspaceMeta: true,
+        controlMeasurementJson: true,
+        commercialSnapshotJson: true,
+        createdAt: true,
+        updatedAt: true,
         client: true,
         primaryContact: true,
         owner: { select: { id: true, name: true, email: true } },
@@ -233,53 +298,32 @@ export async function getDealWorkspacePayload(
         },
         pipeline: true,
         stage: true,
-        productionFlow: {
-          select: {
-            id: true,
-            status: true,
-            createdAt: true,
-            acceptedAt: true,
-            number: true,
-          },
-        },
-        constructorRoom: {
-          include: {
-            assignedUser: {
-              select: { id: true, name: true, email: true },
-            },
-            messages: {
-              orderBy: { createdAt: "asc" },
-              take: 200,
-              select: {
-                id: true,
-                body: true,
-                author: true,
-                createdAt: true,
-                createdBy: { select: { name: true, email: true } },
-              },
-            },
-          },
-        },
-        contract: {
-          include: {
-            versions: {
-              orderBy: { revision: "desc" },
-              take: 24,
-              select: {
-                id: true,
-                revision: true,
-                createdAt: true,
-                createdById: true,
-                lifecycleStatus: true,
-                templateKey: true,
-              },
-            },
-          },
-        },
       },
     });
     if (!deal) return null;
     if (!canAccessOwner(ctx, deal.ownerId)) return null;
+
+    const constructorRoomSelect = dealConstructorRoomApiSelect();
+    const { messages: _ignoredMessages, ...constructorRoomSelectWithoutMessages } =
+      constructorRoomSelect;
+    let constructorRoom: PrismaRoomRow | null = null;
+    try {
+      constructorRoom = await prisma.dealConstructorRoom.findUnique({
+        where: { dealId: deal.id },
+        select: constructorRoomSelect,
+      });
+    } catch (e) {
+      if (!isMissingTableError(e, "DealConstructorRoomMessage")) {
+        throw e;
+      }
+      const roomWithoutMessages = await prisma.dealConstructorRoom.findUnique({
+        where: { dealId: deal.id },
+        select: constructorRoomSelectWithoutMessages,
+      });
+      constructorRoom = roomWithoutMessages
+        ? { ...roomWithoutMessages, messages: [] }
+        : null;
+    }
 
     const paymentMilestoneRows =
       await loadDealPaymentMilestonesForWorkspace(deal.id);
@@ -290,6 +334,76 @@ export async function getDealWorkspacePayload(
     });
 
     const now = new Date();
+    let flow:
+      | {
+          id: string;
+          status: string;
+          createdAt: Date;
+          acceptedAt: Date | null;
+          number: string;
+        }
+      | null = null;
+    try {
+      flow = await prisma.productionFlow.findUnique({
+        where: { dealId: deal.id },
+        select: {
+          id: true,
+          status: true,
+          createdAt: true,
+          acceptedAt: true,
+          number: true,
+        },
+      });
+    } catch (e) {
+      if (!isMissingTableError(e, "ProductionFlow") && !isMissingColumnError(e)) {
+        throw e;
+      }
+      flow = null;
+    }
+
+    let contractRow:
+      | ({
+          status: DealContractStatus;
+          templateKey: string | null;
+          version: number;
+          updatedAt: Date;
+          signedPdfUrl: string | null;
+          diiaSessionId: string | null;
+          versions: Array<{
+            id: string;
+            revision: number;
+            createdAt: Date;
+            createdById: string | null;
+            lifecycleStatus: DealContractStatus;
+            templateKey: string | null;
+          }>;
+        } & Record<string, unknown>)
+      | null = null;
+    try {
+      contractRow = await prisma.dealContract.findUnique({
+        where: { dealId: deal.id },
+        include: {
+          versions: {
+            orderBy: { revision: "desc" },
+            take: 24,
+            select: {
+              id: true,
+              revision: true,
+              createdAt: true,
+              createdById: true,
+              lifecycleStatus: true,
+              templateKey: true,
+            },
+          },
+        },
+      });
+    } catch (e) {
+      if (!isMissingTableError(e, "DealContract") && !isMissingColumnError(e)) {
+        throw e;
+      }
+      contractRow = null;
+    }
+
     const [
       attachmentRows,
       handoffRow,
@@ -301,6 +415,7 @@ export async function getDealWorkspacePayload(
       lastActivityRow,
       latestEstimate,
       linkedProjects,
+      conversionAudit,
     ] = await Promise.all([
       prisma.attachment.findMany({
         where: {
@@ -321,11 +436,7 @@ export async function getDealWorkspacePayload(
         orderBy: { createdAt: "desc" },
         take: 500,
       }),
-      prisma.dealHandoff.upsert({
-        where: { dealId: deal.id },
-        create: { dealId: deal.id },
-        update: {},
-      }),
+      ensureDealHandoff(deal.id),
       prisma.readinessEvaluation.findFirst({
         where: { dealId: deal.id },
         orderBy: { evaluatedAt: "desc" },
@@ -373,6 +484,18 @@ export async function getDealWorkspacePayload(
         where: { dealId: deal.id },
         select: { id: true, code: true, title: true, status: true },
       }),
+      deal.leadId
+        ? prisma.leadConversionAudit.findUnique({
+            where: { leadId: deal.leadId },
+            select: {
+              migratedFilesCount: true,
+              migratedContactsCount: true,
+              activeEstimateIdUsed: true,
+              checklistSnapshot: true,
+              warningsAtConversion: true,
+            },
+          })
+        : Promise.resolve(null),
     ]);
 
     const attachmentsByCategory: Record<string, number> = {};
@@ -406,12 +529,11 @@ export async function getDealWorkspacePayload(
 
     const readiness = evaluateReadiness({
       meta,
-      contractStatus: deal.contract?.status ?? null,
+      contractStatus: contractRow?.status ?? null,
       attachmentsByCategory,
     });
 
     const manifest = parseHandoffManifest(handoffRow.manifestJson);
-    const flow = deal.productionFlow;
     const productionLaunch: DealWorkspacePayload["productionLaunch"] = !flow
       ? {
           status:
@@ -482,6 +604,27 @@ export async function getDealWorkspacePayload(
         sortOrder: s.sortOrder,
       })),
       leadId: deal.leadId,
+      leadConversionSummary: conversionAudit
+        ? {
+            filesMigrated: conversionAudit.migratedFilesCount ?? 0,
+            contactsLinked: conversionAudit.migratedContactsCount ?? 0,
+            estimatesMoved:
+              (
+                conversionAudit.warningsAtConversion as {
+                  migrationResult?: { estimatesMoved?: number };
+                } | null
+              )?.migrationResult?.estimatesMoved ??
+              (conversionAudit.activeEstimateIdUsed ? 1 : 0),
+            communicationMode:
+              (
+                conversionAudit.checklistSnapshot as {
+                  communication?: { mode?: "full" | "recent" };
+                } | null
+              )?.communication?.mode === "recent"
+                ? "recent"
+                : "full",
+          }
+        : null,
       leadMessagesPreview: leadMessagesPreview.map((m) => ({
         id: m.id,
         body: m.body,
@@ -504,16 +647,16 @@ export async function getDealWorkspacePayload(
       controlMeasurement: parseDealControlMeasurement(
         deal.controlMeasurementJson,
       ),
-      contract: deal.contract
+      contract: contractRow
         ? {
-            status: deal.contract.status,
-            templateKey: deal.contract.templateKey,
-            version: deal.contract.version,
-            updatedAt: deal.contract.updatedAt.toISOString(),
-            signedPdfUrl: deal.contract.signedPdfUrl,
-            diiaSessionId: deal.contract.diiaSessionId,
+            status: contractRow.status,
+            templateKey: contractRow.templateKey,
+            version: contractRow.version,
+            updatedAt: contractRow.updatedAt.toISOString(),
+            signedPdfUrl: contractRow.signedPdfUrl,
+            diiaSessionId: contractRow.diiaSessionId,
             draft: null,
-            versions: deal.contract.versions.map((v) => ({
+            versions: contractRow.versions.map((v) => ({
               id: v.id,
               revision: v.revision,
               createdAt: v.createdAt.toISOString(),
@@ -554,8 +697,8 @@ export async function getDealWorkspacePayload(
         manifest,
       },
       productionLaunch,
-      constructorRoom: deal.constructorRoom
-        ? mapPrismaConstructorRoomToWorkspacePayload(deal.constructorRoom)
+      constructorRoom: constructorRoom
+        ? mapPrismaConstructorRoomToWorkspacePayload(constructorRoom)
         : null,
       operationalStats: {
         estimatesCount,

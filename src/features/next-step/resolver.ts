@@ -15,10 +15,38 @@ export type NextStepViewModel = {
   explanation: string;
   progressPercent: number;
   blockers: string[];
+  blockerActions: {
+    id: string;
+    label: string;
+    href: string;
+    aiHref: string | null;
+  }[];
   primary: ActionPlan["primary"];
   secondary: ActionPlan["secondary"];
   aiNote: string | null;
 };
+
+function leadBlockerHref(leadId: string, blockerId: string): string {
+  switch (blockerId) {
+    case "contact_channel":
+      return `/leads/${leadId}/contact`;
+    case "estimate_exists":
+    case "active_estimate":
+      return `/leads/${leadId}/pricing`;
+    case "proposal_draft_linked":
+    case "proposal_sent":
+    case "proposal_approved":
+    case "approved_amount_documented":
+      return `/leads/${leadId}/kp`;
+    case "measurement_scheduled_or_done":
+      return `/leads/${leadId}#lead-meetings`;
+    case "key_files_present":
+    case "measurement_notes_or_sheet":
+      return `/leads/${leadId}/files`;
+    default:
+      return `/leads/${leadId}#lead-extra`;
+  }
+}
 
 export function resolveLeadNextStep(lead: LeadDetailRow): NextStepViewModel {
   const core = mapLeadDetailRowToCoreInput(lead);
@@ -36,6 +64,12 @@ export function resolveLeadNextStep(lead: LeadDetailRow): NextStepViewModel {
         : "Це найкращий наступний крок за поточним станом ліда.",
     progressPercent: checklist.progressPercent,
     blockers: blockers.hard.map((item) => item.hint ?? item.label),
+    blockerActions: blockers.hard.map((item) => ({
+      id: item.id,
+      label: item.hint ?? item.label,
+      href: leadBlockerHref(lead.id, item.id),
+      aiHref: `/leads/${lead.id}/ai`,
+    })),
     primary: actionPlan.primary,
     secondary: actionPlan.secondary.slice(0, 3),
     aiNote: hints[0]?.textUa ?? null,
@@ -55,6 +89,15 @@ export function resolveDealNextStep(data: DealWorkspacePayload): NextStepViewMod
         : "Крок підібрано з урахуванням стадії, готовності й комунікацій.",
     progressPercent: checklist.progressPercent,
     blockers: blockers.hard.map((item) => item.hint ?? item.label),
+    blockerActions: blockers.hard.map((item) => ({
+      id: item.id,
+      label: item.hint ?? item.label,
+      href:
+        actionPlan.primary.kind === "navigate" && actionPlan.primary.href
+          ? actionPlan.primary.href
+          : "#",
+      aiHref: null,
+    })),
     primary: actionPlan.primary,
     secondary: actionPlan.secondary.slice(0, 3),
     aiNote: deriveNextBestAction(data),

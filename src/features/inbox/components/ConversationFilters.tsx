@@ -29,31 +29,35 @@ export function ConversationFilters({
   onChangeTab,
 }: ConversationFiltersProps) {
   return (
-    <div className="flex items-center justify-between gap-2 pb-2">
-      <div className="inline-flex rounded-full border border-slate-200 bg-[var(--enver-card)] p-0.5 text-[11px] shadow-sm shadow-slate-900/5">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => onChangeTab(tab.id)}
-            className={`px-2 py-1 rounded-full transition ${
-              activeTab === tab.id
-                ? "bg-slate-900 text-slate-50"
-                : "text-slate-600 hover:bg-slate-100"
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+    <div className="space-y-2 pb-2">
+      <div className="min-w-0 overflow-x-auto">
+        <div className="inline-flex w-max rounded-full border border-slate-200 bg-[var(--enver-card)] p-0.5 text-[11px] shadow-sm shadow-slate-900/5">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => onChangeTab(tab.id)}
+              className={`whitespace-nowrap rounded-full px-2 py-1 transition ${
+                activeTab === tab.id
+                  ? "bg-slate-900 text-slate-50"
+                  : "text-slate-600 hover:bg-slate-100"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <button
-        type="button"
-        className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-[var(--enver-card)] px-2.5 py-1.5 text-[11px] text-slate-700 shadow-sm shadow-slate-900/5 transition hover:bg-[var(--enver-hover)]"
-      >
-        <Funnel className="h-3.5 w-3.5" />
-        Фільтри
-      </button>
+      <div className="flex justify-end">
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-[var(--enver-card)] px-2.5 py-1.5 text-[11px] text-slate-700 shadow-sm shadow-slate-900/5 transition hover:bg-[var(--enver-hover)]"
+        >
+          <Funnel className="h-3.5 w-3.5" />
+          Фільтри
+        </button>
+      </div>
     </div>
   );
 }

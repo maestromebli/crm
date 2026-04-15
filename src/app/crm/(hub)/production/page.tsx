@@ -22,7 +22,7 @@ export default async function CrmProductionPage() {
   }
 
   return (
-    <main className="mx-auto max-w-7xl space-y-6 p-4 md:p-6">
+    <main className="enver-page-shell mx-auto max-w-[1700px] space-y-6 p-4 md:p-6">
       <AiV2InsightCard context="production" />
       <ProductionCommandCenterPage data={data} />
     </main>

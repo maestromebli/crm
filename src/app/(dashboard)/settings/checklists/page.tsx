@@ -11,7 +11,7 @@ export default function SettingsChecklistsPage() {
   return (
     <SettingsShell
       title="Шаблони чек-листів"
-      description="Створюйте чек-листи для handoff, монтажів та етапів воронки."
+      description="Створюйте чек-листи для передачі у виробництво, монтажів та етапів воронки."
     >
       <SettingsCard
         title="Існуючі шаблони"
@@ -44,9 +44,9 @@ export default function SettingsChecklistsPage() {
             Застосовується до
           </label>
           <select className="w-full rounded-md border border-slate-200 bg-[var(--enver-card)] px-2 py-1 text-xs outline-none focus:border-slate-900">
-            <option>Handoff</option>
-            <option>Stage</option>
-            <option>Installation</option>
+            <option>Передача</option>
+            <option>Стадія</option>
+            <option>Монтаж</option>
           </select>
         </div>
       </SettingsCard>

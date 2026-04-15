@@ -1,7 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
-import type { AttachmentCategory } from "@prisma/client";
+import type {
+  AttachmentCategory,
+  ContactCategory,
+  ClientType,
+  Prisma,
+} from "@prisma/client";
 import { isAttachmentUploadCategory } from "@/lib/attachments/upload-categories";
 import { appendActivityLog } from "@/lib/deal-api/audit";
 import {
@@ -23,6 +28,21 @@ import { CORE_EVENT_TYPES, publishEntityEvent } from "@/lib/events/crm-events";
 import { recordWorkflowEvent, WORKFLOW_EVENT_TYPES } from "@/features/event-system";
 
 const PRIORITIES = new Set(["low", "normal", "high"]);
+const CONTACT_CATEGORIES = new Set<ContactCategory>([
+  "DESIGNER",
+  "CONSTRUCTION_COMPANY",
+  "MANAGER",
+  "DESIGN_STUDIO",
+  "END_CUSTOMER",
+  "ARCHITECT",
+  "SUPPLIER",
+  "OTHER",
+]);
+const REFERRAL_TYPES = new Set(["DESIGNER", "CONSTRUCTION_COMPANY", "PERSON"]);
+
+function logLeadCreateSideEffectError(step: string, error: unknown) {
+  console.error(`[POST leads] non-fatal side-effect failed: ${step}`, error);
+}
 
 export async function POST(req: Request) {
   const dbNotReady = requireDatabaseUrl();
@@ -48,6 +68,22 @@ export async function POST(req: Request) {
     note?: string | null;
     priority?: string;
     ownerId?: string | null;
+    designerUserId?: string | null;
+    customerType?: ClientType | null;
+    companyName?: string | null;
+    companyContacts?:
+      | Array<{
+          fullName?: string | null;
+          phone?: string | null;
+          email?: string | null;
+          category?: string | null;
+        }>
+      | null;
+    companyContactsJson?: string | null;
+    referralType?: string | null;
+    referralName?: string | null;
+    referralPhone?: string | null;
+    referralEmail?: string | null;
   };
   let uploadFiles: File[] = [];
   let multipartFileCategory: AttachmentCategory = "OTHER";
@@ -75,6 +111,14 @@ export async function POST(req: Request) {
       note: str("note") || null,
       priority: str("priority") || undefined,
       ownerId: str("ownerId") || undefined,
+      designerUserId: str("designerUserId") || undefined,
+      customerType: (str("customerType") as ClientType) || null,
+      companyName: str("companyName") || null,
+      companyContactsJson: str("companyContactsJson") || null,
+      referralType: str("referralType") || null,
+      referralName: str("referralName") || null,
+      referralPhone: str("referralPhone") || null,
+      referralEmail: str("referralEmail") || null,
     };
     uploadFiles = fd
       .getAll("files")
@@ -91,20 +135,39 @@ export async function POST(req: Request) {
     }
   }
 
+  if (
+    !body.companyContacts &&
+    typeof body.companyContactsJson === "string" &&
+    body.companyContactsJson.trim()
+  ) {
+    try {
+      const parsedContacts = JSON.parse(body.companyContactsJson) as unknown;
+      if (Array.isArray(parsedContacts)) {
+        body.companyContacts = parsedContacts as Array<{
+          fullName?: string | null;
+          phone?: string | null;
+          email?: string | null;
+          category?: string | null;
+        }>;
+      }
+    } catch {
+      return NextResponse.json(
+        { error: "Некоректний формат companyContacts" },
+        { status: 400 },
+      );
+    }
+  }
+
   const contactName =
     typeof body.contactName === "string" ? body.contactName.trim() : "";
   const phone = typeof body.phone === "string" ? body.phone.trim() : "";
-  if (!contactName && !phone) {
-    return NextResponse.json(
-      { error: "Вкажіть імʼя або телефон" },
-      { status: 400 },
-    );
-  }
 
   const source =
     typeof body.source === "string" && body.source.trim()
       ? body.source.trim()
       : "Вручну";
+  const designerUserIdRaw =
+    typeof body.designerUserId === "string" ? body.designerUserId.trim() : "";
   const email =
     body.email === null || body.email === undefined
       ? null
@@ -117,13 +180,93 @@ export async function POST(req: Request) {
     typeof body.priority === "string" && PRIORITIES.has(body.priority)
       ? body.priority
       : "normal";
+  const customerTypeRaw =
+    typeof body.customerType === "string" ? body.customerType.trim() : "";
+  const customerType: ClientType =
+    customerTypeRaw === "COMPANY" ? "COMPANY" : "PERSON";
+  const companyNameRaw =
+    body.companyName === null || body.companyName === undefined
+      ? ""
+      : String(body.companyName).trim();
+  const referralTypeRaw =
+    body.referralType === null || body.referralType === undefined
+      ? ""
+      : String(body.referralType).trim().toUpperCase();
+  const referralType = REFERRAL_TYPES.has(referralTypeRaw)
+    ? referralTypeRaw
+    : "PERSON";
+  const referralName =
+    body.referralName === null || body.referralName === undefined
+      ? null
+      : String(body.referralName).trim() || null;
+  const referralPhone =
+    body.referralPhone === null || body.referralPhone === undefined
+      ? null
+      : String(body.referralPhone).trim() || null;
+  const referralEmail =
+    body.referralEmail === null || body.referralEmail === undefined
+      ? null
+      : String(body.referralEmail).trim() || null;
+  const companyContactsInput = Array.isArray(body.companyContacts)
+    ? body.companyContacts
+    : [];
+  const companyContacts = companyContactsInput
+    .map((item) => {
+      const fullName =
+        item?.fullName === null || item?.fullName === undefined
+          ? ""
+          : String(item.fullName).trim();
+      const phoneValue =
+        item?.phone === null || item?.phone === undefined
+          ? null
+          : String(item.phone).trim() || null;
+      const emailValue =
+        item?.email === null || item?.email === undefined
+          ? null
+          : String(item.email).trim() || null;
+      const categoryRaw =
+        item?.category === null || item?.category === undefined
+          ? ""
+          : String(item.category).trim().toUpperCase();
+      const category = CONTACT_CATEGORIES.has(categoryRaw as ContactCategory)
+        ? (categoryRaw as ContactCategory)
+        : "OTHER";
+      return { fullName, phone: phoneValue, email: emailValue, category };
+    })
+    .filter((item) => item.fullName || item.phone || item.email);
+  if (customerType === "COMPANY" && !companyNameRaw) {
+    return NextResponse.json(
+      { error: "Для компанії вкажіть назву" },
+      { status: 400 },
+    );
+  }
+  if (customerType === "COMPANY" && companyContacts.length === 0) {
+    return NextResponse.json(
+      { error: "Додайте хоча б одну контактну особу компанії" },
+      { status: 400 },
+    );
+  }
+  if (
+    !contactName &&
+    !phone &&
+    !(customerType === "COMPANY" && companyContacts.length > 0)
+  ) {
+    return NextResponse.json(
+      { error: "Вкажіть імʼя або телефон" },
+      { status: 400 },
+    );
+  }
 
   let title =
     typeof body.title === "string" && body.title.trim()
       ? body.title.trim()
       : "";
   if (!title) {
-    title = contactName || phone || "Новий лід";
+    title =
+      (customerType === "COMPANY" ? companyNameRaw : "") ||
+      contactName ||
+      phone ||
+      "Новий лід";
   }
 
   let ownerId = sessionUserId;
@@ -168,6 +311,61 @@ export async function POST(req: Request) {
     if (filesDenied) return filesDenied;
   }
 
+  let sourceDesigner:
+    | {
+        id: string;
+        name: string | null;
+        email: string;
+      }
+    | null = null;
+  const normalizedSource = source.toLowerCase();
+  const isDesignerSource =
+    normalizedSource.includes("дизайнер") || normalizedSource.includes("designer");
+  const isReferralSource =
+    normalizedSource.includes("рекомендац") ||
+    normalizedSource.includes("referral") ||
+    isDesignerSource;
+  if (isDesignerSource) {
+    if (!designerUserIdRaw && !referralName) {
+      return NextResponse.json(
+        {
+          error:
+            "Для джерела «Дизайнер» потрібно обрати дизайнера або вказати його вручну",
+        },
+        { status: 400 },
+      );
+    }
+    if (designerUserIdRaw) {
+      const ctx = await resolveAccessContext(prisma, {
+        id: user.id,
+        role: user.dbRole,
+      });
+      if (!canAccessOwner(ctx, designerUserIdRaw)) {
+        return NextResponse.json(
+          { error: "Недостатньо прав обрати цього дизайнера" },
+          { status: 403 },
+        );
+      }
+      const designer = await prisma.user.findUnique({
+        where: { id: designerUserIdRaw },
+        select: { id: true, name: true, email: true },
+      });
+      if (!designer) {
+        return NextResponse.json(
+          { error: "Дизайнера не знайдено" },
+          { status: 400 },
+        );
+      }
+      sourceDesigner = designer;
+    }
+  }
+  if (isReferralSource && !sourceDesigner && !referralName) {
+    return NextResponse.json(
+      { error: "Вкажіть, хто привів замовника" },
+      { status: 400 },
+    );
+  }
+
   try {
     const stage = await resolveDefaultLeadStage();
     if (!stage) {
@@ -180,80 +378,239 @@ export async function POST(req: Request) {
       );
     }
 
-    const lead = await prisma.lead.create({
-      data: {
+    const lead = await prisma.$transaction(async (tx) => {
+      let companyClientId: string | null = null;
+      let primaryContactId: string | null = null;
+      let effectiveContactName = contactName || null;
+      let effectivePhone = phone || null;
+      let effectiveEmail = email;
+      const linkedContacts: Array<{
+        id: string;
+        role: string | null;
+        isPrimary: boolean;
+      }> = [];
+
+      if (customerType === "COMPANY") {
+        const client = await tx.client.create({
+          data: {
+            name: companyNameRaw,
+            type: "COMPANY",
+          },
+          select: { id: true },
+        });
+        companyClientId = client.id;
+        const firstCompanyContact = companyContacts[0] ?? null;
+
+        const primaryContact = await tx.contact.create({
+          data: {
+            fullName:
+              contactName ||
+              firstCompanyContact?.fullName ||
+              companyNameRaw ||
+              "Контакт компанії",
+            phone: phone || firstCompanyContact?.phone || null,
+            email: email || firstCompanyContact?.email || null,
+            category: "END_CUSTOMER",
+            clientId: companyClientId,
+          },
+          select: { id: true, fullName: true, phone: true, email: true },
+        });
+
+        primaryContactId = primaryContact.id;
+        effectiveContactName = primaryContact.fullName;
+        effectivePhone = primaryContact.phone;
+        effectiveEmail = primaryContact.email;
+        linkedContacts.push({
+          id: primaryContact.id,
+          role: "Основний контакт",
+          isPrimary: true,
+        });
+
+        for (const extra of companyContacts) {
+          const isSameAsPrimary =
+            extra.fullName.trim() === (primaryContact.fullName ?? "").trim() &&
+            (extra.phone ?? "") === (primaryContact.phone ?? "") &&
+            (extra.email ?? "") === (primaryContact.email ?? "");
+          if (isSameAsPrimary) continue;
+          const created = await tx.contact.create({
+            data: {
+              fullName: extra.fullName || "Контакт компанії",
+              phone: extra.phone,
+              email: extra.email,
+              category: extra.category,
+              clientId: companyClientId,
+            },
+            select: { id: true },
+          });
+          linkedContacts.push({
+            id: created.id,
+            role: "Контакт компанії",
+            isPrimary: false,
+          });
+        }
+      }
+
+      const hubMeta: Record<string, unknown> = {};
+      if (sourceDesigner) {
+        hubMeta.sourceDesigner = {
+          userId: sourceDesigner.id,
+          name: sourceDesigner.name,
+          email: sourceDesigner.email,
+        };
+      }
+      if (isReferralSource && (referralName || sourceDesigner)) {
+        hubMeta.referral = {
+          type: sourceDesigner ? "DESIGNER" : referralType,
+          name:
+            sourceDesigner?.name?.trim() ||
+            referralName ||
+            sourceDesigner?.email ||
+            null,
+          phone: referralPhone,
+          email: referralEmail ?? sourceDesigner?.email ?? null,
+        };
+      }
+      if (customerType === "COMPANY") {
+        hubMeta.customer = {
+          type: "COMPANY",
+          name: companyNameRaw,
+          contactsCount: companyContacts.length,
+        };
+      }
+
+      const leadCreateData: Prisma.LeadUncheckedCreateInput = {
         title,
         source,
         pipelineId: stage.pipelineId,
         stageId: stage.stageId,
         priority,
-        contactName: contactName || null,
-        phone: phone || null,
-        email,
+        contactName: effectiveContactName,
+        phone: effectivePhone,
+        email: effectiveEmail,
         note,
         ownerId,
-      },
+        clientId: companyClientId,
+        contactId: primaryContactId,
+        ...(Object.keys(hubMeta).length
+          ? { hubMeta: hubMeta as Prisma.InputJsonValue }
+          : {}),
+      };
+
+      const createdLead = await tx.lead.create({
+        data: leadCreateData,
+      });
+
+      for (const linked of linkedContacts) {
+        await tx.leadContact.upsert({
+          where: {
+            leadId_contactId: {
+              leadId: createdLead.id,
+              contactId: linked.id,
+            },
+          },
+          create: {
+            leadId: createdLead.id,
+            contactId: linked.id,
+            isPrimary: linked.isPrimary,
+            role: linked.role,
+          },
+          update: {
+            isPrimary: linked.isPrimary,
+            role: linked.role,
+          },
+        });
+      }
+
+      return createdLead;
     });
 
-    await ensureContactForLead(prisma, lead.id);
+    try {
+      await ensureContactForLead(prisma, lead.id);
+    } catch (error) {
+      logLeadCreateSideEffectError("ensure-contact", error);
+    }
 
-    await appendActivityLog({
-      entityType: "LEAD",
-      entityId: lead.id,
-      type: "LEAD_CREATED",
-      actorUserId: sessionUserId,
-      data: {
-        title: lead.title,
-        source: lead.source,
-        ownerId: lead.ownerId,
-        assignedByUserId:
-          ownerId !== sessionUserId ? sessionUserId : undefined,
-      },
-    });
-    await publishEntityEvent({
-      type: CORE_EVENT_TYPES.LEAD_CREATED,
-      entityType: "LEAD",
-      entityId: lead.id,
-      userId: sessionUserId,
-      payload: {
-        source: lead.source,
-        ownerId: lead.ownerId,
-      },
-    });
-    await recordWorkflowEvent(
-      WORKFLOW_EVENT_TYPES.LEAD_CREATED,
-      { leadId: lead.id },
-      {
+    try {
+      await appendActivityLog({
+        entityType: "LEAD",
+        entityId: lead.id,
+        type: "LEAD_CREATED",
+        actorUserId: sessionUserId,
+        data: {
+          title: lead.title,
+          source: lead.source,
+          ownerId: lead.ownerId,
+          assignedByUserId:
+            ownerId !== sessionUserId ? sessionUserId : undefined,
+        },
+      });
+    } catch (error) {
+      logLeadCreateSideEffectError("activity-log", error);
+    }
+
+    try {
+      await publishEntityEvent({
+        type: CORE_EVENT_TYPES.LEAD_CREATED,
         entityType: "LEAD",
         entityId: lead.id,
         userId: sessionUserId,
-        dedupeKey: `lead-created:${lead.id}`,
-      },
-    );
-    await recordWorkflowEvent(
-      WORKFLOW_EVENT_TYPES.LEAD_ASSIGNED,
-      { leadId: lead.id, ownerId: lead.ownerId },
-      {
-        entityType: "LEAD",
-        entityId: lead.id,
-        userId: sessionUserId,
-        dedupeKey: `lead-assigned:${lead.id}:${lead.ownerId}`,
-      },
-    );
+        payload: {
+          source: lead.source,
+          ownerId: lead.ownerId,
+        },
+      });
+    } catch (error) {
+      logLeadCreateSideEffectError("publish-entity-event", error);
+    }
 
-    revalidatePath("/leads");
-    revalidatePath("/leads/new");
-    revalidatePath("/leads/no-response");
-    revalidatePath("/leads/no-next-step");
-    revalidatePath("/leads/mine");
-    revalidatePath("/leads/overdue");
-    revalidatePath("/leads/duplicates");
-    revalidatePath("/leads/re-contact");
-    revalidatePath("/leads/converted");
-    revalidatePath("/leads/unassigned");
-    revalidatePath("/leads/qualified");
-    revalidatePath("/leads/lost");
-    revalidatePath("/leads/pipeline");
+    try {
+      await recordWorkflowEvent(
+        WORKFLOW_EVENT_TYPES.LEAD_CREATED,
+        { leadId: lead.id },
+        {
+          entityType: "LEAD",
+          entityId: lead.id,
+          userId: sessionUserId,
+          dedupeKey: `lead-created:${lead.id}`,
+        },
+      );
+    } catch (error) {
+      logLeadCreateSideEffectError("workflow-event-lead-created", error);
+    }
+
+    try {
+      await recordWorkflowEvent(
+        WORKFLOW_EVENT_TYPES.LEAD_ASSIGNED,
+        { leadId: lead.id, ownerId: lead.ownerId },
+        {
+          entityType: "LEAD",
+          entityId: lead.id,
+          userId: sessionUserId,
+          dedupeKey: `lead-assigned:${lead.id}:${lead.ownerId}`,
+        },
+      );
+    } catch (error) {
+      logLeadCreateSideEffectError("workflow-event-lead-assigned", error);
+    }
+
+    try {
+      revalidatePath("/leads");
+      revalidatePath("/leads/new");
+      revalidatePath("/leads/no-response");
+      revalidatePath("/leads/no-next-step");
+      revalidatePath("/leads/mine");
+      revalidatePath("/leads/overdue");
+      revalidatePath("/leads/duplicates");
+      revalidatePath("/leads/re-contact");
+      revalidatePath("/leads/closed");
+      revalidatePath("/leads/converted");
+      revalidatePath("/leads/unassigned");
+      revalidatePath("/leads/qualified");
+      revalidatePath("/leads/lost");
+      revalidatePath("/leads/pipeline");
+    } catch (error) {
+      logLeadCreateSideEffectError("revalidate-leads-pages", error);
+    }
 
     const uploadErrors: string[] = [];
     for (const file of uploadFiles) {
@@ -323,8 +680,12 @@ export async function POST(req: Request) {
     }
 
     if (uploadFiles.length > 0) {
-      revalidatePath(`/leads/${lead.id}`);
-      revalidatePath(`/leads/${lead.id}/files`);
+      try {
+        revalidatePath(`/leads/${lead.id}`);
+        revalidatePath(`/leads/${lead.id}/files`);
+      } catch (error) {
+        logLeadCreateSideEffectError("revalidate-lead-files", error);
+      }
     }
 
     return NextResponse.json({

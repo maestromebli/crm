@@ -33,7 +33,7 @@ export async function POST(req: Request) {
     : null;
   const hasValidGlobalSecret = Boolean(expectedToken && providedToken === expectedToken);
   if (!hasValidGlobalSecret && !ownerUserIdFromToken) {
-    return NextResponse.json({ error: "Invalid viber signature" }, { status: 401 });
+    return NextResponse.json({ error: "Некоректний підпис Viber" }, { status: 401 });
   }
   if (ownerUserIdFromToken) {
     await markChannelHealth({
@@ -47,7 +47,7 @@ export async function POST(req: Request) {
   try {
     payload = (await req.json()) as ViberWebhookPayload;
   } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    return NextResponse.json({ error: "Некоректний JSON" }, { status: 400 });
   }
 
   if (payload.event === "delivered" || payload.event === "seen" || payload.event === "failed") {

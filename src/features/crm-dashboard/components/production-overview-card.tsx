@@ -79,7 +79,7 @@ export function ProductionOverviewCard({ data }: ProductionOverviewCardProps) {
       <div className="mt-4">
         <Link
           href="/crm/production"
-          className="inline-flex rounded-lg bg-[var(--enver-accent)] px-4 py-2 text-xs font-semibold text-white shadow-sm hover:brightness-110"
+          className="inline-flex rounded-lg border border-[var(--enver-border)] bg-white px-4 py-2 text-sm font-semibold !text-slate-900 shadow-sm hover:bg-slate-50"
         >
           Відкрити виробництво
         </Link>

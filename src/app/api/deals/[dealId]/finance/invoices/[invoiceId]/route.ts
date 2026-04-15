@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { prisma } from "../../../../../../../lib/prisma";
+import { prisma } from "@/lib/prisma";
 import {
   forbidUnlessDealAccess,
   requireSessionUser,
-} from "../../../../../../../lib/authz/api-guard";
-import { P } from "../../../../../../../lib/authz/permissions";
-import { updateFinanceInvoiceStatus } from "../../../../../../../lib/finance/invoice-payment-service";
+} from "@/lib/authz/api-guard";
+import { P } from "@/lib/authz/permissions";
+import { updateFinanceInvoiceStatus } from "@/lib/finance/invoice-payment-service";
 import type { CrmInvoiceStatus } from "@prisma/client";
 
 type Ctx = { params: Promise<{ dealId: string; invoiceId: string }> };

@@ -1,8 +1,8 @@
 import type { EstimateLineType } from "@prisma/client";
+import { calculateEstimateTotalsFromLines } from "@/features/estimate-core";
 import { forkLeadEstimateWithNewLines } from "./fork-lead-estimate";
 import { newEstimateStableLineId } from "./new-stable-line-id";
 import type { DraftLine } from "./ai-estimate-draft";
-import { recalculateEstimateTotals } from "./recalculate";
 import type { Prisma } from "@prisma/client";
 
 function toLineInput(lines: DraftLine[]) {
@@ -38,7 +38,7 @@ export async function createOrForkLeadEstimateFromDraft(
   const discountAmount = 0;
   const deliveryCost = 0;
   const installationCost = 0;
-  const totals = recalculateEstimateTotals(
+  const totals = calculateEstimateTotalsFromLines(
     lineData.map((l) => ({
       amountSale: l.amountSale,
       amountCost: l.amountCost,

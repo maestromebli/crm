@@ -8,6 +8,7 @@ import { runAiOperation } from "../../../../features/ai/server/run-operation";
 import { requireSessionUser } from "../../../../lib/authz/api-guard";
 import { hasEffectivePermission, P } from "../../../../lib/authz/permissions";
 import { requireDatabaseUrl } from "../../../../lib/api/route-guards";
+import { recordContinuousLearningEvent } from "../../../../lib/ai/continuous-learning";
 import { resolveAiExecutionPolicy } from "../../../../features/ai/policies/ai-action-guard";
 
 export const runtime = "nodejs";
@@ -140,8 +141,31 @@ export async function POST(request: Request) {
   });
 
   if (result.ok === false) {
+    await recordContinuousLearningEvent({
+      userId: user.id,
+      action: "ai_operation",
+      stage: "operations",
+      entityType: leadId ? "LEAD" : dealId ? "DEAL" : "DASHBOARD",
+      entityId: leadId ?? dealId ?? user.id,
+      ok: false,
+      metadata: { operation, status: result.status, error: result.error },
+    });
     return NextResponse.json({ error: result.error }, { status: result.status });
   }
+
+  await recordContinuousLearningEvent({
+    userId: user.id,
+    action: "ai_operation",
+    stage: "operations",
+    entityType: leadId ? "LEAD" : dealId ? "DEAL" : "DASHBOARD",
+    entityId: leadId ?? dealId ?? user.id,
+    ok: true,
+    metadata: {
+      operation,
+      advisoryOnly: policy.advisoryOnly,
+      reason: policy.reason,
+    },
+  });
 
   return NextResponse.json({
     ...result,

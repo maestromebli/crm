@@ -81,6 +81,11 @@ export type LeadMeetingInput = {
   hasAnyScheduledEvent: boolean;
 };
 
+export type LeadCommunicationInput = {
+  messageCount: number;
+  lastMessageAt: Date | null;
+};
+
 export type LeadCoreInput = {
   id: string;
   /** Canonical stage (resolved from DB slug). */
@@ -97,6 +102,7 @@ export type LeadCoreInput = {
   files: LeadFilesInput;
   activity: LeadActivityInput;
   meetings: LeadMeetingInput;
+  communication: LeadCommunicationInput;
   nextStepText: string | null;
   nextContactAt: Date | null;
   /** Lead.projectAgreed — commercial override / client confirmed. */

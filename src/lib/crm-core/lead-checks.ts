@@ -1,6 +1,8 @@
 import type { LeadCoreInput } from "./lead-input.types";
 import type { LeadCheckId, LeadCheckKind, LeadCheckResult } from "./lead-stage.types";
 
+const RECENT_COMMUNICATION_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
+
 function result(
   id: LeadCheckId,
   kind: LeadCheckKind,
@@ -67,16 +69,23 @@ export function evaluateLeadCheck(
           ? "Вкажіть тип меблів або об’єкт"
           : null,
       );
-    case "next_step_text":
+    case "next_step_text": {
+      const hasRecentCommunication =
+        lead.communication.messageCount > 0 &&
+        lead.communication.lastMessageAt != null &&
+        Date.now() - new Date(lead.communication.lastMessageAt).getTime() <=
+          RECENT_COMMUNICATION_WINDOW_MS;
+      const hasExplicitNextStep = Boolean(lead.nextStepText?.trim());
       return result(
         id,
         kind,
-        Boolean(lead.nextStepText?.trim()),
+        hasExplicitNextStep || hasRecentCommunication,
         "Наступний крок (текст)",
-        !lead.nextStepText?.trim()
-          ? "Опишіть наступну дію для команди"
+        !(hasExplicitNextStep || hasRecentCommunication)
+          ? "Опишіть наступну дію або зафіксуйте її в комунікаційному центрі"
           : null,
       );
+    }
     case "next_contact_date":
       return result(
         id,

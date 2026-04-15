@@ -1,6 +1,6 @@
 import type { EstimateLineType, Prisma } from "@prisma/client";
+import { calculateEstimateTotalsFromLines } from "@/features/estimate-core";
 import { newEstimateStableLineId } from "./new-stable-line-id";
-import { recalculateEstimateTotals } from "./recalculate";
 
 /** Рядок смети для нової версії (immutable fork). */
 export type EstimateLineInput = {
@@ -66,7 +66,7 @@ export async function forkLeadEstimateWithNewLines(
     amountCost: l.amountCost,
     metadataJson: l.metadataJson,
   }));
-  const totals = recalculateEstimateTotals(
+  const totals = calculateEstimateTotalsFromLines(
     linesForCalc,
     args.discountAmount,
     args.deliveryCost,

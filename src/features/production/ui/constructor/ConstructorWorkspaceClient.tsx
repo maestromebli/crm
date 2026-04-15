@@ -63,7 +63,7 @@ export function ConstructorWorkspaceClient({ token, flow }: Props) {
 
       <section className="grid gap-4 lg:grid-cols-2">
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h2 className="text-sm font-semibold">Files</h2>
+          <h2 className="text-sm font-semibold">Файли</h2>
           <ul className="mt-2 space-y-1 text-xs text-slate-600">
             {flow.filePackages.map((item) => (
               <li key={item.id}>
@@ -100,7 +100,7 @@ export function ConstructorWorkspaceClient({ token, flow }: Props) {
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h2 className="text-sm font-semibold">Questions / Chat</h2>
+          <h2 className="text-sm font-semibold">Питання / чат</h2>
           <ul className="mt-2 space-y-1 text-xs text-slate-600">
             {flow.questions.map((item) => (
               <li key={item.id}>

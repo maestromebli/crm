@@ -4,10 +4,19 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
-import { AlertTriangle, LogOut, Menu, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import {
+  AlertTriangle,
+  LogOut,
+  Menu,
+  Moon,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Sun,
+} from "lucide-react";
+import { motion, useReducedMotion } from "framer-motion";
 import { Button } from "../ui/button";
 import { Avatar, AvatarFallback } from "../ui/avatar";
-import { Sheet, SheetContent, SheetTrigger } from "../ui/sheet";
+import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "../ui/sheet";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { AppSidebar } from "./AppSidebar";
 import { CrmCommandPalette } from "./CrmCommandPalette";
@@ -31,16 +40,25 @@ type AppHeaderProps = {
   onToggleSidebar?: () => void;
 };
 
+type ThemeMode = "dark" | "light";
+const THEME_STORAGE_KEY = "enver-crm-theme";
+const ALERTS_POLL_MS = 60_000;
+
 export function AppHeader({
   sidebarCompact = false,
   onToggleSidebar,
 }: AppHeaderProps = {}) {
+  const reduceMotion = useReducedMotion();
+  const [animationsReady, setAnimationsReady] = useState(false);
   const pathname = usePathname();
   const { data: session } = useSession();
   /** Radix Sheet генерує aria-controls на клієнті; SSR дає інші id → гідратаційний розрив без defer. */
   const [mobileNavMounted, setMobileNavMounted] = useState(false);
   const [alertsUnread, setAlertsUnread] = useState(0);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [theme, setTheme] = useState<ThemeMode>("light");
+  const [themeReady, setThemeReady] = useState(false);
+  const shouldAnimate = animationsReady && !reduceMotion;
   const canViewAlerts = Boolean(
     session?.user?.permissionKeys?.includes("NOTIFICATIONS_VIEW"),
   );
@@ -49,9 +67,20 @@ export function AppHeader({
 
   const title = getTitleFromPath(pathname);
 
+  const applyTheme = (value: ThemeMode) => {
+    const root = document.documentElement;
+    root.setAttribute("data-theme", value);
+    root.style.colorScheme = value;
+  };
+
+  const applyThemeMode = (mode: ThemeMode) => {
+    applyTheme(mode);
+  };
+
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
+      if (document.visibilityState !== "visible") return;
       try {
         const r = await fetch("/api/settings/communications/alerts/summary");
         const j = await tryReadResponseJson<{ unreadCount?: number }>(r);
@@ -65,23 +94,59 @@ export function AppHeader({
     void load();
     const timer = window.setInterval(() => {
       void load();
-    }, 30000);
+    }, ALERTS_POLL_MS);
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        void load();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
     return () => {
       cancelled = true;
       window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [canViewAlerts]);
 
   useEffect(() => {
-    setMobileNavMounted(true);
+    const timer = window.setTimeout(() => setAnimationsReady(true), 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => setMobileNavMounted(true), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const saved = window.localStorage.getItem(THEME_STORAGE_KEY);
+    const resolved: ThemeMode =
+      saved === "light" || saved === "dark"
+        ? saved
+        : "light";
+    setTheme(resolved);
+    applyThemeMode(resolved);
+    setThemeReady(true);
+  }, []);
+
+  const toggleTheme = () => {
+    setTheme((prev) => {
+      const next: ThemeMode = prev === "dark" ? "light" : "dark";
+      applyThemeMode(next);
+      window.localStorage.setItem(THEME_STORAGE_KEY, next);
+      return next;
+    });
+  };
+
   return (
-    <header
+    <motion.header
       className={cn(
-        "flex h-14 items-center justify-between gap-3 border-b border-[var(--enver-border)] bg-[var(--enver-surface)] px-3 shadow-[var(--enver-shadow)] md:px-6",
+        "flex h-14 items-center justify-between gap-3 border-b border-[var(--enver-border)] bg-[var(--enver-surface)]/95 px-3 backdrop-blur md:px-6",
         commandPaletteOpen && "relative z-[100]",
       )}
+      initial={shouldAnimate ? { opacity: 0, y: -6 } : false}
+      animate={shouldAnimate ? { opacity: 1, y: 0 } : undefined}
+      transition={{ duration: 0.18, ease: "easeOut" }}
     >
       <div className="flex items-center gap-2">
         {onToggleSidebar ? (
@@ -124,6 +189,7 @@ export function AppHeader({
                 side="left"
                 className="flex h-full w-80 max-w-[min(100vw,22rem)] flex-col p-0"
               >
+                <SheetTitle className="sr-only">Навігація CRM</SheetTitle>
                 <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
                   <AppSidebar variant="drawer" className="border-r-0" />
                 </div>
@@ -158,9 +224,14 @@ export function AppHeader({
           <span className="text-sm font-bold tracking-tight text-[var(--enver-text)]">
             {title}
           </span>
-          <span className="text-[11px] text-[var(--enver-muted)]">
-            ENVER CRM · операційний простір
-          </span>
+          <div className="flex items-center gap-1.5">
+            <span className="enver-status-chip" data-tone="ok">
+              SHIFT ACTIVE
+            </span>
+            <span className="hidden text-[11px] text-[var(--enver-muted)] md:inline">
+              ENVER CRM · production control room
+            </span>
+          </div>
         </div>
       </div>
 
@@ -196,12 +267,47 @@ export function AppHeader({
         ) : null}
 
         <div className="flex shrink-0 items-center gap-1.5 md:gap-2">
+          {themeReady ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={toggleTheme}
+                  aria-label={
+                    theme === "dark"
+                      ? "Увімкнути світлу тему"
+                      : "Увімкнути темну тему"
+                  }
+                  title={
+                    theme === "dark"
+                      ? "Увімкнути світлу тему"
+                      : "Увімкнути темну тему"
+                  }
+                >
+                  {theme === "dark" ? (
+                    <Sun className="h-4 w-4" />
+                  ) : (
+                    <Moon className="h-4 w-4" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {theme === "dark"
+                  ? "Наступна: світла тема"
+                  : "Наступна: темна тема"}
+              </TooltipContent>
+            </Tooltip>
+          ) : null}
+
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 asChild
                 size="icon"
-                className="h-8 w-8 border-[var(--enver-accent)]/40 bg-[var(--enver-accent)] text-white shadow-md shadow-[var(--enver-accent)]/20 hover:brightness-110 md:hidden"
+                className="h-8 w-8 border-[var(--enver-accent)]/30 bg-[var(--enver-accent)] text-white hover:bg-[var(--enver-accent-hover)] md:hidden"
                 aria-label="Швидка дія: ліди"
               >
                 <Link href="/leads">+</Link>
@@ -214,7 +320,7 @@ export function AppHeader({
               <Button
                 asChild
                 size="sm"
-                className="hidden border-[var(--enver-accent)]/40 bg-[var(--enver-accent)] text-xs font-semibold text-white shadow-md shadow-[var(--enver-accent)]/20 hover:brightness-110 md:inline-flex"
+                className="hidden border-[var(--enver-accent)]/30 bg-[var(--enver-accent)] text-xs font-semibold text-white hover:bg-[var(--enver-accent-hover)] md:inline-flex"
               >
                 <Link href="/leads">+ Швидка дія</Link>
               </Button>
@@ -254,7 +360,11 @@ export function AppHeader({
             <TooltipContent side="bottom">Завершити сесію</TooltipContent>
           </Tooltip>
 
-          <div className="flex items-center gap-2 rounded-full border border-[var(--enver-border)] bg-[var(--enver-card)] px-2 py-1 text-xs shadow-[var(--enver-shadow)]">
+          <motion.div
+            className="enver-interactive flex items-center gap-2 rounded-full border border-[var(--enver-border)] bg-[var(--enver-card)] px-2 py-1 text-xs"
+            whileHover={reduceMotion ? undefined : { y: -1 }}
+            transition={{ type: "spring", stiffness: 320, damping: 26 }}
+          >
             <Avatar className="h-7 w-7">
               <AvatarFallback>{userInitials}</AvatarFallback>
             </Avatar>
@@ -269,10 +379,10 @@ export function AppHeader({
                   : ""}
               </span>
             </div>
-          </div>
+          </motion.div>
         </div>
       </div>
-    </header>
+    </motion.header>
   );
 }
 
@@ -286,14 +396,14 @@ function getTitleFromPath(pathname: string | null): string {
       finance: "Фінанси",
       procurement: "Закупівлі",
       production: "Виробництво",
-      erp: "ERP Command Center",
+      erp: "Командний центр ERP",
       automation: "Автоматизація",
       deal: "Угода",
       external: "Зовнішній доступ",
     };
     const hub = segments[1] ?? "";
     if (hub === "production" && segments[2] === "workshop") {
-      return "Цеховий Kanban";
+      return "Цеховий Канбан";
     }
     if (crmHubTitles[hub]) return crmHubTitles[hub];
     return "CRM";

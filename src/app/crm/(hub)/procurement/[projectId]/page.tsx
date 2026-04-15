@@ -12,6 +12,7 @@ import { getProcurementProjectData } from "../../../../../features/procurement/d
 import { canAccess, resolveRole } from "../../../../../features/shared/lib/rbac";
 import { EmptyState } from "../../../../../components/shared/EmptyState";
 import { AiV2InsightCard } from "../../../../../features/ai-v2";
+import { buildProcurementHubHref, buildProcurementHubNewRequestHref } from "../../../../../features/procurement/lib/quick-actions";
 
 type Props = { params: Promise<{ projectId: string }>; searchParams?: Promise<{ role?: string }> };
 
@@ -65,18 +66,14 @@ export default async function ProcurementProjectPage({ params, searchParams }: P
             ) : null}
             {canAccess(role, "PROCUREMENT_FULL") ? (
               <Link
-                href={
-                  data.dataSource === "live"
-                    ? `/crm/procurement?newRequest=1&dealId=${encodeURIComponent(projectId)}`
-                    : "/crm/procurement?newRequest=1"
-                }
+                href={buildProcurementHubNewRequestHref(data.dataSource === "live" ? projectId : undefined)}
                 className="rounded-lg border border-[var(--enver-border)] bg-[var(--enver-card)] px-3 py-1.5 text-xs font-medium text-[var(--enver-text)] hover:bg-[var(--enver-hover)]"
               >
                 Нова заявка
               </Link>
             ) : null}
             <Link
-              href="/crm/procurement?view=hub"
+              href={buildProcurementHubHref()}
               className="rounded-lg border border-[var(--enver-border)] bg-[var(--enver-card)] px-3 py-1.5 text-xs font-medium text-[var(--enver-muted)] hover:bg-[var(--enver-hover)]"
             >
               Операційний hub

@@ -9,7 +9,7 @@ function verifySecret(req: Request): NextResponse | null {
   if (!configured) return null;
   const incoming = req.headers.get("x-diia-watchdog-secret")?.trim() ?? "";
   if (incoming !== configured) {
-    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    return NextResponse.json({ error: "Заборонено" }, { status: 403 });
   }
   return null;
 }

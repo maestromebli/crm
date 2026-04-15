@@ -1,6 +1,7 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   useLeadDetailQuery,
@@ -9,10 +10,14 @@ import {
 import { leadQueryKeys } from "../../../features/leads/lead-query-keys";
 import type { LeadDetailRow } from "../../../features/leads/queries";
 import { emitLeadWorkflowEvent } from "../../../features/event-system/lead-events";
-import { postFormData, postJson } from "../../../lib/api/patch-json";
+import { deleteJson, postFormData, postJson } from "../../../lib/api/patch-json";
 import { parseResponseJson } from "../../../lib/api/parse-response-json";
 import { suggestAttachmentCategoryFromFile } from "../../../lib/attachments/suggest-category";
-import { useLeadWorkspaceSlice } from "../../../stores/lead-workspace-store";
+import { getStageConfig, resolveLeadStageKey } from "../../../lib/crm-core";
+import {
+  useLeadWorkspaceSlice,
+  type LeadWorkspaceTabId,
+} from "../../../stores/lead-workspace-store";
 import { LeadCommunicationCard } from "./components/LeadCommunicationCard";
 import { LeadFilesCard } from "./components/LeadFilesCard";
 import { LeadHubClientHeader } from "./components/LeadHubClientHeader";
@@ -28,11 +33,79 @@ import { LeadMeetingsCard } from "./components/LeadMeetingsCard";
 import { LeadTasksCard } from "./components/LeadTasksCard";
 import { LeadHubWorkspaceTabs } from "./components/LeadHubWorkspaceTabs";
 import { LeadDetailOverviewClient } from "../../../components/leads/LeadDetailOverviewClient";
+import { ConvertToDealModal } from "../../../components/leads/ConvertToDealModal";
 import { PostCreateActions } from "../../../components/leads/new-lead/PostCreateActions";
+
+const ALL_WORKSPACE_TABS: LeadWorkspaceTabId[] = [
+  "communication",
+  "files",
+  "measurement",
+  "calculation",
+  "notes",
+];
+
+function warningsToHint(
+  warnings: { messageUa: string }[] | null | undefined,
+): string | null {
+  if (!warnings?.length) return null;
+  return warnings.map((item) => item.messageUa).join(" · ");
+}
+
+function focusTabsForStage(
+  stage: LeadDetailRow["stage"],
+): LeadWorkspaceTabId[] {
+  const key = resolveLeadStageKey(stage.slug, {
+    isFinal: stage.isFinal,
+    finalType: stage.finalType,
+    stageName: stage.name,
+  });
+  const group = getStageConfig(key).group;
+
+  if (key === "CONTROL_MEASUREMENT") {
+    return ["measurement", "communication", "notes"];
+  }
+
+  switch (group) {
+    case "intake":
+    case "qualification":
+      return ["communication", "measurement", "notes"];
+    case "site_work":
+      return ["measurement", "communication", "files"];
+    case "pricing":
+      return ["calculation", "communication", "notes"];
+    case "proposal":
+      return ["calculation", "communication", "notes"];
+    case "closing":
+      return ["communication", "calculation", "notes"];
+    case "handoff":
+      return ["calculation", "files", "notes"];
+    case "terminal":
+      return ["communication", "notes", "files"];
+    default:
+      return ["communication", "notes", "files"];
+  }
+}
+
+function modeForStage(
+  stage: LeadDetailRow["stage"],
+): "new" | "contacted" | "proposal" | "closing" | "stuck" {
+  const key = resolveLeadStageKey(stage.slug, {
+    isFinal: stage.isFinal,
+    finalType: stage.finalType,
+    stageName: stage.name,
+  });
+  const group = getStageConfig(key).group;
+  if (group === "intake" || group === "qualification") return "new";
+  if (group === "site_work" || group === "pricing") return "contacted";
+  if (group === "proposal") return "proposal";
+  if (group === "closing" || group === "handoff") return "closing";
+  return "stuck";
+}
 
 export type LeadHubOverviewClientProps = {
   lead: LeadDetailRow;
   canUpdateLead: boolean;
+  canDeleteLead: boolean;
   canConvertToDeal: boolean;
   canUploadLeadFiles: boolean;
   canAssignLead: boolean;
@@ -45,6 +118,7 @@ export type LeadHubOverviewClientProps = {
 export function LeadHubOverviewClient({
   lead,
   canUpdateLead,
+  canDeleteLead,
   canConvertToDeal,
   canUploadLeadFiles,
   canAssignLead,
@@ -53,6 +127,7 @@ export function LeadHubOverviewClient({
   canCreateEstimate,
   canUpdateEstimate,
 }: LeadHubOverviewClientProps) {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const { data: leadQuery } = useLeadDetailQuery(lead.id, lead);
   const leadRow = leadQuery ?? lead;
@@ -72,15 +147,35 @@ export function LeadHubOverviewClient({
 
   const [qErr, setQErr] = useState<string | null>(null);
   const [quickStageId, setQuickStageId] = useState(leadRow.stageId);
+  const [autoStageBusy, setAutoStageBusy] = useState(false);
   const [measureOpen, setMeasureOpen] = useState(false);
   const [measureTitle, setMeasureTitle] = useState("Замір на об'єкті");
   const [measureStart, setMeasureStart] = useState("");
   const [measureBusy, setMeasureBusy] = useState(false);
+  const [convertOpen, setConvertOpen] = useState(false);
+  const [convertBusy, setConvertBusy] = useState(false);
+  const [deletingLead, setDeletingLead] = useState(false);
   const [dismissedErr, setDismissedErr] = useState(false);
   const [stageHintUa, setStageHintUa] = useState<string | null>(null);
   const [dismissedStageHint, setDismissedStageHint] = useState(false);
+  const archivedStage = leadRow.pipelineStages.find((s) => s.slug === "archived");
+  const canArchiveLead =
+    canUpdateLead &&
+    archivedStage != null &&
+    leadRow.stageId !== archivedStage.id;
 
   const canManageCommercial = canCreateEstimate || canUpdateEstimate;
+  const measurementNotRequired = (() => {
+    const status = leadRow.qualification.decisionStatus?.toLowerCase() ?? "";
+    return status.includes("без замір") || status.includes("skip");
+  })();
+  const focusTabs = focusTabsForStage(leadRow.stage);
+  const leadMode = modeForStage(leadRow.stage);
+  const visibleTabs = ALL_WORKSPACE_TABS;
+  const transitionTabs: LeadWorkspaceTabId[] = [
+    ...focusTabs,
+    ...ALL_WORKSPACE_TABS.filter((tab) => !focusTabs.includes(tab)),
+  ];
 
   useEffect(() => {
     ensureLead(lead.id);
@@ -102,25 +197,96 @@ export function LeadHubOverviewClient({
     setQuickStageId(leadRow.stageId);
   }, [leadRow.stageId, leadRow.updatedAt]);
 
+  useEffect(() => {
+    if (!visibleTabs.includes(slice.activeTab)) {
+      setActiveTab(visibleTabs[0] ?? "communication");
+    }
+  }, [setActiveTab, slice.activeTab, visibleTabs]);
+
+  useEffect(() => {
+    if (slice.activeTab === "quote") {
+      setActiveTab("calculation");
+    }
+  }, [setActiveTab, slice.activeTab]);
+
+  const emitStageChanged = useCallback(
+    (stageId: string) => {
+      emitLeadWorkflowEvent("lead.stage.changed", {
+        leadId: leadRow.id,
+        stageId,
+      });
+      setLastEvent("lead.stage.changed");
+    },
+    [leadRow.id, setLastEvent],
+  );
+
   const saveQuickStage = async (nextId: string) => {
-    if (!canUpdateLead || nextId === leadRow.stageId) return;
+    if (!canUpdateLead || nextId === leadRow.stageId || stageBusy || autoStageBusy) {
+      return;
+    }
     setQErr(null);
     setStageHintUa(null);
     try {
       const j = await patchMutation.mutateAsync({ stageId: nextId });
       setQuickStageId(nextId);
-      const w = j.stageTransition?.warnings;
-      setStageHintUa(
-        w?.length ? w.map((x) => x.messageUa).join(" · ") : null,
-      );
-      emitLeadWorkflowEvent("lead.stage.changed", {
-        leadId: leadRow.id,
-        stageId: nextId,
-      });
-      setLastEvent("lead.stage.changed");
+      setStageHintUa(warningsToHint(j.stageTransition?.warnings));
+      emitStageChanged(nextId);
     } catch (e) {
       setQErr(e instanceof Error ? e.message : "Помилка");
       setQuickStageId(leadRow.stageId);
+    }
+  };
+
+  const runAutoStage = async () => {
+    if (!canUpdateLead || autoStageBusy) return;
+    setQErr(null);
+    setStageHintUa(null);
+    setAutoStageBusy(true);
+    try {
+      const j = await patchMutation.mutateAsync({ autoAdvance: true });
+      const autoResult = j.autoAdvance;
+      const warningHint = warningsToHint(autoResult?.warnings);
+      if (warningHint) {
+        setStageHintUa(warningHint);
+      } else if (autoResult && !autoResult.applied) {
+        setStageHintUa(
+          autoResult.reasonUa ??
+            "Наразі немає підстав для автоматичного переходу на наступний етап.",
+        );
+      }
+      if (autoResult?.applied) {
+        const nextStageId = autoResult.toStageId ?? leadRow.stageId;
+        setQuickStageId(nextStageId);
+        emitStageChanged(nextStageId);
+      }
+    } catch (e) {
+      setQErr(e instanceof Error ? e.message : "Не вдалося виконати автоетап");
+    } finally {
+      setAutoStageBusy(false);
+    }
+  };
+
+  const archiveLead = async () => {
+    if (!archivedStage) return;
+    await saveQuickStage(archivedStage.id);
+  };
+
+  const deleteLead = async () => {
+    if (!canDeleteLead || deletingLead) return;
+    const confirmed = window.confirm(
+      "Видалити цей лід? Дію неможливо скасувати.",
+    );
+    if (!confirmed) return;
+    setQErr(null);
+    setDeletingLead(true);
+    try {
+      await deleteJson<{ ok?: boolean; error?: string }>(`/api/leads/${leadRow.id}`);
+      router.push("/leads");
+      router.refresh();
+    } catch (e) {
+      setQErr(e instanceof Error ? e.message : "Не вдалося видалити лід");
+    } finally {
+      setDeletingLead(false);
     }
   };
 
@@ -179,6 +345,7 @@ export function LeadHubOverviewClient({
         leadId: leadRow.id,
       });
       setMeasureOpen(false);
+      setLastEvent("lead.measurement.scheduled");
       await queryClient.invalidateQueries({
         queryKey: leadQueryKeys.detail(leadRow.id),
       });
@@ -189,9 +356,27 @@ export function LeadHubOverviewClient({
     }
   };
 
+  const markMeasurementNotRequired = async () => {
+    if (!canUpdateLead || stageBusy || autoStageBusy || measurementNotRequired) return;
+    setQErr(null);
+    try {
+      await patchMutation.mutateAsync({
+        qualification: {
+          ...leadRow.qualification,
+          decisionStatus: "без заміру",
+        },
+      });
+      setLastEvent("lead.measurement.skipped");
+      setActiveTab("calculation");
+    } catch (e) {
+      setQErr(e instanceof Error ? e.message : "Не вдалося зберегти рішення щодо заміру");
+    }
+  };
+
   const tabPanels = {
     communication: (
       <div className="space-y-5">
+        <span id="lead-communication" className="sr-only" />
         <span id="lead-next-action" className="sr-only" />
         <LeadCommunicationCard
           leadId={leadRow.id}
@@ -202,6 +387,7 @@ export function LeadHubOverviewClient({
           phone={phone}
           createdAt={leadRow.createdAt}
           stage={leadRow.stage}
+          onScheduleMeasure={() => openMeasureModal()}
         />
         <LeadTasksCard leadId={leadRow.id} canViewTasks={canViewTasks} />
       </div>
@@ -218,16 +404,27 @@ export function LeadHubOverviewClient({
       </div>
     ),
     calculation: (
-      <div>
+      <div className="space-y-5">
+        <span id="lead-pricing" className="sr-only" />
         <span id="lead-commercial" className="sr-only" />
         <LeadHubEstimateSection
           lead={leadRow}
           canViewEstimates={canViewEstimates}
         />
+        <LeadHubQuoteSection
+          lead={leadRow}
+          canManageEstimates={canManageCommercial}
+        />
       </div>
     ),
     quote: (
-      <div>
+      <div className="space-y-5">
+        <span id="lead-pricing" className="sr-only" />
+        <span id="lead-commercial" className="sr-only" />
+        <LeadHubEstimateSection
+          lead={leadRow}
+          canViewEstimates={canViewEstimates}
+        />
         <LeadHubQuoteSection
           lead={leadRow}
           canManageEstimates={canManageCommercial}
@@ -242,44 +439,70 @@ export function LeadHubOverviewClient({
     measurement: (
       <div>
         <span id="lead-meetings" className="sr-only" />
-        <LeadMeetingsCard lead={leadRow} onSchedule={() => openMeasureModal()} />
+        <LeadMeetingsCard
+          lead={leadRow}
+          onSchedule={() => openMeasureModal()}
+          canUpdateLead={canUpdateLead}
+          measurementNotRequired={measurementNotRequired}
+          onMarkMeasurementNotRequired={() => void markMeasurementNotRequired()}
+          markingMeasurementNotRequired={stageBusy}
+        />
       </div>
     ),
   };
 
   const centerColumn = (
-    <div id="lead-hub" className="space-y-6">
+    <div id="lead-hub" className="space-y-5">
       <div className="sr-only" aria-hidden>
         <div id="lead-readiness" />
         <div id="lead-contact" />
       </div>
 
-      <PostCreateActions
-        leadId={leadRow.id}
-        phone={phone}
-        showSupervisorFlow={canAssignLead}
-      />
+      <div className="px-1">
+        <PostCreateActions
+          leadId={leadRow.id}
+          phone={phone}
+          showSupervisorFlow={canAssignLead}
+        />
+      </div>
 
       <div
-        className="sticky top-0 z-30 -mx-4 border-b border-[var(--enver-border)]/70 bg-[var(--enver-bg)]/92 px-4 py-3 backdrop-blur-md md:-mx-6 md:px-6 supports-[backdrop-filter]:bg-[var(--enver-bg)]/78"
+        className="sticky top-14 z-20 -mx-4 border-b border-[var(--enver-border)]/60 bg-[var(--enver-bg)]/90 px-4 py-3 backdrop-blur-xl md:-mx-6 md:px-6 supports-[backdrop-filter]:bg-[var(--enver-bg)]/72"
       >
         <LeadHubClientHeader
           lead={leadRow}
           quickStageId={quickStageId}
           stageBusy={stageBusy}
+          autoStageBusy={autoStageBusy}
           canUpdateLead={canUpdateLead}
+          canAutoAdvanceStage={canUpdateLead}
           onStageChange={(id) => void saveQuickStage(id)}
+          onAutoAdvanceStage={() => void runAutoStage()}
           primaryCta={
-            <LeadHubNextStepBanner lead={leadRow} placement="header" />
+            <LeadHubNextStepBanner
+              lead={leadRow}
+              placement="header"
+              pulseEventAt={slice.lastEvent?.at ?? null}
+            />
           }
           quickActions={
             <LeadHubHeaderQuickActions
               leadId={leadRow.id}
               phone={phone}
+              mode={leadMode}
+              canConvertToDeal={canConvertToDeal && !leadRow.linkedDeal}
+              convertingToDeal={convertBusy}
               canUploadLeadFiles={canUploadLeadFiles}
+              canDeleteLead={canDeleteLead}
+              deletingLead={deletingLead}
+              canArchiveLead={canArchiveLead}
+              archiving={stageBusy}
               onUploadClick={() => fileRef.current?.click()}
               onScheduleMeasure={() => openMeasureModal()}
               onFocusNotesTab={() => setActiveTab("notes")}
+              onConvertToDeal={() => setConvertOpen(true)}
+              onDeleteLead={() => void deleteLead()}
+              onArchiveLead={() => void archiveLead()}
             />
           }
         />
@@ -290,7 +513,7 @@ export function LeadHubOverviewClient({
           <p className="min-w-0 flex-1">{qErr}</p>
           <button
             type="button"
-            className="shrink-0 rounded-[12px] px-2 py-1 text-[11px] font-medium text-rose-800 hover:bg-rose-100"
+            className="shrink-0 rounded-[12px] px-2 py-1 text-[11px] font-medium text-rose-800 transition duration-200 hover:bg-rose-100"
             onClick={() => setDismissedErr(true)}
           >
             Закрити
@@ -303,7 +526,7 @@ export function LeadHubOverviewClient({
           <p className="min-w-0 flex-1">{stageHintUa}</p>
           <button
             type="button"
-            className="shrink-0 rounded-[12px] px-2 py-1 text-[11px] font-medium text-amber-900 hover:bg-amber-100"
+            className="shrink-0 rounded-[12px] px-2 py-1 text-[11px] font-medium text-amber-900 transition duration-200 hover:bg-amber-100"
             onClick={() => setDismissedStageHint(true)}
           >
             Закрити
@@ -311,35 +534,40 @@ export function LeadHubOverviewClient({
         </div>
       ) : null}
 
+      <div className="flex justify-end">
+        <p className="text-[11px] text-[var(--enver-muted)]">
+          Cmd/Ctrl + K - палітра команд
+        </p>
+      </div>
+
       <LeadHubWorkspaceTabs
         activeTab={slice.activeTab}
         onTabChange={setActiveTab}
         panels={tabPanels}
+        visibleTabs={visibleTabs}
+        transitionTabs={transitionTabs}
       />
 
       <div className="lg:hidden">
-        <LeadHubNextStepBanner lead={leadRow} />
+        <LeadHubNextStepBanner
+          lead={leadRow}
+          pulseEventAt={slice.lastEvent?.at ?? null}
+        />
       </div>
 
       <details
         id="lead-extra"
-        className="group scroll-mt-24 rounded-[12px] border border-[var(--enver-border)] bg-[var(--enver-card)] shadow-[var(--enver-shadow)] open:ring-1 open:ring-[#E5E7EB]"
+        className="group scroll-mt-24 rounded-[14px] border border-[var(--enver-border)] bg-[var(--enver-card)] shadow-[0_8px_20px_rgba(15,23,42,0.05)] open:ring-1 open:ring-[#E5E7EB]"
       >
         <summary className="cursor-pointer list-none px-4 py-3.5 text-[14px] font-medium text-[var(--enver-text)] marker:hidden [&::-webkit-details-marker]:hidden">
-          <span className="inline-flex flex-wrap items-center gap-2">
-            <span className="rounded-[12px] bg-[var(--enver-surface)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--enver-muted)]">
-              Розширено
-            </span>
-            <span className="text-[var(--enver-text-muted)]">
-              Поля ліда, кваліфікація та конверсія
-            </span>
-          </span>
+          Розширені поля
         </summary>
         <div className="border-t border-[var(--enver-border)] px-4 pb-5 pt-3">
           <LeadDetailOverviewClient
             key={`${leadRow.updatedAt.toISOString()}-detail`}
             lead={leadRow}
             canUpdateLead={canUpdateLead}
+            canDeleteLead={canDeleteLead}
             canConvertToDeal={canConvertToDeal}
           />
         </div>
@@ -350,23 +578,11 @@ export function LeadHubOverviewClient({
   return (
     <>
       <LeadHubThreeColumnShell
+        className="lead-hub-root lead-hub-density-comfortable lead-hub-godmode"
         left={<LeadHubFlowColumn lead={leadRow} />}
         center={centerColumn}
         right={
-          <LeadHubRightPanel
-            lead={leadRow}
-            quickActions={
-              <LeadHubHeaderQuickActions
-                leadId={leadRow.id}
-                phone={phone}
-                canUploadLeadFiles={canUploadLeadFiles}
-                onUploadClick={() => fileRef.current?.click()}
-                onScheduleMeasure={() => openMeasureModal()}
-                onFocusNotesTab={() => setActiveTab("notes")}
-                className="justify-start"
-              />
-            }
-          />
+          <LeadHubRightPanel lead={leadRow} mode={leadMode} />
         }
       />
 
@@ -381,6 +597,18 @@ export function LeadHubOverviewClient({
           onSubmit={() => void submitMeasurement()}
         />
       ) : null}
+      <ConvertToDealModal
+        open={convertOpen}
+        onClose={() => setConvertOpen(false)}
+        lead={leadRow}
+        canConvert={canConvertToDeal}
+        onBusyChange={setConvertBusy}
+        onConverted={(dealId) => {
+          setConvertOpen(false);
+          router.push(`/deals/${dealId}/workspace?fromLead=1`);
+          router.refresh();
+        }}
+      />
     </>
   );
 }
@@ -433,7 +661,7 @@ function LeadHubMeasurementDialog({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-[12px] border border-[var(--enver-border)] px-3 py-2 text-[12px] text-[var(--enver-text)] hover:bg-[var(--enver-bg)]"
+            className="rounded-[12px] border border-[var(--enver-border)] px-3 py-2 text-[12px] text-[var(--enver-text)] transition duration-200 hover:bg-[var(--enver-bg)]"
           >
             Скасувати
           </button>
@@ -441,7 +669,7 @@ function LeadHubMeasurementDialog({
             type="button"
             disabled={measureBusy || !measureStart}
             onClick={onSubmit}
-            className="rounded-[12px] bg-[#2563EB] px-3 py-2 text-[12px] font-medium text-white disabled:opacity-50"
+            className="rounded-[12px] bg-[#2563EB] px-3 py-2 text-[12px] font-medium text-white transition duration-200 hover:bg-[#1D4ED8] disabled:opacity-50"
           >
             {measureBusy ? "Збереження…" : "Створити"}
           </button>

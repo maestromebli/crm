@@ -18,6 +18,11 @@ import { formatMoneyUa } from "../../../../features/finance/lib/format-money";
 import { StatusBadge } from "../../../../components/shared/StatusBadge";
 import { ProcurementHubClient } from "./ProcurementHubClient";
 import { AiV2InsightCard } from "../../../../features/ai-v2";
+import {
+  buildProcurementHubHref,
+  buildProcurementHubNewRequestHref,
+  parseProcurementQuickAction,
+} from "../../../../features/procurement/lib/quick-actions";
 
 type Props = {
   searchParams?: Promise<{ role?: string; view?: string; newRequest?: string; dealId?: string }>;
@@ -26,14 +31,15 @@ type Props = {
 export default async function ProcurementOverviewPage({ searchParams }: Props) {
   const params = await searchParams;
   const role = resolveRole(params?.role);
-  const viewMode = params?.view === "hub" ? "hub" : "overview";
+  const quickAction = parseProcurementQuickAction(params);
+  const viewMode = quickAction.isHubView ? "hub" : "overview";
 
   if (viewMode === "hub") {
     return (
       <main className="space-y-4 p-4">
         <PageHeader
           title="Закупки"
-          subtitle="Live ERP hub: заявки, PO, постачальники та SLA в оперативному контурі."
+          subtitle="Оперативний ERP-хаб: заявки, PO, постачальники та SLA в єдиному контурі."
           actionsSlot={
             <div className="inline-flex rounded-lg border border-[var(--enver-border)] bg-[var(--enver-bg)] p-1">
               <Link
@@ -43,13 +49,16 @@ export default async function ProcurementOverviewPage({ searchParams }: Props) {
                 Аналітичний огляд
               </Link>
               <span className="rounded-md bg-[var(--enver-accent-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--enver-accent-hover)]">
-                Live hub
+                Оперативний хаб
               </span>
             </div>
           }
         />
         <AiV2InsightCard context="procurement" />
-        <ProcurementHubClient />
+        <ProcurementHubClient
+          initialOpenNewRequest={quickAction.openNewRequest}
+          initialDealId={quickAction.dealId}
+        />
       </main>
     );
   }
@@ -76,22 +85,22 @@ export default async function ProcurementOverviewPage({ searchParams }: Props) {
                 Аналітичний огляд
               </span>
               <Link
-                href="/crm/procurement?view=hub"
+                href={buildProcurementHubHref()}
                 className="rounded-md px-3 py-1.5 text-xs font-medium text-[var(--enver-muted)] hover:bg-[var(--enver-hover)]"
               >
-                Live hub
+                Оперативний хаб
               </Link>
             </div>
             {canAccess(role, "PROCUREMENT_FULL") ? (
               <>
                 <Link
-                  href="/crm/procurement?newRequest=1"
+                  href={buildProcurementHubNewRequestHref()}
                   className="rounded-lg border border-[var(--enver-border)] bg-[var(--enver-card)] px-3 py-1.5 text-xs font-medium text-[var(--enver-text)] hover:bg-[var(--enver-hover)]"
                 >
                   Нова заявка
                 </Link>
                 <Link
-                  href="/crm/procurement?view=hub#supplier-onboarding"
+                  href={`${buildProcurementHubHref()}#supplier-onboarding`}
                   className="rounded-lg border border-[var(--enver-border)] bg-[var(--enver-card)] px-3 py-1.5 text-xs font-medium text-[var(--enver-text)] hover:bg-[var(--enver-hover)]"
                 >
                   Постачальник у hub
@@ -138,7 +147,7 @@ export default async function ProcurementOverviewPage({ searchParams }: Props) {
         />
       </SectionCard>
       <SectionCard
-        title="SaaS procurement control"
+        title="Контур контролю закупівель"
         subtitle="SLA постачальників, концентрація, якість приймання і прострочені потреби"
       >
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -170,7 +179,7 @@ export default async function ProcurementOverviewPage({ searchParams }: Props) {
             </p>
           </div>
           <div className="rounded-lg border border-slate-200 p-3">
-            <p className="text-xs text-slate-500">Systemic risk</p>
+            <p className="text-xs text-slate-500">Системний ризик</p>
             <p className="mt-1 text-lg font-semibold text-[var(--enver-text)]">
               {data.saasControl.systemicRiskScore}/100
             </p>
@@ -184,7 +193,7 @@ export default async function ProcurementOverviewPage({ searchParams }: Props) {
               {data.saasControl.topSupplierConcentrationPct}%
             </p>
             <p className="mt-1 text-[11px] text-slate-500">
-              Контролюйте vendor lock-in та ціновий ризик
+              Контролюйте залежність від одного постачальника та ціновий ризик
             </p>
           </div>
         </div>
@@ -223,7 +232,7 @@ export default async function ProcurementOverviewPage({ searchParams }: Props) {
               projectNameById={projectNameById}
             />
           </SectionCard>
-          <SectionCard title="Supplier scorecard" subtitle="Фокус витрат і незакриті замовлення по постачальниках">
+          <SectionCard title="Профіль постачальників" subtitle="Фокус витрат і незакриті замовлення по постачальниках">
             <div className="overflow-x-auto">
               <table className="min-w-full text-left text-sm">
                 <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
@@ -302,16 +311,16 @@ export default async function ProcurementOverviewPage({ searchParams }: Props) {
               />
             )}
           </SectionCard>
-          <SectionCard title="Supplier risk radar" subtitle="SLA, платіжна дисципліна, затримки і composite risk">
+          <SectionCard title="Радар ризиків постачальників" subtitle="SLA, платіжна дисципліна, затримки й інтегральний ризик">
             <div className="overflow-x-auto">
               <table className="min-w-full text-left text-sm">
                 <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                   <tr>
                     <th className="px-2 py-2">Постачальник</th>
                     <th className="px-2 py-2">SLA</th>
-                    <th className="px-2 py-2">Payment discipline</th>
-                    <th className="px-2 py-2">Late PO</th>
-                    <th className="px-2 py-2">Risk</th>
+                    <th className="px-2 py-2">Платіжна дисципліна</th>
+                    <th className="px-2 py-2">Прострочені PO</th>
+                    <th className="px-2 py-2">Ризик</th>
                   </tr>
                 </thead>
                 <tbody>

@@ -15,8 +15,8 @@ export type ProductionAccessRole =
   | "none";
 
 export function productionAccessFromSession(session: Session): ProductionAccessRole {
-  const role = session.user.role as Role;
-  if (role === "SUPER_ADMIN" || role === "ADMIN") return "admin";
+  const role = String(session.user.role);
+  if (role === "SUPER_ADMIN" || role === "ADMIN" || role === "DIRECTOR_PRODUCTION") return "admin";
   if (role === "TEAM_LEAD" || role === "HEAD_MANAGER" || role === "MANAGER")
     return "team_lead";
   if (role === "PRODUCTION_WORKER") return "worker";

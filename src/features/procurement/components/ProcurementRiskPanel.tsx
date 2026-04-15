@@ -5,7 +5,7 @@ type Risk = { level: "P0" | "P1" | "P2"; text: string };
 
 export function ProcurementRiskPanel({ risks }: { risks: Risk[] }) {
   return (
-    <SectionCard title="Ризики закупок" subtitle="Проблемні позиції і контроль бюджету">
+    <SectionCard title="Ризики закупівель" subtitle="Проблемні позиції та контроль бюджету">
       <div className="space-y-2">
         {risks.map((r, i) => (
           <div key={`${r.text}-${i}`} className="rounded border border-slate-200 p-2">

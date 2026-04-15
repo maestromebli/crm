@@ -111,7 +111,7 @@ export function LeadAiOperationsPanel({ leadId, className }: Props) {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[11px] text-[var(--enver-muted)]">Follow-up:</span>
+            <span className="text-[11px] text-[var(--enver-muted)]">Повторний контакт:</span>
             <select
               value={tone}
               onChange={(e) =>
@@ -129,7 +129,7 @@ export function LeadAiOperationsPanel({ leadId, className }: Props) {
               disabled={loading !== null}
               onClick={() => void run("lead_follow_up")}
             >
-              Згенерувати follow-up
+              Згенерувати текст повторного контакту
             </button>
           </div>
 

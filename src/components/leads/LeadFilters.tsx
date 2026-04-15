@@ -12,6 +12,7 @@ const FILTERS: { id: string; href: string; label: string }[] = [
   { id: "unassigned", href: "/leads/unassigned", label: "На розподіл" },
   { id: "mine", href: "/leads/mine", label: "Мої" },
   { id: "overdue", href: "/leads/overdue", label: "Прострочені" },
+  { id: "closed", href: "/leads/closed", label: "Закриті" },
   { id: "duplicates", href: "/leads/duplicates", label: "Дублі" },
 ];
 
@@ -19,7 +20,8 @@ const MORE_FILTERS: { id: string; href: string; label: string }[] = [
   { id: "qualified", href: "/leads/qualified", label: "Розрахунок" },
   { id: "re-contact", href: "/leads/re-contact", label: "Повторний контакт" },
   { id: "converted", href: "/leads/converted", label: "Конвертовані" },
-  { id: "lost", href: "/leads/lost", label: "Архів" },
+  { id: "lost", href: "/leads/lost", label: "Втрачені" },
+  { id: "archived", href: "/leads/archived", label: "Архів" },
   { id: "sources", href: "/leads/sources", label: "За джерелом" },
   { id: "pipeline", href: "/leads/pipeline", label: "Воронка" },
 ];

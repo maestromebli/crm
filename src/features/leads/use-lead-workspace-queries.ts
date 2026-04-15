@@ -39,6 +39,14 @@ export type LeadPatchSuccess = {
     warnings?: { messageUa: string }[];
     missingRequirements?: string[];
   };
+  autoAdvance?: {
+    applied: boolean;
+    fromStageId: string | null;
+    toStageId: string | null;
+    warnings?: { messageUa: string }[];
+    missingRequirements?: string[];
+    reasonUa?: string;
+  };
 };
 
 export function useLeadPatchMutation(leadId: string): UseMutationResult<
@@ -63,6 +71,14 @@ export function useLeadPatchMutation(leadId: string): UseMutationResult<
         stageTransition?: {
           warnings?: { messageUa: string }[];
           missingRequirements?: string[];
+        };
+        autoAdvance?: {
+          applied: boolean;
+          fromStageId: string | null;
+          toStageId: string | null;
+          warnings?: { messageUa: string }[];
+          missingRequirements?: string[];
+          reasonUa?: string;
         };
       }>(r);
       if (!r.ok) {

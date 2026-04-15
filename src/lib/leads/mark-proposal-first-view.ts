@@ -1,5 +1,6 @@
 import type { LeadProposalStatus } from "@prisma/client";
 import { prisma, prismaCodegenIncludesLeadProposalViewedAt } from "../prisma";
+import { syncLeadStageFromProposalStatus } from "./proposal-status-stage-sync";
 
 /**
  * Фіксує перший перегляд публічного КП (`viewedAt` + за потреби `CLIENT_REVIEWING`).
@@ -16,11 +17,17 @@ export async function ensureLeadProposalFirstViewRecorded(proposal: {
     proposal.status === "DRAFT" || proposal.status === "SENT"
       ? "CLIENT_REVIEWING"
       : proposal.status;
-  await prisma.leadProposal.update({
+  const updated = await prisma.leadProposal.update({
     where: { id: proposal.id },
     data: {
       viewedAt: new Date(),
       status: nextStatus,
     },
   });
+  if (nextStatus !== proposal.status) {
+    await syncLeadStageFromProposalStatus(prisma, {
+      leadId: updated.leadId,
+      status: nextStatus,
+    });
+  }
 }

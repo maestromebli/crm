@@ -65,6 +65,9 @@ export async function DealsListPage({ view, defaultLayout = "table" }: Props) {
     !error &&
     !showFilteredEmptyHint &&
     (rows.length > 0 || view === "pipeline");
+  const stagger = (index: number) => ({
+    animationDelay: `${Math.min(index, 10) * 45}ms`,
+  });
 
   return (
     <main className="flex min-h-[calc(100vh-56px)] flex-col bg-[var(--enver-bg)] px-3 py-3 md:px-6 md:py-4">
@@ -82,15 +85,17 @@ export async function DealsListPage({ view, defaultLayout = "table" }: Props) {
           <span className="text-[var(--enver-text-muted)]">{copy.title}</span>
         </nav>
 
-        <header className="relative overflow-hidden rounded-xl border border-[var(--enver-border)] bg-gradient-to-br from-[var(--enver-card)] via-[#1a1b22] to-[#25204a] px-4 py-4 shadow-[var(--enver-shadow)] md:px-6 md:py-5">
-          <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-[var(--enver-accent)]/20 blur-3xl" />
+        <header
+          className="enver-card-appear relative overflow-hidden rounded-xl border border-[var(--enver-border)] bg-[var(--enver-card)] px-4 py-4 md:px-6 md:py-5"
+          style={stagger(0)}
+        >
           <div className="relative flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div className="flex gap-4">
-              <div className="hidden h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-[var(--enver-accent)] text-white shadow-lg shadow-[var(--enver-accent)]/30 sm:flex">
+              <div className="hidden h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-[var(--enver-surface)] text-[var(--enver-text-muted)] sm:flex">
                 <KanbanSquare className="h-7 w-7" strokeWidth={1.6} aria-hidden />
               </div>
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[var(--enver-accent-hover)]">
+                <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[var(--enver-muted)]">
                   Модуль · Продажі
                 </p>
                 <h1 className="mt-1 text-xl font-bold tracking-tight text-[var(--enver-text)] md:text-2xl">
@@ -115,7 +120,10 @@ export async function DealsListPage({ view, defaultLayout = "table" }: Props) {
           </div>
         </header>
 
-        <div className="rounded-xl border border-[var(--enver-border)] bg-[var(--enver-card)] px-3 py-2 shadow-[var(--enver-shadow)] md:px-4">
+        <div
+          className="enver-card-appear rounded-xl border border-[var(--enver-border)] bg-[var(--enver-card)] px-3 py-2 shadow-[var(--enver-shadow)] md:px-4"
+          style={stagger(1)}
+        >
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--enver-muted)]">
               Динамічні процеси · швидкий перехід
@@ -151,7 +159,10 @@ export async function DealsListPage({ view, defaultLayout = "table" }: Props) {
         ) : null}
 
         {showFilteredEmptyHint ? (
-          <div className="rounded-xl border border-dashed border-[var(--enver-border)] bg-[var(--enver-card)] px-4 py-10 text-center text-sm text-[var(--enver-text-muted)] shadow-[var(--enver-shadow)]">
+          <div
+            className="enver-card-appear rounded-xl border border-dashed border-[var(--enver-border)] bg-[var(--enver-card)] px-4 py-10 text-center text-sm text-[var(--enver-text-muted)] shadow-[var(--enver-shadow)]"
+            style={stagger(2)}
+          >
             <p>{copy.emptyExtra ?? "Немає угод у цьому вигляді."}</p>
             <p className="mt-2 text-xs text-[var(--enver-muted)]">
               Перегляньте{" "}
@@ -170,20 +181,33 @@ export async function DealsListPage({ view, defaultLayout = "table" }: Props) {
         !error &&
         !showFilteredEmptyHint &&
         view !== "pipeline" ? (
-          <div className="rounded-xl border border-dashed border-[var(--enver-border)] bg-[var(--enver-card)] px-4 py-12 text-center text-sm text-[var(--enver-text-muted)] shadow-[var(--enver-shadow)]">
-            <p>
-              Немає угод у вашій зоні видимості. Створіть угоду з ліда або
-              перевірте підключення до БД після{" "}
-              <code className="rounded bg-[var(--enver-hover)] px-1.5 py-0.5 text-xs text-[var(--enver-text)]">
-                pnpm db:push
-              </code>
-              .
+          <div
+            className="enver-card-appear rounded-xl border border-dashed border-[var(--enver-border)] bg-[var(--enver-card)] px-4 py-12 text-center text-sm text-[var(--enver-text-muted)] shadow-[var(--enver-shadow)]"
+            style={stagger(2)}
+          >
+            <p>Немає угод у вашій зоні видимості.</p>
+            <p className="mt-2 text-xs text-[var(--enver-muted)]">
+              Почніть з{" "}
+              <Link
+                href="/leads"
+                className="font-semibold text-[var(--enver-accent-hover)] underline-offset-2 hover:underline"
+              >
+                лідів
+              </Link>{" "}
+              або відкрийте{" "}
+              <Link
+                href="/deals/pipeline"
+                className="font-semibold text-[var(--enver-accent-hover)] underline-offset-2 hover:underline"
+              >
+                воронку угод
+              </Link>{" "}
+              для швидкої навігації.
             </p>
           </div>
         ) : null}
 
         {showHub ? (
-          <>
+          <div className="enver-card-appear space-y-2" style={stagger(3)}>
             <DealsHubClient
               rows={rows.map((r) => ({
                 ...r,
@@ -200,7 +224,7 @@ export async function DealsListPage({ view, defaultLayout = "table" }: Props) {
               Оновлено:{" "}
               {format(new Date(), "d MMM yyyy HH:mm", { locale: uk })}
             </p>
-          </>
+          </div>
         ) : null}
       </div>
     </main>

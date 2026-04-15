@@ -7,7 +7,7 @@ import { getSessionAccess } from "@/lib/authz/session-access";
 import { loadEventHealthSnapshot } from "@/lib/events/event-health";
 
 export const metadata: Metadata = {
-  title: "Event Health · Automation",
+  title: "Стан подій · Автоматизація",
   description: "Моніторинг якості подій DomainEvent та оркестрації.",
 };
 
@@ -29,7 +29,7 @@ export default async function EventHealthPage() {
     <div className="space-y-4">
       <header className="rounded-2xl border border-slate-200 bg-[var(--enver-card)] p-4 shadow-sm">
         <h1 className="text-lg font-semibold text-[var(--enver-text)]">
-          Event Health
+          Стан подій
         </h1>
         <p className="mt-1 text-xs text-slate-600">
           Знімок згенеровано{" "}
@@ -43,17 +43,17 @@ export default async function EventHealthPage() {
 
       <section className="grid gap-3 md:grid-cols-3">
         <Card
-          title="24h Processed Rate"
+          title="Оброблено за 24 год"
           value={`${snapshot.window.last24h.processedRate}%`}
           hint={`${snapshot.window.last24h.processed}/${snapshot.window.last24h.total}`}
         />
         <Card
-          title="24h Dedupe Coverage"
+          title="Покриття дедуплікації за 24 год"
           value={`${snapshot.window.last24h.dedupeCoverage}%`}
           hint="Частка подій з dedupeKey"
         />
         <Card
-          title="Pending Backlog"
+          title="Черга в очікуванні"
           value={String(snapshot.backlog.pendingTotal)}
           hint={
             snapshot.backlog.oldestPendingAt
@@ -64,14 +64,14 @@ export default async function EventHealthPage() {
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-[var(--enver-card)] p-4 shadow-sm">
-        <h2 className="text-sm font-semibold text-[var(--enver-text)]">Top Types (24h)</h2>
+        <h2 className="text-sm font-semibold text-[var(--enver-text)]">Топ типів (24 год)</h2>
         <div className="mt-3 overflow-x-auto">
           <table className="min-w-full text-left text-xs">
             <thead className="text-slate-500">
               <tr>
-                <th className="px-2 py-1">Type</th>
-                <th className="px-2 py-1">Total</th>
-                <th className="px-2 py-1">Pending</th>
+                <th className="px-2 py-1">Тип</th>
+                <th className="px-2 py-1">Усього</th>
+                <th className="px-2 py-1">У черзі</th>
               </tr>
             </thead>
             <tbody>
@@ -88,15 +88,15 @@ export default async function EventHealthPage() {
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-[var(--enver-card)] p-4 shadow-sm">
-        <h2 className="text-sm font-semibold text-[var(--enver-text)]">Recent Events</h2>
+        <h2 className="text-sm font-semibold text-[var(--enver-text)]">Останні події</h2>
         <div className="mt-3 overflow-x-auto">
           <table className="min-w-full text-left text-xs">
             <thead className="text-slate-500">
               <tr>
-                <th className="px-2 py-1">Type</th>
-                <th className="px-2 py-1">Entity</th>
-                <th className="px-2 py-1">Created</th>
-                <th className="px-2 py-1">Processed</th>
+                <th className="px-2 py-1">Тип</th>
+                <th className="px-2 py-1">Сутність</th>
+                <th className="px-2 py-1">Створено</th>
+                <th className="px-2 py-1">Оброблено</th>
               </tr>
             </thead>
             <tbody>
@@ -110,7 +110,7 @@ export default async function EventHealthPage() {
                   <td className="px-2 py-1">
                     {row.processedAt
                       ? new Date(row.processedAt).toLocaleString("uk-UA")
-                      : "pending"}
+                      : "у черзі"}
                   </td>
                 </tr>
               ))}

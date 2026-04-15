@@ -1,8 +1,13 @@
-import { redirect } from "next/navigation";
+import { permanentRedirect } from "next/navigation";
+import { toQueryString } from "@/lib/routing/to-query-string";
 
-type Props = { params: Promise<{ id: string }> };
+type Props = {
+  params: Promise<{ id: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
 
-export default async function CrmDealPage({ params }: Props) {
+export default async function CrmDealPage({ params, searchParams }: Props) {
   const { id } = await params;
-  redirect(`/deals/${id}/workspace`);
+  const query = toQueryString((await searchParams) ?? {});
+  permanentRedirect(`/deals/${id}/workspace${query}`);
 }

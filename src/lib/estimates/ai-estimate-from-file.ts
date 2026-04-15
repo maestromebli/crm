@@ -58,19 +58,73 @@ type AiFileJson = {
   confidence?: string;
 };
 
+function normalizeUnit(u: string | undefined): string {
+  const raw = (u ?? "").trim().toLowerCase();
+  if (!raw) return "шт";
+  if (/^(шт|piece|pcs?)$/.test(raw)) return "шт";
+  if (/^(компл|комплект|set)$/.test(raw)) return "компл";
+  if (/^(м2|м²)$/.test(raw)) return "м²";
+  if (/^(мп|пог\.?\s*м|погонн|l\.?m\.?)$/.test(raw)) return "пог. м";
+  if (/^(м|метр|meter)$/.test(raw)) return "м";
+  if (/^(рейс|trip)$/.test(raw)) return "рейс";
+  return u?.trim() || "шт";
+}
+
+function inferCategoryKeyFromText(name: string): EstimateCategoryKey {
+  const t = name.toLowerCase();
+  if (/(достав|логіст|рейс|delivery)/.test(t)) return "delivery";
+  if (/(монтаж|збірк|установ|install)/.test(t)) return "installation";
+  if (/(фасад|front|door)/.test(t)) return "facades";
+  if (/(стільниц|столеш|counter|кварц|hpl|акрил)/.test(t)) return "countertop";
+  if (/(фурнітур|blum|hettich|петл|напрям|лифт)/.test(t)) return "fittings";
+  if (/(корпус|дсп|мдф|шаф|гардероб|тумб|пенал|модул)/.test(t)) return "cabinets";
+  return "extras";
+}
+
+function inferQtyAndUnitFromName(name: string): { qty: number; unit: string } | null {
+  const m = name.match(/(\d+(?:[.,]\d+)?)\s*(шт|компл|комплект|пог\.?\s*м|м²|м2|м|рейс)\b/i);
+  if (!m) return null;
+  const qtyRaw = Number.parseFloat(m[1].replace(",", "."));
+  if (!Number.isFinite(qtyRaw) || qtyRaw <= 0) return null;
+  return { qty: qtyRaw, unit: normalizeUnit(m[2]) };
+}
+
+function detectTemplateKeyFromLines(lines: DraftLine[]): string | null {
+  if (!lines.length) return null;
+  const text = lines.map((l) => `${l.productName} ${l.category ?? ""}`).join(" ").toLowerCase();
+  if (/(острів|island)/.test(text)) return "kitchen_island";
+  if (/(шаф|гардероб|купе|wardrobe)/.test(text)) return "wardrobe";
+  if (/(санвуз|ванн|умиваль|bathroom)/.test(text)) return "bathroom";
+  if (/(віталь|tv|тумба тв|living)/.test(text)) return "living";
+  if (/(коридор|передпок|hallway)/.test(text)) return "hallway";
+  if (/(офіс|кабінет|office)/.test(text)) return "office";
+  if (/(дитяч|children)/.test(text)) return "children";
+  if (/(кухн|стільниц|фасад|blum|hettich)/.test(text)) return "kitchen";
+  return null;
+}
+
 function normalizeDraftFromAi(j: AiFileJson): DraftLine[] {
   const lines: DraftLine[] = [];
   for (const raw of j.lines ?? []) {
     const name =
       typeof raw.productName === "string" ? raw.productName.trim() : "";
     if (!name) continue;
+    const inferred = inferCategoryKeyFromText(name);
     const ck: EstimateCategoryKey = isCategoryKey(String(raw.categoryKey))
       ? (raw.categoryKey as EstimateCategoryKey)
-      : "extras";
-    const qty =
+      : inferred;
+    const parsedQtyUnit = inferQtyAndUnitFromName(name);
+    const qtyRaw =
       typeof raw.qty === "number" && Number.isFinite(raw.qty) ? raw.qty : 1;
-    const unit =
-      typeof raw.unit === "string" && raw.unit.trim() ? raw.unit.trim() : "шт";
+    const qty =
+      parsedQtyUnit?.qty != null
+        ? parsedQtyUnit.qty
+        : Math.max(0.01, Math.min(10_000, qtyRaw));
+    const unit = normalizeUnit(
+      typeof raw.unit === "string" && raw.unit.trim()
+        ? raw.unit
+        : parsedQtyUnit?.unit,
+    );
     const salePrice =
       typeof raw.salePrice === "number" && Number.isFinite(raw.salePrice)
         ? Math.max(0, raw.salePrice)
@@ -235,10 +289,12 @@ export async function analyzeEstimateFromContent(args: {
     configured: true,
     result,
     isProjectDocument: Boolean(parsed.isProjectDocument),
-    templateKey:
-      typeof parsed.templateKey === "string" && parsed.templateKey.trim()
-        ? parsed.templateKey.trim().slice(0, 64)
-        : null,
+    templateKey: (() => {
+      if (typeof parsed.templateKey === "string" && parsed.templateKey.trim()) {
+        return parsed.templateKey.trim().slice(0, 64);
+      }
+      return detectTemplateKeyFromLines(lines);
+    })(),
     aiSummary: parsed.summary?.trim() ?? null,
     confidence: parsed.confidence ?? null,
   };

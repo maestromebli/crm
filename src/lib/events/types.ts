@@ -26,6 +26,8 @@ export const WORKFLOW_EVENT_TYPES = {
   AI_ALERT_CREATED: "ai_alert_created",
   TELEGRAM_MESSAGE_SYNCED: "telegram_message_synced",
   PRODUCTION_TRANSFERRED: "production_transferred",
+  FINANCIAL_WORKFLOW_COMPLETED: "financial_workflow_completed",
+  FINANCIAL_WORKFLOW_FAILED: "financial_workflow_failed",
 } as const;
 
 export type WorkflowEventType =
@@ -83,4 +85,12 @@ export type WorkflowEventPayloadMap = {
   [WORKFLOW_EVENT_TYPES.AI_ALERT_CREATED]: { leadId?: string; dealId?: string; note: string };
   [WORKFLOW_EVENT_TYPES.TELEGRAM_MESSAGE_SYNCED]: { leadId?: string; dealId?: string };
   [WORKFLOW_EVENT_TYPES.PRODUCTION_TRANSFERRED]: { dealId: string };
+  [WORKFLOW_EVENT_TYPES.FINANCIAL_WORKFLOW_COMPLETED]: {
+    dealId: string;
+    failedSteps?: string[];
+  };
+  [WORKFLOW_EVENT_TYPES.FINANCIAL_WORKFLOW_FAILED]: {
+    dealId: string;
+    failedSteps?: string[];
+  };
 };

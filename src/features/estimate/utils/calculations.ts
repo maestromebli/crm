@@ -3,6 +3,8 @@ import type { FormulaConfig } from "../types/domain";
 
 const MM_TO_M = 0.001;
 
+// CORE LOGIC - DO NOT BREAK
+
 export function deriveAreaM2(
   widthMm: number | null,
   heightMm: number | null,

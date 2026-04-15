@@ -6,6 +6,7 @@ import {
 } from "../../../../../../lib/authz/api-guard";
 import { P } from "../../../../../../lib/authz/permissions";
 import { parseEstimatePromptToDraft } from "../../../../../../lib/estimates/ai-estimate-draft";
+import { recordContinuousLearningEvent } from "../../../../../../lib/ai/continuous-learning";
 import { prisma } from "../../../../../../lib/prisma";
 
 type Ctx = { params: Promise<{ leadId: string }> };
@@ -51,5 +52,19 @@ export async function POST(req: Request, ctx: Ctx) {
   if (denied) return denied;
 
   const draft = parseEstimatePromptToDraft(prompt);
+  await recordContinuousLearningEvent({
+    userId: user.id,
+    action: "estimate_ai_draft",
+    stage: "estimate_draft",
+    entityType: "LEAD",
+    entityId: leadId,
+    ok: true,
+    metadata: {
+      promptLength: prompt.length,
+      lines: draft.lines.length,
+      assumptions: draft.assumptions.length,
+      missing: draft.missing.length,
+    },
+  });
   return NextResponse.json({ ok: true, draft });
 }

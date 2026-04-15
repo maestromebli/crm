@@ -18,7 +18,10 @@ export type LeadDetailViewProps = {
   lead: LeadDetailRow;
   tab: string | null;
   canUpdateLead: boolean;
+  canDeleteLead: boolean;
+  canViewMessages: boolean;
   canConvertToDeal: boolean;
+  canViewLeadFiles: boolean;
   canUploadLeadFiles: boolean;
   canSearchContacts: boolean;
   canViewTasks: boolean;
@@ -36,7 +39,10 @@ export function LeadPage({
   lead,
   tab,
   canUpdateLead,
+  canDeleteLead,
+  canViewMessages,
   canConvertToDeal,
+  canViewLeadFiles,
   canUploadLeadFiles,
   canSearchContacts,
   canViewTasks,
@@ -66,9 +72,12 @@ export function LeadPage({
       <EntitySubnav
         entityId={lead.id}
         kind="lead"
-        leadHiddenTabIds={
-          canViewEstimates ? undefined : ["pricing", "kp"]
-        }
+        hiddenTabIds={[
+          ...(canViewMessages ? [] : ["messages"]),
+          ...(canViewEstimates ? [] : ["pricing"]),
+          ...(canViewTasks ? [] : ["tasks"]),
+          ...(canViewLeadFiles ? [] : ["files"]),
+        ]}
       />
       <div
         className={`flex flex-1 flex-col ${
@@ -80,6 +89,7 @@ export function LeadPage({
             key={lead.updatedAt.toISOString()}
             lead={lead}
             canUpdateLead={canUpdateLead}
+            canDeleteLead={canDeleteLead}
             canConvertToDeal={canConvertToDeal}
             canUploadLeadFiles={canUploadLeadFiles}
             canAssignLead={canAssignLead}
@@ -101,6 +111,9 @@ export function LeadPage({
               tab={tab!}
               lead={lead}
               canUpdateLead={canUpdateLead}
+              canDeleteLead={canDeleteLead}
+              canViewMessages={canViewMessages}
+              canViewLeadFiles={canViewLeadFiles}
               canUploadLeadFiles={canUploadLeadFiles}
               canSearchContacts={canSearchContacts}
               canViewTasks={canViewTasks}
@@ -119,11 +132,22 @@ export function LeadPage({
   );
 }
 
-type NonOverviewProps = Omit<
-  LeadDetailViewProps,
-  "tab" | "canConvertToDeal" | "canAssignLead"
-> & {
+type NonOverviewProps = {
   tab: string;
+  lead: LeadDetailRow;
+  canUpdateLead: boolean;
+  canDeleteLead: boolean;
+  canViewMessages: boolean;
+  canViewLeadFiles: boolean;
+  canUploadLeadFiles: boolean;
+  canSearchContacts: boolean;
+  canViewTasks: boolean;
+  canCreateTasks: boolean;
+  canUpdateTasks: boolean;
+  canViewEstimates: boolean;
+  canCreateEstimate: boolean;
+  canUpdateEstimate: boolean;
+  canViewCost: boolean;
 };
 
 function LeadNonOverviewPanels({
@@ -143,10 +167,7 @@ function LeadNonOverviewPanels({
   if (tab === "pricing" || tab === "kp") {
     return (
       <div className="space-y-5">
-        <LeadCommercialProcessStepper
-          lead={lead}
-          active={tab === "kp" ? "kp" : "pricing"}
-        />
+        <LeadCommercialProcessStepper lead={lead} active="pricing" />
         <LeadPricingWorkspaceClient
           leadId={lead.id}
           leadTitle={lead.title}

@@ -21,11 +21,13 @@ type TaskRow = {
 };
 
 const btn =
-  "rounded-xl border border-[var(--enver-accent)]/35 bg-[var(--enver-accent)] px-3 py-2 text-sm font-semibold text-white shadow-sm shadow-[var(--enver-accent)]/25 transition hover:brightness-110 disabled:opacity-50";
+  "rounded-xl border border-[var(--enver-accent)]/35 bg-[var(--enver-accent)] px-3 py-2 text-sm font-semibold text-white shadow-sm shadow-[var(--enver-accent)]/25 transition hover:brightness-110 disabled:opacity-50 focus-visible:enver-focus-ring";
 
 type Props = {
   pathname: string;
 };
+const INITIAL_VISIBLE_TASKS = 40;
+const TASKS_STEP = 30;
 
 export function TasksWorkspace({ pathname }: Props) {
   const reduceMotion = useReducedMotion();
@@ -33,6 +35,7 @@ export function TasksWorkspace({ pathname }: Props) {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_TASKS);
 
   let mode: "mine" | "overdue" | "today" | "team" | "diia" | "all" = "all";
   if (pathname.includes("/overdue")) mode = "overdue";
@@ -61,6 +64,7 @@ export function TasksWorkspace({ pathname }: Props) {
       const j = (await r.json()) as { items?: TaskRow[]; error?: string };
       if (!r.ok) throw new Error(j.error ?? "Помилка");
       setItems(j.items ?? []);
+      setVisibleCount(INITIAL_VISIBLE_TASKS);
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Помилка");
       setItems([]);
@@ -117,6 +121,11 @@ export function TasksWorkspace({ pathname }: Props) {
           <h1 className="text-lg font-semibold text-[var(--enver-text)]">{title}</h1>
           <p className="mt-1 text-sm text-[var(--enver-text-muted)]">
             Дані з API `/api/tasks`. Швидке завершення — PATCH статусу DONE.
+          </p>
+          <p className="mt-2">
+            <span className="enver-status-chip" data-tone="ok">
+              TASK CONTROL ACTIVE
+            </span>
           </p>
           <div className="mt-3 flex flex-wrap gap-2 text-sm">
             <Tooltip>
@@ -198,8 +207,19 @@ export function TasksWorkspace({ pathname }: Props) {
         ) : items.length === 0 ? (
           <p className="text-sm text-[var(--enver-text-muted)]">Немає задач за цим фільтром.</p>
         ) : (
-          <ul className="space-y-2">
-            {items.map((t) => (
+          <ul
+            className="max-h-[68vh] space-y-2 overflow-y-auto pr-1"
+            onScroll={(event) => {
+              const el = event.currentTarget;
+              const nearBottom =
+                el.scrollTop + el.clientHeight >= el.scrollHeight - 200;
+              if (!nearBottom) return;
+              setVisibleCount((prev) =>
+                Math.min(items.length, prev + TASKS_STEP),
+              );
+            }}
+          >
+            {items.slice(0, visibleCount).map((t) => (
               <motion.li
                 key={t.id}
                 className="enver-panel enver-panel--interactive flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 text-sm"
@@ -239,6 +259,12 @@ export function TasksWorkspace({ pathname }: Props) {
                 ) : null}
               </motion.li>
             ))}
+            {items.length > visibleCount ? (
+              <li className="px-2 py-1 text-center text-[11px] text-[var(--enver-muted)]">
+                Показано {visibleCount} з {items.length}. Прокрутіть нижче для
+                підвантаження.
+              </li>
+            ) : null}
           </ul>
         )}
       </div>

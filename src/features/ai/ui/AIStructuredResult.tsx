@@ -77,7 +77,7 @@ export function AIStructuredResult({ payload }: Props) {
           {result.detailedVersion}
         </p>
         <p>
-          <span className="font-semibold">CTA: </span>
+          <span className="font-semibold">Заклик до дії: </span>
           {result.ctaSuggestion}
         </p>
       </div>

@@ -32,6 +32,8 @@ export type InstagramChannelConfig = ChannelNotes & {
   pageAccessToken?: string | null;
   pageId?: string | null;
   instagramBusinessAccountId?: string | null;
+  webhookUrl?: string | null;
+  verifyToken?: string | null;
 };
 
 export type FacebookChannelConfig = ChannelNotes & {
@@ -215,6 +217,8 @@ function stripInstagram(
     notes: x.notes ?? null,
     pageId: x.pageId ?? null,
     instagramBusinessAccountId: x.instagramBusinessAccountId ?? null,
+    webhookUrl: x.webhookUrl ?? null,
+    verifyToken: x.verifyToken ?? null,
     pageAccessTokenSet: isSecretSet(x.pageAccessToken),
   };
 }

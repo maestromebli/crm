@@ -1,14 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Image, Video, Layers } from "lucide-react";
+import { Image as ImageIcon, Video, Layers } from "lucide-react";
 import type { DemoCreative } from "../types";
 
 function CreativeKindIcon({ kind }: { kind: "image" | "video" | "carousel" }) {
   if (kind === "video") return <Video className="h-8 w-8 text-slate-400" />;
   if (kind === "carousel")
     return <Layers className="h-8 w-8 text-slate-400" />;
-  return <Image className="h-8 w-8 text-slate-400" />;
+  return <ImageIcon className="h-8 w-8 text-slate-400" />;
 }
 
 const STATUS_OPTS: Array<{ value: "" | DemoCreative["status"]; label: string }> = [

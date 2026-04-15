@@ -43,13 +43,16 @@ export function LeadMessengerFloatingDock(state: Props) {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
+    const timer = window.setTimeout(() => setMounted(true), 0);
     try {
       const v = sessionStorage.getItem(dockStorageKey(leadId));
-      if (v === "1") setOpen(true);
+      if (v === "1") {
+        window.setTimeout(() => setOpen(true), 0);
+      }
     } catch {
       /* ignore */
     }
+    return () => window.clearTimeout(timer);
   }, [leadId]);
 
   const setOpenPersist = useCallback(

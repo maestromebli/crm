@@ -73,7 +73,7 @@ export async function PATCH(req: Request) {
     allowedUserIds: ids,
   });
   if (!ok) {
-    return NextResponse.json({ error: "Alert не знайдено" }, { status: 404 });
+    return NextResponse.json({ error: "Сповіщення не знайдено" }, { status: 404 });
   }
   return NextResponse.json({ ok: true });
 }

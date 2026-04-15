@@ -54,24 +54,30 @@ export function LeadTasksCard({ leadId, canViewTasks }: Props) {
       setLoading(false);
       return;
     }
+    const ac = new AbortController();
     let c = false;
     void (async () => {
       try {
         const r = await fetch(
           `/api/tasks?entityType=LEAD&entityId=${encodeURIComponent(leadId)}`,
+          { signal: ac.signal, cache: "no-store" },
         );
-        const j = (await r.json()) as { items?: TaskRow[] };
+        const j = (await r.json().catch(() => ({}))) as { items?: TaskRow[] };
         if (!c && r.ok) {
           const list = j.items ?? [];
           const open = list.filter((t) => t.status !== "DONE" && t.status !== "CANCELLED");
           setItems(open);
         }
+      } catch (error) {
+        if ((error as { name?: string } | null)?.name === "AbortError") return;
+        if (!c) setItems([]);
       } finally {
         if (!c) setLoading(false);
       }
     })();
     return () => {
       c = true;
+      ac.abort();
     };
   }, [leadId, canViewTasks, syncVersion]);
 
@@ -87,10 +93,11 @@ export function LeadTasksCard({ leadId, canViewTasks }: Props) {
     return (
       <section
         id="lead-tasks"
-        className="rounded-[12px] border border-[var(--enver-border)] bg-[var(--enver-card)] p-4 shadow-[var(--enver-shadow)]"
+        className="leadhub-card p-4"
       >
-        <h3 className="text-[18px] font-medium text-[var(--enver-text)]">Задачі</h3>
-        <p className="mt-2 text-[12px] text-[var(--enver-muted)]">Немає доступу до задач.</p>
+        <span className="leadhub-kicker">Tasks</span>
+        <h3 className="leadhub-title mt-1">Задачі</h3>
+        <p className="leadhub-subtitle">Немає доступу до задач.</p>
       </section>
     );
   }
@@ -98,25 +105,29 @@ export function LeadTasksCard({ leadId, canViewTasks }: Props) {
   return (
     <section
       id="lead-tasks"
-      className="rounded-[12px] border border-[var(--enver-border)] bg-[var(--enver-card)] p-4 shadow-[var(--enver-shadow)]"
+      className="leadhub-card p-4"
     >
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="text-[18px] font-medium text-[var(--enver-text)]">Задачі</h3>
+      <div className="leadhub-head">
+        <div>
+          <span className="leadhub-kicker">Tasks</span>
+          <h3 className="leadhub-title mt-1">Задачі</h3>
+          <p className="leadhub-subtitle">Прострочені й найближчі до виконання.</p>
+        </div>
         <Link
           href={`/leads/${leadId}/tasks`}
-          className="text-[12px] font-medium text-[var(--enver-accent)] hover:underline"
+          className="leadhub-inline-link"
         >
           Усі →
         </Link>
       </div>
       {loading ? (
-        <p className="mt-2 text-[11px] text-slate-500">Завантаження…</p>
+        <p className="mt-2 text-[12px] text-[var(--enver-muted)]">Завантаження…</p>
       ) : overdue.length ? (
         <ul className="mt-2 space-y-1">
           {overdue.map((t) => (
             <li
               key={t.id}
-              className="rounded-lg border border-rose-100 bg-rose-50/80 px-2 py-1.5 text-[11px] text-rose-950"
+              className="rounded-lg border border-rose-200/80 bg-rose-50/90 px-2 py-1.5 text-[12px] text-rose-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]"
             >
               <span className="font-medium">Прострочено:</span> {t.title}
               {t.dueAt
@@ -129,7 +140,7 @@ export function LeadTasksCard({ leadId, canViewTasks }: Props) {
       {!loading && rest.length ? (
         <ul className="mt-2 space-y-1">
           {rest.slice(0, 3).map((t) => (
-            <li key={t.id} className="text-[11px] text-slate-800">
+            <li key={t.id} className="leadhub-list-item px-2.5 py-2 text-[12px] text-slate-800">
               · {t.title}
               {t.dueAt
                 ? ` — ${format(new Date(t.dueAt), "d MMM", { locale: uk })}`
@@ -139,7 +150,7 @@ export function LeadTasksCard({ leadId, canViewTasks }: Props) {
         </ul>
       ) : null}
       {!loading && !items.length ? (
-        <p className="mt-2 text-[11px] text-slate-500">Відкритих задач немає.</p>
+        <p className="mt-2 text-[12px] text-[var(--enver-muted)]">Відкритих задач немає.</p>
       ) : null}
     </section>
   );

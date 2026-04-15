@@ -15,7 +15,7 @@ import { listCommunicationsAlerts } from "../../../../lib/messaging/communicatio
 import { prisma } from "../../../../lib/prisma";
 
 export const metadata: Metadata = {
-  title: "Critical items · ENVER CRM",
+  title: "Критичні пункти · ENVER CRM",
 };
 
 export default async function DashboardCriticalPage() {
@@ -83,7 +83,7 @@ export default async function DashboardCriticalPage() {
                       {item.label}
                       {item.severity === "high" ? (
                         <span className="ml-1 rounded bg-rose-100 px-1 py-0.5 text-[10px] text-rose-800">
-                          high
+                          високий
                         </span>
                       ) : null}
                     </p>

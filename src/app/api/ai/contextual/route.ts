@@ -7,6 +7,7 @@ import {
   executeAiAction,
   type AiContextName,
 } from "@/lib/ai/contextual-engine";
+import { recordContinuousLearningEvent } from "@/lib/ai/continuous-learning";
 
 const bodySchema = z.object({
   context: z.enum([
@@ -53,5 +54,21 @@ export async function POST(req: Request) {
       await executeAiAction({ dealId, action });
     }
   }
+  await recordContinuousLearningEvent({
+    userId: user.id,
+    action: "ai_contextual_result",
+    stage: "contextual",
+    entityType: leadId ? "LEAD" : dealId ? "DEAL" : "DASHBOARD",
+    entityId: leadId ?? dealId ?? user.id,
+    ok: true,
+    metadata: {
+      context,
+      executeActions: Boolean(executeActions),
+      insights: ai.insights.length,
+      risks: ai.risks.length,
+      recommendations: ai.recommendations.length,
+      actions: ai.actions.length,
+    },
+  });
   return NextResponse.json(ai);
 }

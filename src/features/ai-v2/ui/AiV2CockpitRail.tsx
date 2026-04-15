@@ -15,7 +15,7 @@ export function AiV2CockpitRail() {
         open ? "translate-x-0" : "translate-x-[332px]",
         "transition-transform duration-300",
       )}
-      aria-label="AI V2 cockpit rail"
+      aria-label="Бічна панель AI V2"
     >
       <div className="pointer-events-auto flex h-full gap-2">
         <button
@@ -23,8 +23,8 @@ export function AiV2CockpitRail() {
           onClick={() => setOpen((v) => !v)}
           className="mt-2 inline-flex h-9 w-9 items-center justify-center rounded-l-xl border border-[var(--enver-border)] bg-[var(--enver-card)] text-[var(--enver-text)] shadow-sm"
           aria-expanded={open}
-          aria-label={open ? "Згорнути AI V2 cockpit" : "Розгорнути AI V2 cockpit"}
-          title={open ? "Згорнути AI V2 cockpit" : "Розгорнути AI V2 cockpit"}
+          aria-label={open ? "Згорнути панель AI V2" : "Розгорнути панель AI V2"}
+          title={open ? "Згорнути панель AI V2" : "Розгорнути панель AI V2"}
         >
           {open ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
         </button>

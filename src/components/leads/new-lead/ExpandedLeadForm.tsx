@@ -53,7 +53,7 @@ export function ExpandedLeadForm({
   return (
     <div className="space-y-2 rounded-xl border border-slate-200 bg-[var(--enver-card)] px-3 py-2.5">
       <label className="block space-y-0.5">
-        <span className="text-[11px] text-slate-600">Email</span>
+        <span className="text-[11px] text-slate-600">Е-пошта</span>
         <input
           type="email"
           className={inputClass}

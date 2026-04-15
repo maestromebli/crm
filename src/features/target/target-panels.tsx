@@ -188,7 +188,7 @@ export function TargetSyncPanel({ sync }: { sync: TargetSyncStatus }) {
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="rounded-xl border border-slate-200 bg-[var(--enver-card)] p-4 shadow-sm">
-          <p className="text-[11px] font-semibold text-slate-800">Marketing API</p>
+          <p className="text-[11px] font-semibold text-slate-800">Маркетинговий API</p>
           <p className="mt-2 text-[11px] text-slate-600">
             Статус: <span className={`font-medium ${m.className}`}>{m.text}</span>
           </p>
@@ -208,7 +208,7 @@ export function TargetSyncPanel({ sync }: { sync: TargetSyncStatus }) {
           </p>
         </div>
         <div className="rounded-xl border border-slate-200 bg-[var(--enver-card)] p-4 shadow-sm">
-          <p className="text-[11px] font-semibold text-slate-800">Lead Ads webhook</p>
+          <p className="text-[11px] font-semibold text-slate-800">Вебхук лід-реклами</p>
           <p className="mt-2 text-[11px] text-slate-600">
             Остання доставка:{" "}
             <span className="text-slate-800">

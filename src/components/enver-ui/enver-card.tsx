@@ -19,7 +19,7 @@ export function EnverCard({
   return (
     <div
       className={cn(
-        "rounded-xl border border-[var(--enver-border)] bg-[var(--enver-card)] p-5 shadow-[var(--enver-shadow)] transition-[box-shadow,border-color] duration-200",
+        "rounded-xl border border-[var(--enver-border)] bg-[var(--enver-card)] p-5 transition-[border-color] duration-200 shadow-[var(--enver-shadow)]",
         elevated && "shadow-[var(--enver-shadow-lg)]",
         className,
       )}

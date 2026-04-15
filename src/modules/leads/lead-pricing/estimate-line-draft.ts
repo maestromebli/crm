@@ -10,7 +10,10 @@ export type LineType =
   | "DELIVERY"
   | "INSTALLATION"
   | "DISCOUNT"
-  | "OTHER";
+  | "OTHER"
+  | "MATERIAL"
+  | "FITTING"
+  | "WORK";
 
 export type EstimateLineDraft = {
   id: string;
@@ -40,4 +43,8 @@ export type EstimateLineDraft = {
   kitchenClientPriceMultiplier?: number;
   /** Націнка на матеріали для кухонних таблиць (необов'язково). */
   kitchenMaterialMarkupPercent?: number;
+  supplierItemId?: string;
+  supplierSource?: "VIYAR" | "CSV" | "MANUAL";
+  supplierCode?: string;
+  supplierUpdatedAt?: string;
 };

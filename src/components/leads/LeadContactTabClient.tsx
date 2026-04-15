@@ -145,7 +145,7 @@ export function LeadContactTabClient({
         </h2>
         <p className="mt-2 text-xs text-slate-600">
           Контакт у довіднику створюється автоматично, коли на картці ліда є імʼя,
-          телефон або email. Нижче — поточні поля ліда.
+          телефон або е-пошта. Нижче — поточні поля ліда.
         </p>
         <dl className="mt-3 space-y-1.5 text-xs">
           <div>
@@ -159,7 +159,7 @@ export function LeadContactTabClient({
             <dd className="text-[var(--enver-text)]">{lead.phone ?? "—"}</dd>
           </div>
           <div>
-            <dt className="text-slate-500">Email</dt>
+            <dt className="text-slate-500">Е-пошта</dt>
             <dd className="text-[var(--enver-text)]">{lead.email ?? "—"}</dd>
           </div>
         </dl>
@@ -171,7 +171,7 @@ export function LeadContactTabClient({
             Привʼязати існуючий контакт
           </h2>
           <p className="mt-1 text-xs text-slate-600">
-            Пошук за іменем, телефоном або email (мінімум 2 символи).
+            Пошук за іменем, телефоном або е-поштою (мінімум 2 символи).
           </p>
           <input
             value={q}

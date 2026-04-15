@@ -12,13 +12,13 @@ export function DailyOperatingCard({ data }: DailyOperatingCardProps) {
       <div className="flex items-center gap-2">
         <ClipboardList className="h-4 w-4 text-sky-600" aria-hidden />
         <h2 className="text-sm font-semibold text-[var(--enver-text)]">
-          Daily Operating System
+          Щоденна операційна система
         </h2>
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
         <div className="rounded-lg border border-[var(--enver-border)] bg-[var(--enver-surface)] px-2.5 py-2">
-          <p className="text-[var(--enver-text-muted)]">Overdue задачі</p>
+          <p className="text-[var(--enver-text-muted)]">Прострочені задачі</p>
           <p className="text-base font-semibold text-[var(--enver-text)]">
             {data.workload.overdueTasks}
           </p>
@@ -30,7 +30,7 @@ export function DailyOperatingCard({ data }: DailyOperatingCardProps) {
           </p>
         </div>
         <div className="rounded-lg border border-[var(--enver-border)] bg-[var(--enver-surface)] px-2.5 py-2">
-          <p className="text-[var(--enver-text-muted)]">Stale ліди</p>
+          <p className="text-[var(--enver-text-muted)]">Ліди без руху</p>
           <p className="text-base font-semibold text-[var(--enver-text)]">
             {data.workload.staleLeads}
           </p>

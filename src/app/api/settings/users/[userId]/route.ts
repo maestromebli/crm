@@ -8,6 +8,7 @@ import {
   requireSessionUser,
 } from "../../../../../lib/authz/api-guard";
 import {
+  canAssignSuperAdminRole,
   hasEffectivePermission,
   P,
 } from "../../../../../lib/authz/permissions";
@@ -35,13 +36,13 @@ const patchBody = z
     (d) =>
       d.permissionKey === undefined ||
       d.permissionGranted !== undefined,
-    { message: "permissionGranted обовʼязковий разом із permissionKey" },
+    { message: "Поле `permissionGranted` обовʼязкове разом із `permissionKey`" },
   )
   .refine(
     (d) =>
       d.permissionGranted === undefined ||
       d.permissionKey !== undefined,
-    { message: "permissionKey обовʼязковий разом із permissionGranted" },
+    { message: "Поле `permissionKey` обовʼязкове разом із `permissionGranted`" },
   );
 
 type Ctx = { params: Promise<{ userId: string }> };
@@ -95,7 +96,9 @@ export async function GET(_req: Request, ctx: Ctx) {
       menuAccess: sanitizeMenuAccess(target.menuAccess),
       navManifest: buildNavManifest(),
       canManage,
-      canAssignSuperAdmin: sessionUser.realRole === "SUPER_ADMIN",
+      canAssignSuperAdmin: canAssignSuperAdminRole({
+        realRole: sessionUser.realRole,
+      }),
     });
   } catch (err) {
      
@@ -150,7 +153,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
 
     if (
       target.role === "SUPER_ADMIN" &&
-      sessionUser.realRole !== "SUPER_ADMIN"
+      !canAssignSuperAdminRole({ realRole: sessionUser.realRole })
     ) {
       return NextResponse.json(
         { error: "Лише SUPER_ADMIN може змінювати цього користувача" },
@@ -204,7 +207,10 @@ export async function PATCH(req: Request, ctx: Ctx) {
       }
     }
 
-    if (body.role === "SUPER_ADMIN" && sessionUser.realRole !== "SUPER_ADMIN") {
+    if (
+      body.role === "SUPER_ADMIN" &&
+      !canAssignSuperAdminRole({ realRole: sessionUser.realRole })
+    ) {
       return NextResponse.json(
         { error: "Лише SUPER_ADMIN може призначати роль SUPER_ADMIN" },
         { status: 403 },

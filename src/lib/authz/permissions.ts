@@ -114,3 +114,49 @@ export function hasEffectivePermission(
   }
   return hasPermission(granted, required);
 }
+
+export function hasEffectiveAnyPermission(
+  granted: string[] | undefined,
+  required: Phase1Permission[],
+  ctx: {
+    realRole?: string;
+    impersonatorId?: string | null;
+  },
+): boolean {
+  return required.some((key) =>
+    hasEffectivePermission(granted, key, ctx),
+  );
+}
+
+export function canDeleteLeadByRole(ctx: {
+  realRole?: string;
+  dbRole?: string;
+}): boolean {
+  return (
+    ctx.realRole === "HEAD_MANAGER" ||
+    ctx.realRole === "ADMIN" ||
+    ctx.realRole === "DIRECTOR" ||
+    ctx.realRole === "SUPER_ADMIN" ||
+    ctx.dbRole === "MANAGER"
+  );
+}
+
+export function canAssignSuperAdminRole(ctx: {
+  realRole?: string;
+}): boolean {
+  return ctx.realRole === "SUPER_ADMIN";
+}
+
+export function isAdminLikeScope(ctx: {
+  realRole?: string;
+  dbRole?: string;
+}): boolean {
+  return (
+    ctx.realRole === "SUPER_ADMIN" ||
+    ctx.dbRole === "SUPER_ADMIN" ||
+    ctx.dbRole === "ADMIN" ||
+    ctx.dbRole === "DIRECTOR" ||
+    ctx.realRole === "DIRECTOR_PRODUCTION" ||
+    ctx.dbRole === "DIRECTOR_PRODUCTION"
+  );
+}

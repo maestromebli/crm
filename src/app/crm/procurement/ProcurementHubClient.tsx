@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
 import { useErpBridge } from "@/components/erp/ErpBridgeProvider";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -14,6 +15,10 @@ import {
 } from "@/features/procurement/lib/ordered-monitor-prefs";
 import type { OrderedLineMonitorRow } from "@/features/procurement/lib/ordered-line-monitor";
 import { tryReadResponseJson } from "@/lib/http/read-response-json";
+import {
+  clearProcurementQuickActionParams,
+  parseProcurementQuickActionFromSearchParams,
+} from "@/features/procurement/lib/quick-actions";
 
 type Dash = {
   suppliers: Array<{ id: string; name: string; category: string; rating: number | null }>;
@@ -183,7 +188,18 @@ function readRiskConfigFromStorage() {
   }
 }
 
-export function ProcurementHubClient() {
+type ProcurementHubClientProps = {
+  initialOpenNewRequest?: boolean;
+  initialDealId?: string;
+};
+
+export function ProcurementHubClient({
+  initialOpenNewRequest = false,
+  initialDealId = "",
+}: ProcurementHubClientProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [data, setData] = useState<Dash | null>(null);
   const [q, setQ] = useState("");
   const [err, setErr] = useState<string | null>(null);
@@ -204,6 +220,8 @@ export function ProcurementHubClient() {
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const [pollMs, setPollMs] = useState(0);
   const [clock, setClock] = useState(0);
+  const requestFormRef = useRef<HTMLFormElement | null>(null);
+  const quickActionAppliedRef = useRef(false);
   const {
     productionOrders,
     addPurchaseRequest,
@@ -277,6 +295,51 @@ export function ProcurementHubClient() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (quickActionAppliedRef.current) return;
+
+    const fromUrl = parseProcurementQuickActionFromSearchParams(searchParams);
+    const shouldOpenNewRequest = fromUrl.openNewRequest || initialOpenNewRequest;
+    const linkedDealId = fromUrl.dealId || initialDealId.trim();
+    const hasQuickActionParams = Boolean(fromUrl.openNewRequest || fromUrl.dealId);
+    if (!shouldOpenNewRequest && !linkedDealId && !hasQuickActionParams) return;
+
+    quickActionAppliedRef.current = true;
+
+    if (linkedDealId) {
+      setDealId(linkedDealId);
+    }
+
+    if (shouldOpenNewRequest) {
+      setOpsFeed((prev) => [
+        `Швидка дія → форма нової заявки готова${linkedDealId ? ` (угода ${linkedDealId})` : ""}`,
+        ...prev,
+      ]);
+      window.requestAnimationFrame(() => {
+        requestFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        requestFormRef.current
+          ?.querySelector<HTMLInputElement>('input[list="procurement-prod-orders"]')
+          ?.focus();
+      });
+    }
+
+    const next = new URLSearchParams(searchParams.toString());
+    if (clearProcurementQuickActionParams(next)) {
+      const query = next.toString();
+      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    }
+  }, [initialDealId, initialOpenNewRequest, pathname, router, searchParams]);
+
+  useEffect(() => {
+    if (!dealId || deals.length === 0) return;
+    if (deals.some((d) => d.id === dealId)) return;
+    setDealId("");
+    setOpsFeed((prev) => [
+      `Швидка дія → угоду ${dealId} не знайдено, оберіть вручну`,
+      ...prev,
+    ]);
+  }, [dealId, deals]);
 
   useEffect(() => {
     const updateNow = () => setNowLabel(new Date().toLocaleString("uk-UA"));
@@ -358,8 +421,7 @@ export function ProcurementHubClient() {
     return sortProcurementRequests(data.procurementRequests);
   }, [data?.procurementRequests]);
 
-  /** Оновлюється з `clock`, щоб підказки дедлайнів у списку заявок залишались актуальними без «магічного» `void clock`. */
-  const nowMsForDueHints = useMemo(() => Date.now(), [clock]);
+  const nowMsForDueHints = clock;
 
   useEffect(() => {
     if (!data) return;
@@ -389,10 +451,10 @@ export function ProcurementHubClient() {
         module: "procurement",
         type: "ENTERPRISE_RISK_ALERT",
         message: alert.message,
-        actor: "AI Control",
+        actor: "AI-контроль",
         payload: { key: alert.key },
       });
-      setOpsFeed((prev) => [`ALERT → ${alert.message}`, ...prev].slice(0, 80));
+      setOpsFeed((prev) => [`СПОВІЩЕННЯ → ${alert.message}`, ...prev].slice(0, 80));
     }
   }, [addEvent, data, riskConfig, supplierRiskTop]);
 
@@ -485,7 +547,7 @@ export function ProcurementHubClient() {
       <header className="rounded-3xl border border-slate-200 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-800 p-5 text-slate-100 shadow-xl">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-cyan-300">ENVER · SaaS ERP · Procurement</p>
+            <p className="text-xs uppercase tracking-[0.2em] text-cyan-300">ENVER · SaaS ERP · Закупівлі</p>
             <h1 className="mt-2 text-2xl font-semibold tracking-tight">Командний контур закупівлі</h1>
             <p className="mt-1 text-sm text-slate-300">
               SLA постачань, контроль запасів, зв&apos;язок з виробництвом і фінансами в єдиному стеку.
@@ -513,13 +575,13 @@ export function ProcurementHubClient() {
                 href="/crm/production/workshop"
                 className="text-cyan-200/95 underline-offset-2 hover:text-white hover:underline"
               >
-                Kanban цеху
+                Канбан цеху
               </Link>
             </div>
           </div>
           <div className="rounded-2xl border border-slate-700 bg-slate-900/70 px-4 py-3 text-right text-sm">
             <p className="text-slate-400">Операційний статус</p>
-            <p className="font-semibold text-emerald-300">ACTIVE</p>
+            <p className="font-semibold text-emerald-300">АКТИВНО</p>
             <p className="text-xs text-slate-400">{nowLabel}</p>
           </div>
         </div>
@@ -565,7 +627,7 @@ export function ProcurementHubClient() {
             tone="info"
             dark
           />
-          <MetricCard label="Постачальників у radar" value={`${data?.enterprise.supplierRiskRadar.length ?? 0}`} dark />
+          <MetricCard label="Постачальників у радарі" value={`${data?.enterprise.supplierRiskRadar.length ?? 0}`} dark />
         </div>
         <div className="mt-3 grid gap-2 text-xs text-slate-300 sm:grid-cols-3">
           <p className="rounded-lg border border-slate-700 bg-slate-900/60 px-2 py-1">
@@ -574,7 +636,7 @@ export function ProcurementHubClient() {
           <p className="rounded-lg border border-slate-700 bg-slate-900/60 px-2 py-1">
             ERP заявки закупівлі: {purchaseRequests.length}
           </p>
-          <p className="rounded-lg border border-slate-700 bg-slate-900/60 px-2 py-1">SLA моніторинг: online</p>
+          <p className="rounded-lg border border-slate-700 bg-slate-900/60 px-2 py-1">Моніторинг SLA: онлайн</p>
         </div>
       </header>
 
@@ -855,6 +917,7 @@ export function ProcurementHubClient() {
           <h2 className="text-sm font-semibold text-slate-900">Процесні форми (ERP + CRM)</h2>
           <form
             id="new-request"
+            ref={requestFormRef}
             className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3"
             onSubmit={(event) => {
               event.preventDefault();
@@ -1013,7 +1076,7 @@ export function ProcurementHubClient() {
                   <th className="py-2 pr-2">Матеріал</th>
                   <th className="py-2 pr-2">Код</th>
                   <th className="py-2 pr-2">Доступно</th>
-                  <th className="py-2">Coverage</th>
+                      <th className="py-2">Покриття</th>
                 </tr>
               </thead>
               <tbody>
@@ -1055,7 +1118,7 @@ export function ProcurementHubClient() {
         </div>
       </section>
       <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <h2 className="text-sm font-semibold text-slate-900">Radar ризиків постачальників</h2>
+        <h2 className="text-sm font-semibold text-slate-900">Радар ризиків постачальників</h2>
         <div className="mt-3 overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
@@ -1115,7 +1178,7 @@ export function ProcurementHubClient() {
 
         <div className="space-y-4">
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <h2 className="text-sm font-semibold text-slate-900">Черга погодження (ERP bridge)</h2>
+            <h2 className="text-sm font-semibold text-slate-900">Черга погодження (ERP-міст)</h2>
             <ul className="mt-2 max-h-80 space-y-2 overflow-y-auto text-xs">
               {(showAllBridge ? purchaseRequests : purchaseRequests.slice(0, 8)).map((request) => (
                 <li key={request.id} className="rounded border border-slate-200 bg-slate-50 px-2 py-1.5">
@@ -1127,7 +1190,7 @@ export function ProcurementHubClient() {
                       <button
                         type="button"
                         className="rounded border border-slate-300 bg-white px-2 py-0.5 text-[11px] text-slate-700"
-                        onClick={() => approvePurchaseRequest(request.id, "Procurement Lead")}
+                        onClick={() => approvePurchaseRequest(request.id, "Керівник закупівель")}
                       >
                         Погодити
                       </button>
@@ -1136,7 +1199,7 @@ export function ProcurementHubClient() {
                       <button
                         type="button"
                         className="rounded border border-slate-300 bg-white px-2 py-0.5 text-[11px] text-slate-700"
-                        onClick={() => setPurchaseRequestStatus(request.id, "DONE", "Procurement Lead")}
+                        onClick={() => setPurchaseRequestStatus(request.id, "DONE", "Керівник закупівель")}
                       >
                         Готово
                       </button>
@@ -1157,10 +1220,10 @@ export function ProcurementHubClient() {
             ) : null}
           </div>
           <div className="grid gap-2">
-          <QuickLink href="/crm/production" title="Виробничий командний пункт" subtitle="замовлення, конструктори, апруви" />
+          <QuickLink href="/crm/production" title="Виробничий командний пункт" subtitle="замовлення, конструктори, погодження" />
           <QuickLink href="/warehouse" title="Склад WMS" subtitle="залишки, резерви, рух із PO" />
           <QuickLink href="/crm/finance" title="Фінансовий центр ERP" subtitle="cash-flow, P&L, оплати постачальникам" />
-          <QuickLink href="/crm/erp" title="Global ERP Command" subtitle="approval trail і наскрізний timeline" />
+          <QuickLink href="/crm/erp" title="Глобальний ERP-командний центр" subtitle="ланцюжок погоджень і наскрізна стрічка подій" />
           </div>
         </div>
       </section>

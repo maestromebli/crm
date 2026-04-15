@@ -29,6 +29,10 @@ export type NavSubItem = {
   label: string;
   href: string;
   description?: string;
+  /** Якщо задано, підпункт видно лише з цим правом. */
+  permission?: NavPermissionKey;
+  /** Опційно: підпункт видно, якщо є хоча б одне з прав. */
+  anyPermissions?: NavPermissionKey[];
 };
 
 export type NavSection = {
@@ -65,7 +69,7 @@ export const NAV_SECTIONS: NavSection[] = [
     permission: P.LEADS_VIEW,
     subItems: [
       { id: "all", label: "Усі ліди", href: "/leads" },
-      { id: "new", label: "Нові", href: "/leads/new" },
+      { id: "new", label: "Нові", href: "/leads/new", permission: P.LEADS_CREATE },
       {
         id: "no-response",
         label: "Без відповіді (SLA)",
@@ -95,6 +99,12 @@ export const NAV_SECTIONS: NavSection[] = [
         description: "Запланований контакт до кінця дня або прострочений.",
       },
       {
+        id: "closed",
+        label: "Закриті",
+        href: "/leads/closed",
+        description: "Фінальні ліди: конвертовані у deal або завершені у воронці.",
+      },
+      {
         id: "converted",
         label: "Конвертовані",
         href: "/leads/converted",
@@ -107,7 +117,8 @@ export const NAV_SECTIONS: NavSection[] = [
         description: "Нові ліди, з якими ще не працювали.",
       },
       { id: "qualified", label: "Кваліфіковані", href: "/leads/qualified" },
-      { id: "lost", label: "Закриті / архів", href: "/leads/lost" },
+      { id: "lost", label: "Втрачені", href: "/leads/lost" },
+      { id: "archived", label: "Архів", href: "/leads/archived" },
       { id: "sources", label: "Джерела", href: "/leads/sources" },
       { id: "pipeline", label: "Воронка лідів", href: "/leads/pipeline" },
     ],
@@ -240,9 +251,9 @@ export const NAV_SECTIONS: NavSection[] = [
       },
       {
         id: "procurement-hub",
-        label: "Операційний hub",
+        label: "Операційний хаб",
         href: "/crm/procurement?view=hub",
-        description: "Kanban PO, склад, radar постачальників, форми ERP.",
+        description: "Канбан PO, склад, радар постачальників, форми ERP.",
       },
       {
         id: "warehouse-wms",
@@ -391,7 +402,12 @@ export const NAV_SECTIONS: NavSection[] = [
         description: "Прострочені та задачі на сьогодні — один екран.",
       },
       { id: "my", label: "Мої задачі", href: "/tasks" },
-      { id: "team", label: "Задачі команди", href: "/tasks/team" },
+      {
+        id: "team",
+        label: "Задачі команди",
+        href: "/tasks/team",
+        permission: P.TASKS_ASSIGN,
+      },
       { id: "today", label: "Сьогодні (список)", href: "/tasks/today" },
       { id: "overdue", label: "Прострочені", href: "/tasks/overdue" },
       { id: "by-entity", label: "За сутністю", href: "/tasks/by-entity" },
@@ -440,8 +456,18 @@ export const NAV_SECTIONS: NavSection[] = [
     permission: P.SETTINGS_VIEW,
     subItems: [
       { id: "general", label: "Загальні", href: "/settings" },
-      { id: "users", label: "Користувачі та ролі", href: "/settings/users" },
-      { id: "permissions", label: "Права доступу", href: "/settings/permissions" },
+      {
+        id: "users",
+        label: "Користувачі та ролі",
+        href: "/settings/users",
+        permission: P.USERS_VIEW,
+      },
+      {
+        id: "permissions",
+        label: "Права доступу",
+        href: "/settings/permissions",
+        permission: P.ROLES_MANAGE,
+      },
       { id: "pipelines", label: "Воронки та стадії", href: "/settings/pipelines" },
       { id: "custom-fields", label: "Кастомні поля", href: "/settings/custom-fields" },
       { id: "file-categories", label: "Категорії файлів", href: "/settings/file-categories" },
@@ -450,6 +476,12 @@ export const NAV_SECTIONS: NavSection[] = [
       { id: "calendar", label: "Календар", href: "/settings/calendar" },
       { id: "inbox", label: "Вхідні / Telegram", href: "/settings/inbox" },
       { id: "ai", label: "AI‑налаштування", href: "/settings/ai" },
+      {
+        id: "ai-admin-chat",
+        label: "AI‑архітектор CRM",
+        href: "/settings/ai/admin",
+        permission: P.AI_ANALYTICS,
+      },
       { id: "branding", label: "Брендинг / UI", href: "/settings/branding" },
       { id: "integrations", label: "Інтеграції", href: "/settings/integrations" },
     ],

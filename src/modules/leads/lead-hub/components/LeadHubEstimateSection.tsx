@@ -33,20 +33,14 @@ export function LeadHubEstimateSection({ lead, canViewEstimates }: Props) {
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-[15px] font-medium text-[var(--enver-text)]">
-          Розрахунок вартості
+          Розрахунок і КП
         </h2>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px]">
           <Link
             href={`/leads/${lead.id}/pricing`}
             className="font-medium text-[var(--enver-accent)] hover:underline"
           >
-            Розрахунок
-          </Link>
-          <Link
-            href={`/leads/${lead.id}/kp`}
-            className="text-[var(--enver-muted)] hover:text-[var(--enver-text)]"
-          >
-            КП
+            Відкрити розрахунок / КП
           </Link>
         </div>
       </div>

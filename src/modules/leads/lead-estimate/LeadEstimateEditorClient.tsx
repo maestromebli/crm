@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { patchLeadEstimateById } from "../../../features/leads/lead-estimate-api";
-import { postJson } from "../../../lib/api/patch-json";
+import { postFormData, postJson } from "../../../lib/api/patch-json";
 import { cn } from "../../../lib/utils";
 
 type LineRow = {
@@ -33,6 +33,19 @@ type EstPayload = {
   installationCost?: number | null;
   notes?: string | null;
   lineItems?: LineRow[];
+};
+
+type AnalyzeEstimateFileResponse = {
+  aiSummary?: string | null;
+  draft?: {
+    lines?: Array<{
+      productName?: string;
+      qty?: number;
+      unit?: string;
+      salePrice?: number;
+    }>;
+    assumptions?: string[];
+  };
 };
 
 const btn =
@@ -70,6 +83,8 @@ export function LeadEstimateEditorClient({
   const [matHits, setMatHits] = useState<
     Array<{ id: string; label: string; hint?: string; unit?: string; unitPrice?: number }>
   >([]);
+  const [fileBusy, setFileBusy] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -236,6 +251,69 @@ export function LeadEstimateEditorClient({
     }
   };
 
+  const importEstimateFromFile = async (file: File) => {
+    setFileBusy(true);
+    setErr(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("category", "CALCULATION");
+      const uploaded = await postFormData<{ id?: string; fileName?: string }>(
+        `/api/leads/${leadId}/attachments`,
+        fd,
+      );
+      if (!uploaded.id) {
+        throw new Error("Не вдалося завантажити файл");
+      }
+      const analyzed = await postJson<AnalyzeEstimateFileResponse>(
+        `/api/leads/${leadId}/attachments/${uploaded.id}/analyze-estimate`,
+        { apply: false },
+      );
+      const draftLines = analyzed.draft?.lines ?? [];
+      if (draftLines.length === 0) {
+        throw new Error("Не знайдено позицій у файлі прорахунку");
+      }
+      setLineDrafts(
+        draftLines
+          .map((line) => ({
+            productName: String(line.productName ?? "").trim(),
+            qty: String(
+              typeof line.qty === "number" && Number.isFinite(line.qty)
+                ? line.qty
+                : 1,
+            ),
+            unit:
+              typeof line.unit === "string" && line.unit.trim()
+                ? line.unit.trim()
+                : "шт",
+            salePrice: String(
+              typeof line.salePrice === "number" && Number.isFinite(line.salePrice)
+                ? Math.max(0, line.salePrice)
+                : 0,
+            ),
+          }))
+          .filter((line) => line.productName.length > 0),
+      );
+      if (analyzed.draft?.assumptions?.length) {
+        setNotes((n) =>
+          [n.trim(), analyzed.draft!.assumptions!.join("\n")]
+            .filter(Boolean)
+            .join("\n\n"),
+        );
+      } else if (analyzed.aiSummary?.trim()) {
+        setNotes((n) =>
+          [n.trim(), analyzed.aiSummary!.trim()].filter(Boolean).join("\n\n"),
+        );
+      }
+    } catch (e) {
+      setErr(
+        e instanceof Error ? e.message : "Помилка імпорту файлу прорахунку",
+      );
+    } finally {
+      setFileBusy(false);
+    }
+  };
+
   const searchMat = async () => {
     const q = matQ.trim();
     if (!q) {
@@ -376,6 +454,26 @@ export function LeadEstimateEditorClient({
               Текстовий опис проєкту → чернетка рядків (без зовнішнього GPT).
               Каталог — локальний кеш постачальників.
             </p>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.currentTarget.files?.[0];
+                if (!file) return;
+                void importEstimateFromFile(file);
+                e.currentTarget.value = "";
+              }}
+            />
+            <button
+              type="button"
+              disabled={fileBusy}
+              className={cn(btn, "mt-2")}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              {fileBusy ? "Обробка файлу…" : "Завантажити файл прорахунку"}
+            </button>
             <textarea
               value={aiPrompt}
               onChange={(e) => setAiPrompt(e.target.value)}

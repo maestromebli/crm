@@ -205,17 +205,17 @@ export function CommunicationsHealthClient() {
             disabled={checking}
             className="rounded-md bg-slate-900 px-3 py-1.5 text-xs text-white disabled:opacity-50"
           >
-            {checking ? "Перевірка…" : "Check"}
+            {checking ? "Перевірка…" : "Перевірити"}
           </button>
         </div>
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-[var(--enver-card)] p-3">
         <p className="mb-2 text-xs font-semibold text-slate-800">
-          Internal alerts (unread)
+          Внутрішні сповіщення (непрочитані)
         </p>
         {alerts.length === 0 ? (
-          <p className="text-xs text-slate-500">Немає нових alert-подій.</p>
+          <p className="text-xs text-slate-500">Немає нових подій-сповіщень.</p>
         ) : (
           <div className="space-y-1">
             {alerts.slice(0, 30).map((a) => (
@@ -231,7 +231,7 @@ export function CommunicationsHealthClient() {
                   onClick={() => void ackAlert(a.id)}
                   className="rounded bg-[var(--enver-card)] px-2 py-0.5 text-[10px] text-slate-700"
                 >
-                  Ack
+                  Підтвердити
                 </button>
               </div>
             ))}
@@ -240,10 +240,10 @@ export function CommunicationsHealthClient() {
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-[var(--enver-card)] p-3">
-        <p className="mb-2 text-xs font-semibold text-slate-800">Alert thresholds</p>
+        <p className="mb-2 text-xs font-semibold text-slate-800">Пороги сповіщень</p>
         <div className="grid gap-2 md:grid-cols-2">
           <label className="text-[11px] text-slate-600">
-            Delivery fail threshold
+            Поріг збоїв доставки
             <input
               type="number"
               min={1}
@@ -258,7 +258,7 @@ export function CommunicationsHealthClient() {
             />
           </label>
           <label className="text-[11px] text-slate-600">
-            Outbound fail threshold
+            Поріг збоїв відправки
             <input
               type="number"
               min={1}
@@ -279,7 +279,7 @@ export function CommunicationsHealthClient() {
           disabled={savingPolicy}
           className="mt-2 rounded-md bg-slate-900 px-3 py-1.5 text-xs text-white disabled:opacity-50"
         >
-          {savingPolicy ? "Збереження…" : "Зберегти thresholds"}
+          {savingPolicy ? "Збереження…" : "Зберегти пороги"}
         </button>
       </div>
 
@@ -290,23 +290,23 @@ export function CommunicationsHealthClient() {
           return (
             <div key={name} className="rounded-xl border border-slate-200 bg-[var(--enver-card)] p-3 text-xs">
               <p className="font-semibold uppercase tracking-wide text-slate-700">{name}</p>
-              <p className="mt-1 text-slate-500">Webhook: {dt(h.lastWebhookAt)}</p>
-              <p className="text-slate-500">Inbound: {dt(h.lastInboundAt)}</p>
-              <p className="text-slate-500">Outbound: {dt(h.lastOutboundAt)}</p>
+              <p className="mt-1 text-slate-500">Вебхук: {dt(h.lastWebhookAt)}</p>
+              <p className="text-slate-500">Вхідні: {dt(h.lastInboundAt)}</p>
+              <p className="text-slate-500">Вихідні: {dt(h.lastOutboundAt)}</p>
               <p className="mt-1 text-slate-600">
-                Sent: {h.outboundSentCount ?? 0} · OutFail: {h.outboundFailedCount ?? 0}
+                Надіслано: {h.outboundSentCount ?? 0} · Збій відправки: {h.outboundFailedCount ?? 0}
               </p>
-              <p className="text-slate-600">DeliveryFail: {h.deliveryFailedCount ?? 0}</p>
+              <p className="text-slate-600">Збій доставки: {h.deliveryFailedCount ?? 0}</p>
               <p className="mt-1 text-rose-700">
-                {h.lastError ? `Last error: ${h.lastError}` : "Last error: —"}
+                {h.lastError ? `Остання помилка: ${h.lastError}` : "Остання помилка: —"}
               </p>
               {c ? (
                 <p className={`mt-2 ${c.ready ? "text-emerald-700" : "text-amber-700"}`}>
                   {c.enabled
                     ? c.ready
-                      ? "Config OK"
-                      : `Missing: ${c.missing.join(", ")}`
-                    : "Channel disabled"}
+                      ? "Налаштовано"
+                      : `Відсутнє: ${c.missing.join(", ")}`
+                    : "Канал вимкнено"}
                 </p>
               ) : null}
             </div>
@@ -315,7 +315,7 @@ export function CommunicationsHealthClient() {
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-[var(--enver-card)] p-3">
-        <p className="mb-2 text-xs font-semibold text-slate-800">Weekly digest (all users)</p>
+        <p className="mb-2 text-xs font-semibold text-slate-800">Тижневий дайджест (усі користувачі)</p>
         {data.digest.length === 0 ? (
           <p className="text-xs text-slate-500">Поки немає подій.</p>
         ) : (
@@ -327,8 +327,8 @@ export function CommunicationsHealthClient() {
                   r.alert ? "border-rose-200 bg-rose-50" : "border-slate-200 bg-slate-50"
                 }`}
               >
-                {r.userLabel} · {r.channel} · sent {r.sent} · outFail {r.outboundFailed} · deliveryFail{" "}
-                {r.deliveryFailed} {r.alert ? "· ALERT" : ""}
+                {r.userLabel} · {r.channel} · надіслано {r.sent} · збій відправки {r.outboundFailed} · збій доставки{" "}
+                {r.deliveryFailed} {r.alert ? "· СПОВІЩЕННЯ" : ""}
               </div>
             ))}
           </div>

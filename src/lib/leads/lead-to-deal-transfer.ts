@@ -114,6 +114,8 @@ export async function syncContactFromLead(
 /**
  * Копії вкладень (поточні версії) на угоду: новий FileAsset + Attachment для кожного файлу.
  * Джерела: лід, контакт, клієнт. Категорії замір/розрахунок/КП йдуть першими.
+ * Важливо: переносимо кожне завантаження окремо без дедуплікації, щоб у файлах угоди
+ * відображалися всі файли, які були завантажені під лід.
  */
 export async function cloneLeadRelatedAttachmentsToDeal(
   tx: Prisma.TransactionClient,
@@ -164,14 +166,9 @@ export async function cloneLeadRelatedAttachmentsToDeal(
           )
       : null;
 
-  const seen = new Set<string>();
   let n = 0;
   for (const src of rows) {
     if (filter && !filter(src.category)) continue;
-    const key =
-      (src.contentHash && src.contentHash.trim()) || src.fileUrl || src.id;
-    if (seen.has(key)) continue;
-    seen.add(key);
 
     const fa = await tx.fileAsset.create({
       data: {

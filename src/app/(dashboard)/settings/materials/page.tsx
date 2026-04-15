@@ -16,6 +16,13 @@ export default async function SettingsMaterialsPage() {
       description="Завантаження прайсів (Excel), AI/heuristic обробка та оновлення каталогу матеріалів для швидкого прорахунку."
     >
       <SettingsMaterialsCatalogManager />
+      <div className="rounded-lg border border-sky-200 bg-sky-50/60 px-3 py-2 text-xs text-sky-900">
+        Керуйте джерелами та sync-статусом у{" "}
+        <a href="/settings/suppliers" className="font-semibold underline underline-offset-2">
+          Налаштування → Постачальники
+        </a>
+        .
+      </div>
     </SettingsShell>
   );
 }

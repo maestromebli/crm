@@ -5,7 +5,7 @@ export type EnverBadgeTone = "neutral" | "accent" | "success" | "warning" | "dan
 
 const toneClass: Record<EnverBadgeTone, string> = {
   neutral:
-    "border-[var(--enver-border)] bg-[var(--enver-hover)] text-[var(--enver-text-muted)]",
+    "border-[var(--enver-border)] bg-[var(--enver-surface)] text-[var(--enver-text-muted)]",
   accent:
     "border-[var(--enver-accent)]/35 bg-[var(--enver-accent-soft)] text-[var(--enver-accent-hover)]",
   success:

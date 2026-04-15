@@ -14,7 +14,8 @@ import {
   type FurnitureTemplateKey,
 } from "../../../../../lib/estimates/kitchen-cost-sheet-template";
 import { newEstimateStableLineId } from "../../../../../lib/estimates/new-stable-line-id";
-import { recalculateEstimateTotals } from "../../../../../lib/estimates/recalculate";
+import { calculateEstimateTotalsFromLines } from "../../../../../features/estimate-core";
+import { recordEstimateLearningSnapshot } from "../../../../../lib/estimates/estimate-learning";
 import {
   prisma,
   prismaCodegenIncludesEstimateLeadId,
@@ -26,6 +27,13 @@ import { recordWorkflowEvent, WORKFLOW_EVENT_TYPES } from "../../../../../featur
 type Ctx = { params: Promise<{ leadId: string }> };
 
 const FURNITURE_TEMPLATE_KEY_SET = new Set<string>(FURNITURE_TEMPLATE_KEYS);
+const ESTIMATE_CREATE_PRECONDITION = {
+  SESSION_USER_NOT_FOUND: "SESSION_USER_NOT_FOUND",
+  LEAD_NOT_FOUND: "LEAD_NOT_FOUND",
+  LEAD_ALREADY_CONVERTED: "LEAD_ALREADY_CONVERTED",
+} as const;
+type EstimateCreatePreconditionCode =
+  (typeof ESTIMATE_CREATE_PRECONDITION)[keyof typeof ESTIMATE_CREATE_PRECONDITION];
 
 function mapKitchenSeedLines(
   lines: ReturnType<typeof buildFurnitureSheetLinesForDb>,
@@ -257,7 +265,7 @@ export async function POST(req: Request, ctx: Ctx) {
     const discountAmount = 0;
     const deliveryCost = 0;
     const installationCost = 0;
-    const totals = recalculateEstimateTotals(
+    const totals = calculateEstimateTotalsFromLines(
       lineData.map((l) => ({
         amountSale: l.amountSale,
         amountCost: l.amountCost,
@@ -268,6 +276,26 @@ export async function POST(req: Request, ctx: Ctx) {
     );
 
     const created = await prisma.$transaction(async (tx) => {
+      const [dbUser, dbLead] = await Promise.all([
+        tx.user.findUnique({
+          where: { id: user.id },
+          select: { id: true },
+        }),
+        tx.lead.findUnique({
+          where: { id: leadId },
+          select: { id: true, dealId: true },
+        }),
+      ]);
+      if (!dbUser) {
+        throw new Error(ESTIMATE_CREATE_PRECONDITION.SESSION_USER_NOT_FOUND);
+      }
+      if (!dbLead) {
+        throw new Error(ESTIMATE_CREATE_PRECONDITION.LEAD_NOT_FOUND);
+      }
+      if (dbLead.dealId) {
+        throw new Error(ESTIMATE_CREATE_PRECONDITION.LEAD_ALREADY_CONVERTED);
+      }
+
       return tx.estimate.create({
         data: {
           leadId,
@@ -337,6 +365,18 @@ export async function POST(req: Request, ctx: Ctx) {
         dedupeKey: `estimate-created:${created.id}`,
       },
     );
+    await recordEstimateLearningSnapshot({
+      userId: user.id,
+      leadId,
+      estimateId: created.id,
+      lineItems: created.lineItems.map((li) => ({
+        productName: li.productName,
+        salePrice: li.salePrice,
+        qty: li.qty,
+        amountSale: li.amountSale,
+      })),
+      totalPrice: created.totalPrice,
+    });
 
     return NextResponse.json({
       ok: true,
@@ -350,8 +390,25 @@ export async function POST(req: Request, ctx: Ctx) {
       },
     });
   } catch (e) {
-    // eslint-disable-next-line no-console
     console.error("[POST leads/[leadId]/estimates]", e);
+    if (e instanceof Error) {
+      const code = e.message as EstimateCreatePreconditionCode;
+      if (code === ESTIMATE_CREATE_PRECONDITION.SESSION_USER_NOT_FOUND) {
+        return NextResponse.json(
+          { error: "Користувача сесії не знайдено в БД. Перелогіньтесь і спробуйте ще раз." },
+          { status: 401 },
+        );
+      }
+      if (code === ESTIMATE_CREATE_PRECONDITION.LEAD_NOT_FOUND) {
+        return NextResponse.json({ error: "Лід не знайдено" }, { status: 404 });
+      }
+      if (code === ESTIMATE_CREATE_PRECONDITION.LEAD_ALREADY_CONVERTED) {
+        return NextResponse.json(
+          { error: "Лід уже привʼязаний до угоди — прорахунки ведуться в угоді" },
+          { status: 409 },
+        );
+      }
+    }
     if (e instanceof Prisma.PrismaClientKnownRequestError) {
       if (e.code === "P2002") {
         return NextResponse.json(

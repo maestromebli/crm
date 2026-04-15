@@ -12,18 +12,13 @@ export type EntityTabsConfig = Record<EntityKind, EntityTab[]>;
 
 export const ENTITY_TABS: EntityTabsConfig = {
   lead: [
-    { id: "overview", label: "Lead Hub", href: (id) => `/leads/${id}` },
+    { id: "overview", label: "Хаб ліда", href: (id) => `/leads/${id}` },
     { id: "messages", label: "Діалог", href: (id) => `/leads/${id}/messages` },
     { id: "contact", label: "Контакт", href: (id) => `/leads/${id}/contact` },
     {
       id: "pricing",
-      label: "Розрахунок",
+      label: "Розрахунок / КП",
       href: (id) => `/leads/${id}/pricing`,
-    },
-    {
-      id: "kp",
-      label: "КП",
-      href: (id) => `/leads/${id}/kp`,
     },
     { id: "tasks", label: "Задачі", href: (id) => `/leads/${id}/tasks` },
     { id: "files", label: "Файли", href: (id) => `/leads/${id}/files` },
@@ -86,7 +81,7 @@ export const ENTITY_TABS: EntityTabsConfig = {
     { id: "tasks", label: "Задачі", href: (id) => `/inbox/${id}/tasks` },
     { id: "files", label: "Файли", href: (id) => `/inbox/${id}/files` },
     { id: "activity", label: "Активність", href: (id) => `/inbox/${id}/activity` },
-    { id: "ai", label: "AI-огляд", href: (id) => `/inbox/${id}/ai` },
+    { id: "ai", label: "ШІ-огляд", href: (id) => `/inbox/${id}/ai` },
   ],
 };
 

@@ -7,7 +7,7 @@ import {
 import { hasEffectivePermission, P } from "../../../../lib/authz/permissions";
 import { requireDatabaseUrl } from "../../../../lib/api/route-guards";
 import { prisma } from "../../../../lib/prisma";
-import { logAiEvent } from "../../../../lib/ai/log-ai-event";
+import { recordContinuousLearningEvent } from "../../../../lib/ai/continuous-learning";
 import { buildAiWorkspaceSnapshot } from "../../../../features/ai/workspace/build-workspace-snapshot";
 
 export const runtime = "nodejs";
@@ -88,9 +88,10 @@ export async function GET(request: Request) {
     });
   }
 
-  await logAiEvent({
+  await recordContinuousLearningEvent({
     userId: user.id,
     action: "workspace_snapshot",
+    stage: "workspace",
     entityType: snapshot.entity.toUpperCase(),
     entityId: snapshot.entityId,
     ok: true,

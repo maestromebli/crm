@@ -110,8 +110,8 @@ export function ProductionQueueTableClient({
       }>("/api/production/queue-actions", { action });
       setBulkInfo(
         action === "launch_ready"
-          ? `Bulk launch: ${j.affected ?? 0}`
-          : `Bulk retry: ${j.affected ?? 0}`,
+          ? `Масовий запуск: ${j.affected ?? 0}`
+          : `Масовий повтор: ${j.affected ?? 0}`,
       );
       router.refresh();
     } catch (e) {
@@ -123,14 +123,14 @@ export function ProductionQueueTableClient({
 
   const exportCsv = () => {
     const header = [
-      "DealId",
-      "Title",
-      "Client",
-      "Owner",
-      "HandoffStatus",
-      "LaunchStatus",
-      "SlaHours",
-      "UpdatedAt",
+      "ID угоди",
+      "Назва",
+      "Клієнт",
+      "Власник",
+      "Статус передачі",
+      "Статус запуску",
+      "SLA години",
+      "Оновлено",
     ];
     const rowsCsv = visibleRows.map((r) => [
       r.id,
@@ -168,7 +168,7 @@ export function ProductionQueueTableClient({
           { id: "all", label: "Усі" },
           { id: "failed", label: "Помилки" },
           { id: "ready", label: "Готові" },
-          { id: "sla", label: "SLA breach" },
+          { id: "sla", label: "Порушення SLA" },
           { id: "waiting", label: "Очікують прийняття" },
         ].map((f) => (
           <button
@@ -193,7 +193,7 @@ export function ProductionQueueTableClient({
           onClick={() => void runBulk("launch_ready")}
           className="rounded border border-slate-900 bg-slate-900 px-2.5 py-1.5 text-sm font-medium text-white disabled:opacity-40"
         >
-          {bulkBusy === "launch_ready" ? "Launch..." : "Launch all ready"}
+          {bulkBusy === "launch_ready" ? "Запуск..." : "Запустити всі готові"}
         </button>
         <button
           type="button"
@@ -201,14 +201,14 @@ export function ProductionQueueTableClient({
           onClick={() => void runBulk("retry_failed")}
           className="rounded border border-slate-300 bg-[var(--enver-card)] px-2.5 py-1.5 text-sm font-medium text-slate-700 disabled:opacity-40"
         >
-          {bulkBusy === "retry_failed" ? "Retry..." : "Retry all failed"}
+          {bulkBusy === "retry_failed" ? "Повтор..." : "Повторити всі з помилкою"}
         </button>
         <button
           type="button"
           onClick={exportCsv}
           className="rounded border border-slate-300 bg-[var(--enver-card)] px-2.5 py-1.5 text-sm font-medium text-slate-700"
         >
-          Export CSV
+          Експорт CSV
         </button>
         {bulkInfo ? (
           <span className="text-xs text-slate-600">{bulkInfo}</span>
@@ -310,7 +310,7 @@ export function ProductionQueueTableClient({
                       onClick={() => void runAction(r.id, "launch")}
                       className="rounded border border-slate-800 bg-slate-900 px-2 py-1 text-xs font-medium text-white disabled:opacity-40"
                     >
-                      Launch
+                      Запустити
                     </button>
                     <button
                       type="button"
@@ -318,7 +318,7 @@ export function ProductionQueueTableClient({
                       onClick={() => void runAction(r.id, "retry")}
                       className="rounded border border-slate-300 bg-[var(--enver-card)] px-2 py-1 text-xs font-medium text-slate-700 disabled:opacity-40"
                     >
-                      Retry
+                      Повторити
                     </button>
                     <button
                       type="button"
@@ -326,7 +326,7 @@ export function ProductionQueueTableClient({
                       onClick={() => void runAction(r.id, "fail")}
                       className="rounded border border-rose-200 bg-rose-50 px-2 py-1 text-xs font-medium text-rose-700 disabled:opacity-40"
                     >
-                      Mark fail
+                      Позначити як помилку
                     </button>
                   </div>
                 </td>

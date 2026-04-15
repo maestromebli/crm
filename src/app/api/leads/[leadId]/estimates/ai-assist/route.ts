@@ -8,7 +8,10 @@ import { P } from "../../../../../../lib/authz/permissions";
 import { parseEstimatePromptToDraft, type DraftLine } from "../../../../../../lib/estimates/ai-estimate-draft";
 import { enrichDraftPricingFromText } from "../../../../../../lib/estimates/estimate-draft-pricing-enrich";
 import type { EstimateCategoryKey } from "../../../../../../lib/estimates/estimate-categories";
+import { applyHistoricalPricingHints } from "../../../../../../lib/estimates/estimate-learning";
+import { recordContinuousLearningEvent } from "../../../../../../lib/ai/continuous-learning";
 import { prisma } from "../../../../../../lib/prisma";
+import { buildSupplierAiHints } from "../../../../../../features/suppliers/services/supplierSearchService";
 
 type Ctx = { params: Promise<{ leadId: string }> };
 
@@ -112,12 +115,40 @@ export async function POST(req: Request, ctx: Ctx) {
 
   const contextText = [estimateName, prompt].filter(Boolean).join("\n\n");
   const { lines, extraAssumptions } = enrichDraftPricingFromText(merged, contextText);
+  const learned = await applyHistoricalPricingHints({
+    leadId,
+    lines,
+  });
+  const supplierHints = await buildSupplierAiHints(prompt);
+
+  const finalAssumptions = [
+    ...parsed.assumptions,
+    ...extraAssumptions,
+    ...learned.notes,
+    ...supplierHints,
+  ];
+  await recordContinuousLearningEvent({
+    userId: user.id,
+    action: "estimate_ai_assist",
+    stage: "estimate_assist",
+    entityType: "LEAD",
+    entityId: leadId,
+    ok: true,
+    metadata: {
+      promptLength: prompt.length,
+      baseLines: baseLines.length,
+      resultLines: learned.lines.length,
+      assumptions: finalAssumptions.length,
+      missing: parsed.missing.length,
+      learnedFromHistory: learned.notes.length > 0,
+    },
+  });
 
   return NextResponse.json({
     ok: true,
     draft: {
-      lines,
-      assumptions: [...parsed.assumptions, ...extraAssumptions],
+      lines: learned.lines,
+      assumptions: finalAssumptions,
       missing: parsed.missing,
     },
   });

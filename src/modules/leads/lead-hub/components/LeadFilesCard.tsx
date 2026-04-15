@@ -70,22 +70,26 @@ export function LeadFilesCard({
   return (
     <section
       id="lead-files"
-      className={`rounded-[12px] border bg-[var(--enver-card)] p-4 shadow-[var(--enver-shadow)] transition-colors duration-200 ${
+      className={`leadhub-card p-4 transition-colors duration-200 ${
         dragOver
           ? "border-[#2563EB] ring-2 ring-[#2563EB]/20"
-          : "border-[var(--enver-border)]"
+          : ""
       }`}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
     >
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-[18px] font-medium text-[var(--enver-text)]">
-          Файли
-          <span className="ml-1.5 text-[12px] font-normal text-[var(--enver-muted)]">
-            ({lead.attachments.length})
-          </span>
-        </h3>
+      <div className="leadhub-head">
+        <div>
+          <span className="leadhub-kicker">Files</span>
+          <h3 className="leadhub-title mt-1">
+            Файли
+            <span className="ml-1.5 text-[12px] font-normal text-[var(--enver-muted)]">
+              ({lead.attachments.length})
+            </span>
+          </h3>
+          <p className="leadhub-subtitle">Фото, документи та робочі вкладення ліда.</p>
+        </div>
         <div className="flex items-center gap-2">
           {canUploadLeadFiles ? (
             <>
@@ -100,7 +104,7 @@ export function LeadFilesCard({
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="text-[11px] font-medium text-slate-800 underline"
+                className="leadhub-btn rounded-[10px] px-2.5 py-1.5 text-[11px] font-medium"
               >
                 Додати
               </button>
@@ -108,7 +112,7 @@ export function LeadFilesCard({
           ) : null}
           <Link
             href={`/leads/${lead.id}/files`}
-            className="text-[11px] font-medium text-slate-700 underline"
+            className="leadhub-inline-link"
           >
             Усі →
           </Link>
@@ -126,7 +130,7 @@ export function LeadFilesCard({
         {bucketCounts.map((b) => (
           <li
             key={b.id}
-            className="rounded-lg border border-slate-100 bg-slate-50/90 px-2 py-1.5 text-[10px]"
+            className="leadhub-list-item px-2 py-1.5 text-[10px]"
           >
             <span className="font-medium text-slate-800">{b.labelUa}</span>
             <span className="ml-1 text-slate-500">({b.count})</span>
@@ -134,17 +138,17 @@ export function LeadFilesCard({
         ))}
       </ul>
 
-      <ul className="mt-2 space-y-1 border-t border-slate-100 pt-2">
+      <ul className="mt-2 space-y-1 border-t border-slate-200/80 pt-2">
         {recent.length === 0 ? (
           <li className="text-[11px] text-slate-500">Поки без вкладень.</li>
         ) : (
           recent.map((f) => (
-            <li key={f.id} className="truncate text-[11px]">
+            <li key={f.id} className="leadhub-list-item truncate px-2.5 py-2 text-[12px]">
               <a
                 href={f.fileUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="text-slate-800 underline"
+                className="text-slate-800 underline decoration-slate-300 underline-offset-2 transition hover:text-slate-950"
               >
                 {f.fileName}
               </a>

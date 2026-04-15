@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { format } from "date-fns";
+import { format, isToday, isYesterday } from "date-fns";
 import { uk } from "date-fns/locale";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -9,6 +9,7 @@ import { postJson } from "../../../../lib/api/patch-json";
 import type { LeadMetaInput } from "../../../../lib/leads/lead-row-meta";
 import { leadResponseStatus } from "../../../../lib/leads/lead-row-meta";
 import { cn } from "../../../../lib/utils";
+import { useLeadWorkspaceSlice } from "../../../../stores/lead-workspace-store";
 
 type Msg = {
   id: string;
@@ -28,6 +29,7 @@ type Props = {
   phone: string | null;
   createdAt: Date;
   stage: LeadMetaInput["stage"];
+  onScheduleMeasure?: () => void;
 };
 
 type LeadMessageUpsertResponse = {
@@ -62,12 +64,15 @@ export function LeadCommunicationCard({
   phone,
   createdAt,
   stage,
+  onScheduleMeasure,
 }: Props) {
   const router = useRouter();
+  const { setLastEvent } = useLeadWorkspaceSlice(leadId);
   const draftRef = useRef<HTMLTextAreaElement>(null);
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  const [inlineOpen, setInlineOpen] = useState<"call" | "note" | null>(null);
 
   const startInternalNote = () => {
     setDraft((d) => {
@@ -121,29 +126,46 @@ export function LeadCommunicationCard({
           },
         ]);
       } else void load();
+      setLastEvent("lead.message.posted");
       router.refresh();
     } finally {
       setBusy(false);
     }
   };
 
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setInlineOpen(null);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   const chronological = [...msgs].sort(
     (a, b) =>
       new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
   );
   const tail = chronological.slice(-12);
+  const grouped = tail.reduce<Record<string, Msg[]>>((acc, msg) => {
+    const dt = new Date(msg.createdAt);
+    const key = isToday(dt) ? "Сьогодні" : isYesterday(dt) ? "Вчора" : format(dt, "d MMM yyyy", { locale: uk });
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(msg);
+    return acc;
+  }, {});
 
   return (
     <section
       id="lead-communication"
-      className="enver-card-appear rounded-[12px] border border-[var(--enver-border)] bg-[var(--enver-card)] p-5 shadow-[var(--enver-shadow)]"
+      className="enver-card-appear leadhub-card px-5 py-4"
     >
-      <div className="flex flex-wrap items-end justify-between gap-2">
+      <div className="leadhub-head">
         <div>
-          <h2 className="text-[18px] font-semibold text-[var(--enver-text)]">
-            Комунікаційний центр
-          </h2>
-          <p className="mt-0.5 text-[12px] text-[var(--enver-muted)]">
+          <span className="leadhub-kicker">Communication</span>
+          <h2 className="leadhub-title mt-1">Комунікаційний центр</h2>
+          <p className="leadhub-subtitle">
             Дзвінки, повідомлення та події — єдиний потік для сканування.
           </p>
         </div>
@@ -156,40 +178,78 @@ export function LeadCommunicationCard({
         </p>
       </div>
 
-      <div className="mt-4 flex max-h-[min(420px,55vh)] flex-col gap-2 overflow-y-auto rounded-[12px] border border-[var(--enver-border)] bg-[var(--enver-bg)] p-3">
+      <div className="mt-4 flex max-h-[min(420px,55vh)] flex-col gap-3 overflow-y-auto rounded-[10px] bg-[var(--enver-card)]/55 p-3">
         {tail.length === 0 ? (
           <p className="py-6 text-center text-[12px] text-[var(--enver-muted)]">
             Поки без записів — додайте подію нижче.
+            {" "}
+            <Link
+              href={`/leads/${leadId}/messages`}
+              className="font-medium text-[var(--enver-accent)] transition duration-200 hover:underline"
+            >
+              Відкрити стрічку
+            </Link>
           </p>
         ) : (
-          tail.map((m) => (
-            <div
-              key={m.id}
-              className="enver-hover-lift flex max-w-[95%] flex-col self-end rounded-[12px] rounded-br-sm border border-[var(--enver-border)] bg-[var(--enver-card)] px-3 py-2 shadow-[var(--enver-shadow)]"
-            >
-              <div className="flex flex-wrap items-center gap-2 text-[10px] font-medium uppercase tracking-wide text-[var(--enver-muted)]">
-                <span>{kindLabel(m.interactionKind)}</span>
-                <span className="font-normal normal-case text-[var(--enver-muted)]">
-                  {format(new Date(m.createdAt), "d MMM HH:mm", { locale: uk })}
-                </span>
-              </div>
-              <p className="mt-1 whitespace-pre-wrap text-[14px] leading-relaxed text-[var(--enver-text)]">
-                {m.body}
+          Object.entries(grouped).map(([groupTitle, items]) => (
+            <div key={groupTitle} className="space-y-1.5">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--enver-muted)]">
+                {groupTitle}
               </p>
-              <p className="mt-1 text-[11px] text-[var(--enver-muted)]">{m.author}</p>
+              {items.map((m) => (
+                <div
+                  key={m.id}
+                  className="leadhub-list-item flex max-w-[96%] flex-col rounded-[10px] px-3 py-2"
+                >
+                  <div className="flex flex-wrap items-center gap-2 text-[10px] font-medium uppercase tracking-wide text-[var(--enver-muted)]">
+                    <span>{kindLabel(m.interactionKind)}</span>
+                    <span className="font-normal normal-case text-[var(--enver-muted)]">
+                      {format(new Date(m.createdAt), "HH:mm", { locale: uk })}
+                    </span>
+                  </div>
+                  <p className="mt-1 whitespace-pre-wrap text-[14px] leading-relaxed text-[var(--enver-text)]">
+                    {m.body}
+                  </p>
+                  <p className="mt-1 text-[11px] text-[var(--enver-muted)]">{m.author}</p>
+                </div>
+              ))}
             </div>
           ))
         )}
       </div>
 
-      <div className="mt-3 flex flex-wrap gap-1">
+      <div className="mt-3 flex flex-wrap items-center gap-1">
+        <button
+          type="button"
+          className="leadhub-btn rounded-[10px] px-2 py-1 text-[11px] transition duration-200"
+          onClick={() => setInlineOpen((v) => (v === "call" ? null : "call"))}
+        >
+          Швидкий дзвінок
+        </button>
+        <button
+          type="button"
+          className="leadhub-btn rounded-[10px] px-2 py-1 text-[11px] transition duration-200"
+          onClick={() => {
+            setInlineOpen((v) => (v === "note" ? null : "note"));
+            queueMicrotask(() => draftRef.current?.focus());
+          }}
+        >
+          Швидка нотатка
+        </button>
+        <button
+          type="button"
+          className="leadhub-btn rounded-[10px] px-2 py-1 text-[11px] transition duration-200"
+          onClick={() => onScheduleMeasure?.()}
+        >
+          Швидкий замір
+        </button>
         {PRESETS.map((p) => (
           <button
             key={p.label}
             type="button"
             disabled={!canUpdateLead || busy}
             onClick={() => void post(p.body, p.kind)}
-            className="enver-press rounded-[12px] border border-[var(--enver-border)] bg-[var(--enver-card)] px-2 py-1 text-[11px] font-medium text-[var(--enver-text-muted)] transition duration-200 hover:border-[var(--enver-border-strong)] disabled:opacity-50"
+            className="leadhub-btn enver-press rounded-[12px] px-2 py-1 text-[11px] font-medium text-[var(--enver-text-muted)] disabled:opacity-50"
           >
             {p.label}
           </button>
@@ -198,36 +258,65 @@ export function LeadCommunicationCard({
           type="button"
           disabled={!canUpdateLead || busy}
           onClick={startInternalNote}
-          className="enver-press rounded-[12px] border border-dashed border-[var(--enver-border-strong)] bg-[var(--enver-bg)] px-2 py-1 text-[11px] font-medium text-[var(--enver-muted)] hover:border-[var(--enver-muted)] disabled:opacity-50"
-          title="Вставити префікс у поле нижче — допишіть текст і збережіть"
+          className="leadhub-btn enver-press rounded-[12px] border-dashed px-2 py-1 text-[11px] font-medium text-[var(--enver-muted)] disabled:opacity-50"
         >
           Внутрішня нотатка
         </button>
       </div>
 
+      {inlineOpen === "call" ? (
+        <div className="mt-2 rounded-[10px] bg-[var(--enver-bg)]/70 px-3 py-2 text-[12px] text-[var(--enver-text)]">
+          {phone ? (
+            <div className="flex items-center justify-between gap-2">
+              <span>Готово до дзвінка: {phone}</span>
+              <a href={`tel:${phone.replace(/\s+/g, "")}`} className="leadhub-inline-link">
+                Подзвонити
+              </a>
+            </div>
+          ) : (
+            <span>У контакту немає номера телефону.</span>
+          )}
+        </div>
+      ) : null}
+
+      {inlineOpen === "note" ? (
+        <div className="mt-2 rounded-[10px] bg-[var(--enver-bg)]/70 px-3 py-2 text-[12px] text-[var(--enver-muted)]">
+          Введіть нотатку та натисніть Enter (або кнопку збереження).
+        </div>
+      ) : null}
+
       <textarea
         ref={draftRef}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" && !event.shiftKey) {
+            event.preventDefault();
+            if (draft.trim() && canUpdateLead && !busy) {
+              void post(draft, "NOTE");
+            }
+          }
+          if (event.key === "Escape") {
+            setInlineOpen(null);
+          }
+        }}
         rows={2}
         disabled={!canUpdateLead}
         placeholder="Швидка нотатка…"
-        className="mt-2 w-full rounded-[12px] border border-[var(--enver-border)] px-3 py-2 text-[14px] outline-none transition duration-200 focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB]/20"
+        className="mt-2 w-full rounded-[12px] border border-[var(--enver-border)] bg-[var(--enver-card)]/90 px-3 py-2 text-[14px] outline-none transition duration-200 focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB]/20"
       />
       <button
         type="button"
         disabled={!canUpdateLead || busy || !draft.trim()}
         onClick={() => void post(draft, "NOTE")}
-        className="enver-press mt-2 rounded-[12px] bg-[#2563EB] px-3 py-2 text-[12px] font-medium text-white transition duration-200 hover:bg-[#1D4ED8] disabled:opacity-50"
+        className="leadhub-btn leadhub-btn-primary enver-press mt-2 rounded-[12px] px-3 py-2 text-[12px] font-medium transition duration-200 disabled:opacity-50"
       >
         Зберегти
       </button>
 
       <Link
         href={`/leads/${leadId}/messages`}
-        className={cn(
-          "mt-3 inline-block text-[12px] font-medium text-[var(--enver-accent)] hover:underline",
-        )}
+        className={cn("leadhub-inline-link mt-3 inline-block")}
       >
         Повна стрічка →
       </Link>

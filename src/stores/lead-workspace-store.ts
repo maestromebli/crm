@@ -30,6 +30,8 @@ function defaultSlice(): LeadWorkspaceSlice {
   };
 }
 
+const DEFAULT_SLICE: LeadWorkspaceSlice = defaultSlice();
+
 type LeadWorkspaceState = {
   slices: Record<string, LeadWorkspaceSlice>;
   ensureLead: (leadId: string) => void;
@@ -138,7 +140,7 @@ export const useLeadWorkspaceStore = create<LeadWorkspaceState>((set, get) => ({
 
 export function useLeadWorkspaceSlice(leadId: string) {
   const ensureLead = useLeadWorkspaceStore((s) => s.ensureLead);
-  const slice = useLeadWorkspaceStore((s) => s.slices[leadId] ?? defaultSlice());
+  const slice = useLeadWorkspaceStore((s) => s.slices[leadId] ?? DEFAULT_SLICE);
   const setActiveTab = useLeadWorkspaceStore((s) => s.setActiveTab);
   const setSelectedEstimate = useLeadWorkspaceStore((s) => s.setSelectedEstimate);
   const setSelectedQuote = useLeadWorkspaceStore((s) => s.setSelectedQuote);

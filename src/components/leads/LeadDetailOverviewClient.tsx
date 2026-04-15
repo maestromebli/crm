@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { postJson } from "../../lib/api/patch-json";
+import { deleteJson, postJson } from "../../lib/api/patch-json";
 import { useLeadMutationActions } from "../../features/leads/use-lead-mutation-actions";
 import type { LeadDetailRow } from "../../features/leads/queries";
 import { LeadAiManagerPanel } from "./LeadAiManagerPanel";
@@ -11,18 +11,30 @@ import { LeadAiManagerPanel } from "./LeadAiManagerPanel";
 type Props = {
   lead: LeadDetailRow;
   canUpdateLead: boolean;
+  canDeleteLead: boolean;
   canConvertToDeal: boolean;
+};
+
+const REFERRAL_TYPE_LABEL: Record<
+  "DESIGNER" | "CONSTRUCTION_COMPANY" | "PERSON",
+  string
+> = {
+  DESIGNER: "Дизайнер",
+  CONSTRUCTION_COMPANY: "Будівельна компанія",
+  PERSON: "Людина",
 };
 
 export function LeadDetailOverviewClient({
   lead,
   canUpdateLead,
+  canDeleteLead,
   canConvertToDeal,
 }: Props) {
   const router = useRouter();
   const leadActions = useLeadMutationActions(lead.id);
   const [editing, setEditing] = useState(false);
   const [converting, setConverting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   const [title, setTitle] = useState(lead.title);
@@ -39,6 +51,12 @@ export function LeadDetailOverviewClient({
     lead.email ?? lead.contact?.email ?? "",
   );
   const [note, setNote] = useState(lead.note ?? "");
+  const [referralType, setReferralType] = useState<
+    "DESIGNER" | "CONSTRUCTION_COMPANY" | "PERSON"
+  >(lead.referral?.type ?? "PERSON");
+  const [referralName, setReferralName] = useState(lead.referral?.name ?? "");
+  const [referralPhone, setReferralPhone] = useState(lead.referral?.phone ?? "");
+  const [referralEmail, setReferralEmail] = useState(lead.referral?.email ?? "");
   const [dealTitleDraft, setDealTitleDraft] = useState(lead.title);
   const [quickStageId, setQuickStageId] = useState(lead.stageId);
   const patchBusy = leadActions.isPending;
@@ -56,6 +74,10 @@ export function LeadDetailOverviewClient({
     setPhone(lead.phone ?? lead.contact?.phone ?? "");
     setEmail(lead.email ?? lead.contact?.email ?? "");
     setNote(lead.note ?? "");
+    setReferralType(lead.referral?.type ?? "PERSON");
+    setReferralName(lead.referral?.name ?? "");
+    setReferralPhone(lead.referral?.phone ?? "");
+    setReferralEmail(lead.referral?.email ?? "");
     setDealTitleDraft(lead.title);
     setErr(null);
   }, [lead]);
@@ -72,6 +94,10 @@ export function LeadDetailOverviewClient({
         phone: phone.trim() || null,
         email: email.trim() || null,
         note: note.trim() || null,
+        referralType,
+        referralName: referralName.trim() || null,
+        referralPhone: referralPhone.trim() || null,
+        referralEmail: referralEmail.trim() || null,
       });
       setEditing(false);
     } catch (e) {
@@ -111,6 +137,25 @@ export function LeadDetailOverviewClient({
       router.refresh();
     } finally {
       setConverting(false);
+    }
+  };
+
+  const deleteLead = async () => {
+    if (!canDeleteLead || deleting) return;
+    const confirmed = window.confirm(
+      "Видалити цей лід? Дію неможливо скасувати.",
+    );
+    if (!confirmed) return;
+    setDeleting(true);
+    setErr(null);
+    try {
+      await deleteJson<{ ok?: boolean; error?: string }>(`/api/leads/${lead.id}`);
+      router.push("/leads");
+      router.refresh();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Не вдалося видалити лід");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -166,7 +211,7 @@ export function LeadDetailOverviewClient({
         </div>
         {!lead.linkedDeal && canConvertToDeal ? (
           <p className="mt-2 text-[11px] text-slate-500">
-            Дані ліда оновлять картку контакту; файли та прорахунки з Lead Hub
+            Дані ліда оновлять картку контакту; файли та прорахунки з хаба ліда
             переносяться в угоду. Лід переводиться в архів (воронка лідів).
             Відповідальний за угоду — як у ліда.
           </p>
@@ -190,7 +235,7 @@ export function LeadDetailOverviewClient({
           <h2 className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
             Лід — повні поля
           </h2>
-          {canUpdateLead ? (
+          {canUpdateLead || canDeleteLead ? (
             editing ? (
               <div className="flex gap-2">
                 <button
@@ -212,15 +257,39 @@ export function LeadDetailOverviewClient({
                 >
                   {patchBusy ? "Збереження…" : "Зберегти"}
                 </button>
+                {canDeleteLead ? (
+                  <button
+                    type="button"
+                    disabled={deleting || patchBusy}
+                    onClick={() => void deleteLead()}
+                    className="rounded-lg border border-rose-200 px-2 py-1 text-[11px] text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+                  >
+                    {deleting ? "Видалення…" : "Видалити лід"}
+                  </button>
+                ) : null}
               </div>
             ) : (
-              <button
-                type="button"
-                onClick={() => setEditing(true)}
-                className="rounded-lg border border-slate-200 px-2 py-1 text-[11px] text-slate-700 hover:bg-[var(--enver-hover)]"
-              >
-                Редагувати
-              </button>
+              <div className="flex gap-2">
+                {canUpdateLead ? (
+                  <button
+                    type="button"
+                    onClick={() => setEditing(true)}
+                    className="rounded-lg border border-slate-200 px-2 py-1 text-[11px] text-slate-700 hover:bg-[var(--enver-hover)]"
+                  >
+                    Редагувати
+                  </button>
+                ) : null}
+                {canDeleteLead ? (
+                  <button
+                    type="button"
+                    disabled={deleting}
+                    onClick={() => void deleteLead()}
+                    className="rounded-lg border border-rose-200 px-2 py-1 text-[11px] text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+                  >
+                    {deleting ? "Видалення…" : "Видалити лід"}
+                  </button>
+                ) : null}
+              </div>
             )
           ) : null}
         </div>
@@ -250,9 +319,9 @@ export function LeadDetailOverviewClient({
                 onChange={(e) => setPriority(e.target.value)}
                 className="mt-0.5 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm text-[var(--enver-text)] outline-none focus:border-slate-400"
               >
-                <option value="low">low</option>
-                <option value="normal">normal</option>
-                <option value="high">high</option>
+                <option value="low">низький</option>
+                <option value="normal">звичайний</option>
+                <option value="high">високий</option>
               </select>
             </label>
             <label className="block text-xs">
@@ -287,7 +356,7 @@ export function LeadDetailOverviewClient({
               />
             </label>
             <label className="block text-xs sm:col-span-2">
-              <span className="text-[10px] text-slate-400">Email</span>
+              <span className="text-[10px] text-slate-400">Е-пошта</span>
               <input
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -303,6 +372,58 @@ export function LeadDetailOverviewClient({
                 className="mt-0.5 w-full resize-y rounded-lg border border-slate-200 px-2 py-1.5 text-sm text-[var(--enver-text)] outline-none focus:border-slate-400"
               />
             </label>
+            <div className="sm:col-span-2 rounded-xl border border-slate-200 bg-slate-50/80 p-3">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                Хто привів замовника
+              </p>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                <label className="block text-xs">
+                  <span className="text-[10px] text-slate-400">Тип</span>
+                  <select
+                    value={referralType}
+                    onChange={(e) =>
+                      setReferralType(
+                        e.target.value as
+                          | "DESIGNER"
+                          | "CONSTRUCTION_COMPANY"
+                          | "PERSON",
+                      )
+                    }
+                    className="mt-0.5 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm text-[var(--enver-text)] outline-none focus:border-slate-400"
+                  >
+                    <option value="DESIGNER">Дизайнер</option>
+                    <option value="CONSTRUCTION_COMPANY">
+                      Будівельна компанія
+                    </option>
+                    <option value="PERSON">Людина</option>
+                  </select>
+                </label>
+                <label className="block text-xs">
+                  <span className="text-[10px] text-slate-400">Імʼя / назва</span>
+                  <input
+                    value={referralName}
+                    onChange={(e) => setReferralName(e.target.value)}
+                    className="mt-0.5 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm text-[var(--enver-text)] outline-none focus:border-slate-400"
+                  />
+                </label>
+                <label className="block text-xs">
+                  <span className="text-[10px] text-slate-400">Телефон</span>
+                  <input
+                    value={referralPhone}
+                    onChange={(e) => setReferralPhone(e.target.value)}
+                    className="mt-0.5 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm text-[var(--enver-text)] outline-none focus:border-slate-400"
+                  />
+                </label>
+                <label className="block text-xs">
+                  <span className="text-[10px] text-slate-400">Е-пошта</span>
+                  <input
+                    value={referralEmail}
+                    onChange={(e) => setReferralEmail(e.target.value)}
+                    className="mt-0.5 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm text-[var(--enver-text)] outline-none focus:border-slate-400"
+                  />
+                </label>
+              </div>
+            </div>
           </div>
         ) : (
           <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
@@ -331,7 +452,7 @@ export function LeadDetailOverviewClient({
               </dd>
             </div>
             <div>
-              <dt className="text-[10px] text-slate-400">Email</dt>
+              <dt className="text-[10px] text-slate-400">Е-пошта</dt>
               <dd className="text-[var(--enver-text)]">
                 {lead.contact?.email ?? lead.email ?? "—"}
               </dd>
@@ -341,6 +462,21 @@ export function LeadDetailOverviewClient({
               <dd className="text-[var(--enver-text)]">
                 {lead.owner.name ?? lead.owner.email}
               </dd>
+            </div>
+            <div>
+              <dt className="text-[10px] text-slate-400">Хто привів</dt>
+              <dd className="text-[var(--enver-text)]">
+                {lead.referral?.name?.trim()
+                  ? `${REFERRAL_TYPE_LABEL[lead.referral.type]} · ${lead.referral.name}`
+                  : "—"}
+              </dd>
+              {(lead.referral?.phone || lead.referral?.email) ? (
+                <p className="text-xs text-slate-500">
+                  {[lead.referral.phone, lead.referral.email]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
+              ) : null}
             </div>
             <div className="sm:col-span-2">
               <dt className="text-[10px] text-slate-400">Стадія</dt>

@@ -40,7 +40,7 @@ export function dealConstructorRoomApiSelect() {
   };
 }
 
-type PrismaRoomRow = {
+export type PrismaRoomRow = {
   id: string;
   status: WorkspaceConstructorRoom["status"] | "DRAFT";
   publicToken: string;

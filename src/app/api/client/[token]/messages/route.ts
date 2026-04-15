@@ -7,7 +7,7 @@ type Ctx = { params: Promise<{ token: string }> };
 export async function GET(_req: Request, ctx: Ctx) {
   const { token } = await ctx.params;
   const payload = verifyClientPortalToken(token);
-  if (!payload) return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+  if (!payload) return NextResponse.json({ error: "Некоректний токен" }, { status: 401 });
 
   const rows = await prisma.activityLog.findMany({
     where: { entityType: "DEAL", entityId: payload.dealId, type: "DEAL_UPDATED" },
@@ -35,7 +35,7 @@ export async function GET(_req: Request, ctx: Ctx) {
 export async function POST(req: Request, ctx: Ctx) {
   const { token } = await ctx.params;
   const payload = verifyClientPortalToken(token);
-  if (!payload) return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+  if (!payload) return NextResponse.json({ error: "Некоректний токен" }, { status: 401 });
 
   let body: unknown;
   try {
@@ -48,7 +48,7 @@ export async function POST(req: Request, ctx: Ctx) {
       ? (body as Record<string, unknown>)
       : null;
   const text = typeof o?.message === "string" ? o.message.trim() : "";
-  if (!text) return NextResponse.json({ error: "message is required" }, { status: 400 });
+  if (!text) return NextResponse.json({ error: "Потрібно передати message" }, { status: 400 });
 
   await prisma.activityLog.create({
     data: {

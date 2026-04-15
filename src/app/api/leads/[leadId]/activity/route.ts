@@ -19,6 +19,14 @@ import {
 
 type Ctx = { params: Promise<{ leadId: string }> };
 
+function isSchemaDriftError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const maybe = error as { code?: string; message?: string };
+  if (maybe.code === "P2021" || maybe.code === "P2022") return true;
+  const msg = (maybe.message ?? "").toLowerCase();
+  return msg.includes("does not exist") || msg.includes("column");
+}
+
 export async function GET(req: Request, ctx: Ctx) {
   if (!process.env.DATABASE_URL?.trim()) {
     return NextResponse.json(
@@ -58,18 +66,37 @@ export async function GET(req: Request, ctx: Ctx) {
         actorUser: { select: { name: true, email: true } },
       },
     });
-    const domainRowsIndexed = await prisma.domainEvent.findMany({
-      where: { entityType: "LEAD", entityId: leadId },
-      orderBy: { createdAt: "desc" },
-      take: 120,
-      select: { id: true, type: true, payload: true, createdAt: true },
-    });
-    const domainRowsLegacy = await prisma.domainEvent.findMany({
-      where: { entityType: null },
-      orderBy: { createdAt: "desc" },
-      take: 200,
-      select: { id: true, type: true, payload: true, createdAt: true },
-    });
+    let domainRowsIndexed: Array<{
+      id: string;
+      type: string;
+      payload: unknown;
+      createdAt: Date;
+    }> = [];
+    let domainRowsLegacy: Array<{
+      id: string;
+      type: string;
+      payload: unknown;
+      createdAt: Date;
+    }> = [];
+    try {
+      domainRowsIndexed = await prisma.domainEvent.findMany({
+        where: { entityType: "LEAD", entityId: leadId },
+        orderBy: { createdAt: "desc" },
+        take: 120,
+        select: { id: true, type: true, payload: true, createdAt: true },
+      });
+      domainRowsLegacy = await prisma.domainEvent.findMany({
+        where: { entityType: null },
+        orderBy: { createdAt: "desc" },
+        take: 200,
+        select: { id: true, type: true, payload: true, createdAt: true },
+      });
+    } catch (domainError) {
+      if (!isSchemaDriftError(domainError)) throw domainError;
+      console.warn(
+        "[GET leads/[leadId]/activity] domain events skipped due to schema drift",
+      );
+    }
     const seen = new Set<string>();
     const domainItems = [...domainRowsIndexed, ...domainRowsLegacy]
       .map((r) => {

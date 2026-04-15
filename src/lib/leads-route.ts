@@ -10,7 +10,9 @@ export const LEADS_LIST_SEGMENTS = new Set([
   "converted",
   "unassigned",
   "qualified",
+  "closed",
   "lost",
+  "archived",
   "sources",
   "pipeline",
 ]);

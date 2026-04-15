@@ -4,11 +4,48 @@ import bcrypt from "bcryptjs";
 import { prisma } from "../prisma";
 import { refreshEffectiveUserFields } from "./jwt-effective-user";
 
+function readPositiveIntEnv(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value <= 0) return fallback;
+  return Math.floor(value);
+}
+
+const INACTIVITY_TIMEOUT_SECONDS = readPositiveIntEnv(
+  "AUTH_INACTIVITY_TIMEOUT_SECONDS",
+  60 * 60,
+);
+const DAILY_REAUTH_SECONDS = readPositiveIntEnv(
+  "AUTH_DAILY_REAUTH_SECONDS",
+  24 * 60 * 60,
+);
+
+function nowUnixSeconds(): number {
+  return Math.floor(Date.now() / 1000);
+}
+
+function isSessionExpiredByPolicy(token: {
+  authenticatedAt?: number;
+  lastActivityAt?: number;
+}): boolean {
+  const now = nowUnixSeconds();
+  const authenticatedAt =
+    typeof token.authenticatedAt === "number" ? token.authenticatedAt : now;
+  const lastActivityAt =
+    typeof token.lastActivityAt === "number" ? token.lastActivityAt : now;
+
+  return (
+    now - authenticatedAt > DAILY_REAUTH_SECONDS ||
+    now - lastActivityAt > INACTIVITY_TIMEOUT_SECONDS
+  );
+}
+
 export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
   session: {
     strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60,
+    maxAge: DAILY_REAUTH_SECONDS,
   },
   pages: {
     signIn: "/login",
@@ -81,6 +118,8 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     async jwt({ token, user, trigger, session }) {
+      const now = nowUnixSeconds();
+
       if (user) {
         token.sub = user.id;
         token.role = user.role;
@@ -88,6 +127,9 @@ export const authOptions: NextAuthOptions = {
           user.role === "SUPER_ADMIN"
             ? []
             : (user.permissionKeys ?? []);
+        token.authenticatedAt = now;
+        token.lastActivityAt = now;
+        delete token.sessionExpiredAt;
       }
 
       if (
@@ -111,6 +153,36 @@ export const authOptions: NextAuthOptions = {
             token.impersonateUserId = exists.id;
           }
         }
+      }
+
+      if (
+        trigger === "update" &&
+        session &&
+        typeof session === "object" &&
+        "activityPingAt" in session
+      ) {
+        token.lastActivityAt = now;
+      }
+
+      if (typeof token.authenticatedAt !== "number") {
+        token.authenticatedAt = now;
+      }
+      if (typeof token.lastActivityAt !== "number") {
+        token.lastActivityAt = now;
+      }
+
+      if (isSessionExpiredByPolicy(token)) {
+        token.sessionExpiredAt = now;
+        delete token.sub;
+        delete token.role;
+        delete token.permissionKeys;
+        delete token.impersonateUserId;
+        delete token.effectiveRole;
+        delete token.effectivePermissionKeys;
+        delete token.effectiveEmail;
+        delete token.effectiveName;
+        delete token.menuAccess;
+        return token;
       }
 
       try {
@@ -151,6 +223,14 @@ export const authOptions: NextAuthOptions = {
         if (token.effectiveName !== undefined) {
           session.user.name = token.effectiveName ?? undefined;
         }
+        session.user.authenticatedAt =
+          typeof token.authenticatedAt === "number"
+            ? token.authenticatedAt
+            : undefined;
+        session.user.lastActivityAt =
+          typeof token.lastActivityAt === "number"
+            ? token.lastActivityAt
+            : undefined;
       }
       return session;
     },

@@ -35,10 +35,10 @@ export default function SettingsMetaTargetPage() {
 
       <SettingsCard
         title="Навіщо це в CRM"
-        description="Окремо від повідомлень Instagram Direct (їх дивіться у Вхідні)."
+        description="Окремо від повідомлень у директі Instagram (їх дивіться у Вхідні)."
       >
         <ul className="list-inside list-disc space-y-1 text-[11px] text-slate-600">
-          <li>заявки з лід-форм Meta (Lead Ads) як ліди з мітками кампанії та набору оголошень;</li>
+          <li>заявки з лід-форм Meta (реклама на ліди) як ліди з мітками кампанії та набору оголошень;</li>
           <li>звʼязок джерела «Реклама / Instagram» з UTM і назвами кампаній у картці ліда;</li>
           <li>подальша синхронізація витрат і конверсій — за наявності підключення Marketing API.</li>
         </ul>
@@ -46,7 +46,7 @@ export default function SettingsMetaTargetPage() {
 
       <SettingsCard
         title="Передумови в Meta"
-        description="Що має бути налаштовано у Business Manager до введення ключів тут."
+        description="Що має бути налаштовано в Meta Business Manager до введення ключів тут."
       >
         <ol className="list-inside list-decimal space-y-1.5 text-[11px] text-slate-600">
           <li>
@@ -58,8 +58,8 @@ export default function SettingsMetaTargetPage() {
             leads_retrieval (за потреби — business_management).
           </li>
           <li>
-            Для лід-форм: активні форми в рекламі або Instant Forms; вебхук для Lead Ads на
-            бекенд ENVER (endpoint задає розробка).
+            Для лід-форм: активні форми в рекламі або Instant Forms; вебхук для імпорту лідів на
+            бекенд ENVER (адресу ендпоінта задає розробка).
           </li>
         </ol>
       </SettingsCard>
@@ -69,27 +69,27 @@ export default function SettingsMetaTargetPage() {
         description="Значення зазвичай зберігаються в змінних оточення сервера; тут — для перевірки та передачі адміністратору."
       >
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Meta App ID" placeholder="Напр. 1234567890123456" />
-          <Field label="Ad Account ID" placeholder="act_…" />
-          <Field label="Pixel ID (опційно)" placeholder="Для веб-конверсій" />
-          <Field label="Instagram Business Account ID" placeholder="З Business Manager" />
+          <Field label="ID застосунку Meta" placeholder="Напр. 1234567890123456" />
+          <Field label="ID рекламного акаунта" placeholder="act_…" />
+          <Field label="ID пікселя (опційно)" placeholder="Для веб-конверсій" />
+          <Field label="ID бізнес-акаунта Instagram" placeholder="З Business Manager" />
         </div>
         <div className="mt-2 space-y-2">
           <Field
-            label="App Secret / System User token"
+            label="Секрет застосунку / токен системного користувача"
             type="password"
             placeholder="Не зберігайте в чатах — лише в секретах сервера"
           />
           <Field
-            label="Довгоживучий access token (Marketing API)"
+            label="Довгоживучий токен доступу (Marketing API)"
             type="password"
-            placeholder="Long-lived token з потрібними scopes"
+            placeholder="Довгоживучий токен з потрібними дозволами"
           />
         </div>
         <div className="mt-2 rounded-lg border border-slate-200 bg-[var(--enver-card)] px-2 py-2 text-[10px] text-slate-500">
-          <span className="font-medium text-slate-600">Webhook (Lead Ads): </span>
-          URL та verify token видаються після деплою API; у формі лід-форми вкажіть той самий
-          endpoint, що налаштований у Meta.
+          <span className="font-medium text-slate-600">Вебхук (лід-реклама): </span>
+          Адреса URL та verify token видаються після деплою API; у формі лід-форми вкажіть ту саму
+          адресу, що налаштована в Meta.
         </div>
       </SettingsCard>
 
@@ -104,7 +104,7 @@ export default function SettingsMetaTargetPage() {
 
       <SettingsCard title="Документація Meta">
         <p className="text-[11px] text-slate-600">
-          Офіційні гайди:{" "}
+          Офіційні довідники:{" "}
           <Link
             href={META_DOCS}
             className="text-orange-700 underline underline-offset-2 hover:text-orange-900"

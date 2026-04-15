@@ -19,8 +19,6 @@ import { DEAL_WORKSPACE_TABS } from "./deal-workspace-tabs";
 import { EstimateWorkspaceTab } from "./tabs/EstimateWorkspaceTab";
 import { TasksWorkspaceTab } from "./tabs/TasksWorkspaceTab";
 import { DealFinanceProcurementTab } from "./tabs/DealFinanceProcurementTab";
-import { DealOverviewCommandCenter } from "./DealOverviewCommandCenter";
-import { DealExecutionPanel } from "./DealExecutionPanel";
 import { ConstructorRoomPanel } from "./ConstructorRoomPanel";
 import { dispatchDealTasksUpdated } from "../../features/ai-assistant/utils/dispatchDealTasksUpdated";
 import { cn } from "../../lib/utils";
@@ -45,6 +43,25 @@ import { SyncDealValueFromEstimateButton } from "./SyncDealValueFromEstimateButt
 import { derivePaymentStripSummaryForPayload } from "../../features/deal-workspace/payment-aggregate";
 import { REALTIME_POLICY } from "../../config/realtime-policy";
 import { dealQueryKeys } from "../../features/deal-workspace/deal-query-keys";
+import { DealHubPage } from "@/modules/deal-hub/ui/components/DealHubPage";
+import {
+  getConstructorWorkspaceState,
+  getCriticalBlockers,
+  getDealViewRole,
+  getProductionPackageStatus,
+  getProductionReadiness,
+  type DealViewRole,
+} from "../../features/deal-workspace/deal-view-selectors";
+import {
+  ConstructorWorkspace,
+  ConstructorWorkspaceTabs,
+  DealTransferHub,
+  FinalActionArea,
+  HandoffChecklist,
+  HandoffHistory,
+  ProductionPackage,
+  ProductionReadiness,
+} from "./DealTransferHub";
 
 function renderTemplatePreview(
   contentHtml: string,
@@ -964,7 +981,7 @@ function ContractTab({
         </div>
       ) : null}
       {contractHappySteps ? (
-        <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 px-3 py-2.5 shadow-sm">
+        <div className="rounded-xl border border-indigo-100 bg-indigo-50/35 px-3 py-2.5">
           <p className="text-xs font-semibold uppercase tracking-wide text-indigo-800">
             Рекомендований порядок: від чернетки до оплати
           </p>
@@ -1014,7 +1031,7 @@ function ContractTab({
           </button>
         ) : (
           <div className="mt-3 space-y-3">
-            <div className="rounded-xl border border-slate-200/80 bg-gradient-to-br from-slate-50 via-white to-indigo-50/40 p-3 shadow-sm">
+            <div className="rounded-xl border border-slate-200/80 bg-[var(--enver-surface)] p-3">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -1108,9 +1125,9 @@ function ContractTab({
                 </div>
               </div>
             </div>
-            <div className="rounded-lg border border-blue-200 bg-blue-50 p-2 text-xs">
-              <span className="font-medium text-blue-900">Якість заповнення: {qualityScore}%</span>
-              <span className="ml-2 text-blue-800">Наступний крок: {nextActionLabel}</span>
+            <div className="rounded-lg border border-slate-200 bg-[var(--enver-surface)] p-2 text-xs">
+              <span className="font-medium text-[var(--enver-text)]">Якість заповнення: {qualityScore}%</span>
+              <span className="ml-2 text-[var(--enver-text-muted)]">Наступний крок: {nextActionLabel}</span>
             </div>
             <div className={cn("rounded-lg border p-2 text-xs", contractHealthTone)}>
               <span className="font-medium">Стан договору:</span> {contractHealthLabel}
@@ -1120,10 +1137,10 @@ function ContractTab({
                 </span>
               ) : null}
             </div>
-            <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-xs">
-              <p className="font-semibold text-indigo-900">Next best action</p>
-              <p className="mt-1 text-indigo-900">{nextBestAction.title}</p>
-              <p className="text-indigo-700">{nextBestAction.description}</p>
+            <div className="rounded-lg border border-slate-200 bg-[var(--enver-surface)] p-3 text-xs">
+              <p className="font-semibold text-[var(--enver-text)]">Найкраща наступна дія</p>
+              <p className="mt-1 text-[var(--enver-text)]">{nextBestAction.title}</p>
+              <p className="text-[var(--enver-text-muted)]">{nextBestAction.description}</p>
               <div className="mt-2">
                 {nextBestAction.id === "fill_required" ? (
                   <button
@@ -1994,7 +2011,7 @@ function ContractTab({
 type MilestoneRow = {
   id: string;
   label: string;
-  amount: string;
+  amount: number | null;
   done: boolean;
 };
 
@@ -2005,134 +2022,59 @@ function PaymentTab({
   data: DealWorkspacePayload;
   roleView: "director" | "head" | "sales";
 }) {
-  const { err, busy, run } = useWorkspaceRun(data.deal.id);
-  const { showToast } = useDealWorkspaceToast();
-  const [rows, setRows] = useState<MilestoneRow[]>(() =>
-    (data.meta.payment?.milestones ?? []).map((m) => ({
-      id: m.id,
-      label: m.label,
-      amount: m.amount != null ? String(m.amount) : "",
-      done: m.done,
-    })),
-  );
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync milestones when `data` updates
-    setRows(
+  const rows = useMemo<MilestoneRow[]>(
+    () =>
       (data.meta.payment?.milestones ?? []).map((m) => ({
         id: m.id,
         label: m.label,
-        amount: m.amount != null ? String(m.amount) : "",
+        amount: m.amount ?? null,
         done: m.done,
       })),
-    );
-  }, [data.meta.payment?.milestones]);
+    [data.meta.payment?.milestones],
+  );
 
   const wrap =
     "rounded-2xl border border-slate-200 bg-[var(--enver-card)] p-4 text-sm shadow-sm";
-
-  const saveMilestones = () =>
-    void run(async () => {
-      const milestones = rows.map((r) => ({
-        id: r.id,
-        label: r.label.trim() || "Без назви",
-        amount:
-          r.amount.trim() === ""
-            ? undefined
-            : Number(r.amount.replace(",", ".")),
-        done: r.done,
-      }));
-      await patchMeta(data.deal.id, {
-        payment: { milestones },
-      });
-      showToast("Віхи оплати збережено");
-    });
 
   return (
     <div className={wrap}>
       <h2 className="text-base font-semibold text-[var(--enver-text)]">Оплата</h2>
       <p className="mt-1 text-xs text-slate-600">
-        Віхи оплати зберігаються в метаданих угоди. Додавайте рядки та
-        відмічайте підтвердження.
+        Підтвердження оплат виконує бухгалтер у модулі фінансів. В угоді доступне
+        лише відображення статусу підтвердження.
       </p>
-      {err ? (
-        <p className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-800">
-          {err}
-        </p>
-      ) : null}
       <div className="mt-3 space-y-2">
-        {rows.map((row, idx) => (
+        {rows.map((row) => (
           <div
             key={row.id}
             className="flex flex-col gap-2 rounded-lg border border-slate-100 bg-slate-50/80 p-2 sm:flex-row sm:items-center"
           >
-            <input
-              value={row.label}
-              onChange={(e) => {
-                const next = [...rows];
-                next[idx] = { ...row, label: e.target.value };
-                setRows(next);
-              }}
-              placeholder="Назва віхи"
-              className="min-w-0 flex-1 rounded border border-slate-200 px-2 py-1 text-xs"
-            />
-            <input
-              value={row.amount}
-              onChange={(e) => {
-                const next = [...rows];
-                next[idx] = { ...row, amount: e.target.value };
-                setRows(next);
-              }}
-              placeholder="Сума"
-              className="w-full rounded border border-slate-200 px-2 py-1 text-xs sm:w-24"
-            />
-            <label className="flex items-center gap-1.5 whitespace-nowrap text-xs">
-              <input
-                type="checkbox"
-                checked={row.done}
-                onChange={(e) => {
-                  const next = [...rows];
-                  next[idx] = { ...row, done: e.target.checked };
-                  setRows(next);
-                }}
-              />
-              Підтверджено
-            </label>
-            <button
-              type="button"
-              className={btnGhost}
-              onClick={() => setRows(rows.filter((_, i) => i !== idx))}
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-medium text-slate-800">{row.label}</p>
+              <p className="text-[11px] text-slate-600">
+                {row.amount != null ? `${row.amount.toLocaleString("uk-UA")}` : "Сума не вказана"}
+              </p>
+            </div>
+            <span
+              className={cn(
+                "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium",
+                row.done
+                  ? "bg-emerald-100 text-emerald-900"
+                  : "bg-amber-100 text-amber-900",
+              )}
             >
-              Видалити
-            </button>
+              {row.done ? "Підтверджено бухгалтерією" : "Очікує підтвердження"}
+            </span>
           </div>
         ))}
+        {rows.length === 0 ? (
+          <p className="text-xs text-slate-500">Віхи оплати ще не заповнені у фінансовому модулі.</p>
+        ) : null}
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
-        <button
-          type="button"
-          className={btnGhost}
-          onClick={() =>
-            setRows([
-              ...rows,
-              {
-                id: crypto.randomUUID(),
-                label: "",
-                amount: "",
-                done: false,
-              },
-            ])
-          }
-        >
-          Додати віху
-        </button>
-        <button
-          type="button"
-          disabled={busy}
-          className={btn}
-          onClick={saveMilestones}
-        >
-          {busy ? "Збереження…" : "Зберегти оплату"}
-        </button>
+        <Link href="/finance/projects" className={btnGhost}>
+          Відкрити фінанси
+        </Link>
       </div>
       <StageAiAssistantCard stage="payment" data={data} />
       <StageFormTemplateCard stage="payment" roleView={roleView} />
@@ -2143,9 +2085,11 @@ function PaymentTab({
 function HandoffTab({
   data,
   roleView,
+  onTab,
 }: {
   data: DealWorkspacePayload;
   roleView: "director" | "head" | "sales";
+  onTab: (id: DealWorkspaceTabId) => void;
 }) {
   const { err, busy, run } = useWorkspaceRun(data.deal.id);
   const [notesDraft, setNotesDraft] = useState(data.handoff.notes ?? "");
@@ -2155,6 +2099,9 @@ function HandoffTab({
   );
   const [fileSearch, setFileSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<"all" | AttachmentCategory>("all");
+  const [constructorTab, setConstructorTab] = useState<
+    "technical" | "files" | "comments" | "versions"
+  >("technical");
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect -- sync handoff draft when payload changes */
     setNotesDraft(data.handoff.notes ?? "");
@@ -2164,6 +2111,7 @@ function HandoffTab({
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [
     data.handoff.notes,
+    data.handoff.manifest,
     data.handoff.manifest.selectedAttachmentIds,
     data.handoff.manifest.selectedFileAssetIds,
     data.attachments,
@@ -2183,6 +2131,55 @@ function HandoffTab({
   const wrap =
     "rounded-2xl border border-slate-200 bg-[var(--enver-card)] p-4 text-sm shadow-sm";
   const h = data.handoff;
+  const readiness = getProductionReadiness(data);
+  const packageStatus = getProductionPackageStatus(data);
+  const constructorState = getConstructorWorkspaceState(data);
+  const role: DealViewRole = getDealViewRole(
+    {
+      effectiveRole: roleView === "director" ? "DIRECTOR" : roleView === "head" ? "HEAD_MANAGER" : "MANAGER",
+    },
+    data,
+  );
+  const productionBlockers = [
+    ...readiness.missingItems.map((title) => ({ id: `readiness-${title}`, title })),
+    ...getCriticalBlockers(data, role)
+      .slice(0, 2)
+      .map((item) => ({ id: item.id, title: item.title })),
+  ];
+  const canSubmitToProduction =
+    readiness.isReady && data.productionLaunch.status !== "LAUNCHED";
+  const finalRoleActionLabel =
+    role === "manager"
+      ? "Передати конструктору"
+      : role === "constructor"
+        ? "Завершити ТЗ"
+        : role === "production"
+          ? "Підтвердити запуск"
+          : "Керувати передачею";
+  const checklistItems = [
+    ...data.readiness.map((item) => ({
+      id: item.id,
+      label: item.label,
+      done: item.done,
+      ownerRole:
+        item.source.includes("contract")
+          ? ("manager" as const)
+          : item.source.includes("production")
+            ? ("production" as const)
+            : ("constructor" as const),
+      ctaLabel: item.done ? "Перевірити" : "Відкрити",
+      onCta: () => {
+        const label = item.label.toLowerCase();
+        if (label.includes("догов")) onTab("contract");
+        else if (label.includes("оплат") || label.includes("аванс")) onTab("payment");
+        else if (label.includes("замір")) onTab("measurement");
+        else if (label.includes("кп")) onTab("proposal");
+        else if (label.includes("файл") || label.includes("кресл")) onTab("files");
+        else if (label.includes("тз") || label.includes("пакет")) onTab("handoff");
+        else onTab("overview");
+      },
+    })),
+  ];
 
   return (
     <div className={wrap}>
@@ -2200,6 +2197,42 @@ function HandoffTab({
           Причина відхилення: {h.rejectionReason}
         </p>
       ) : null}
+      <DealTransferHub>
+        <ProductionReadiness
+          readiness={readiness}
+          submitDisabled={busy || !canSubmitToProduction}
+          submitLabel={busy ? "Передача..." : "Передати у виробництво"}
+          onSubmit={() =>
+            void run(async () => {
+              const j = (await postJson(
+                `/api/deals/${data.deal.id}/production-launch`,
+                {},
+              )) as ProductionLaunchResponse;
+              const n = j.handoffImportedFileCount;
+              showToast(
+                typeof n === "number" && n > 0
+                  ? `Виробниче замовлення створено. Перенесено файлів: ${n}.`
+                  : "Виробниче замовлення створено",
+                { tone: "success" },
+              );
+              try {
+                const roomResp = await postJson<{ room?: { publicToken: string } }>(
+                  `/api/deals/${data.deal.id}/constructor-room`,
+                  { action: "ensure" },
+                );
+                if (roomResp.room?.publicToken && typeof window !== "undefined") {
+                  window.open(`/c/${roomResp.room.publicToken}`, "_blank", "noopener,noreferrer");
+                }
+              } catch {
+                showToast("Передачу виконано. Кімната конструктора буде доступна після синхронізації.", {
+                  tone: "warning",
+                });
+              }
+            })
+          }
+        />
+        <HandoffChecklist items={checklistItems} />
+      </DealTransferHub>
       <ProductionOrchestrationHandoffPanel
         dealId={data.deal.id}
         activeEstimateId={data.operationalStats.latestEstimate?.id ?? null}
@@ -2230,181 +2263,203 @@ function HandoffTab({
         />
         Пакет передачі зібрано (метадані)
       </label>
-      <div className="mt-3 rounded-lg border border-slate-100 bg-slate-50 p-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs font-medium text-slate-700">
-            Файли для передачі на виробництво: обрано {selectedAttachmentIds.length} з{" "}
-            {data.attachments.length}
-          </p>
-        </div>
-        <p className="mt-1 text-[11px] text-slate-500">
-          Обрані файли зберігаються в пакеті передачі та при запуску виробництва копіюються у
-          виробничий потік (пакет «Передача з угоди»).
-        </p>
-        {data.attachments.length > 0 ? (
-          <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
-            <label className="block min-w-0 flex-1 text-[11px]">
-              <span className="text-slate-500">Пошук за назвою або типом</span>
-              <input
-                value={fileSearch}
-                onChange={(e) => setFileSearch(e.target.value)}
-                placeholder="Наприклад: договір, креслення…"
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs"
-              />
-            </label>
-            <label className="block text-[11px] sm:w-44">
-              <span className="text-slate-500">Категорія</span>
-              <select
-                value={categoryFilter}
-                onChange={(e) =>
-                  setCategoryFilter(e.target.value as "all" | AttachmentCategory)
-                }
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs"
-              >
-                <option value="all">Усі категорії</option>
-                {ATTACH_CATEGORIES.map((c) => (
-                  <option key={c.value} value={c.value}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+      <ConstructorWorkspace state={constructorState}>
+        <ConstructorWorkspaceTabs
+          value={constructorTab}
+          onChange={setConstructorTab}
+        />
+        {constructorTab === "technical" ? (
+          <div className="mt-3 grid gap-2 text-xs text-slate-700 sm:grid-cols-2">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
+              <p className="font-medium">Замір</p>
+              <p className="mt-1 text-[11px] text-slate-600">
+                {data.controlMeasurement
+                  ? "Замір заповнений, дані доступні."
+                  : "Замір ще не заповнений."}
+              </p>
+            </div>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
+              <p className="font-medium">Комерційна частина</p>
+              <p className="mt-1 text-[11px] text-slate-600">
+                {data.commercialSnapshot
+                  ? "Комерційний пакет сформовано й зафіксовано."
+                  : "Специфікація ще не сформована."}
+              </p>
+            </div>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-2 sm:col-span-2">
+              <p className="font-medium">Швидкі переходи</p>
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                <Link href={`/deals/${data.deal.id}/workspace?tab=measurement`} className={btnGhost}>
+                  Відкрити замір
+                </Link>
+                <Link href={`/deals/${data.deal.id}/workspace?tab=proposal`} className={btnGhost}>
+                  Відкрити КП
+                </Link>
+              </div>
+            </div>
           </div>
         ) : null}
-        <div className="mt-2 flex flex-wrap gap-2">
-          <button
-            type="button"
-            disabled={busy || filteredAttachments.length === 0}
-            className={btnGhost}
-            onClick={() => {
-              const add = new Set(selectedAttachmentIds);
-              for (const a of filteredAttachments) add.add(a.id);
-              setSelectedAttachmentIds([...add]);
-            }}
-          >
-            Обрати видимі ({filteredAttachments.length})
-          </button>
-          <button
-            type="button"
-            disabled={busy || filteredAttachments.length === 0}
-            className={btnGhost}
-            onClick={() => {
-              const drop = new Set(filteredAttachments.map((a) => a.id));
-              setSelectedAttachmentIds((prev) => prev.filter((id) => !drop.has(id)));
-            }}
-          >
-            Зняти з видимих
-          </button>
-          <button
-            type="button"
-            disabled={busy || selectedAttachmentIds.length === 0}
-            className={btnGhost}
-            onClick={() => setSelectedAttachmentIds([])}
-          >
-            Очистити все
-          </button>
-        </div>
-        <ul className="mt-2 max-h-56 space-y-1.5 overflow-y-auto text-xs">
-          {filteredAttachments.map((a) => {
-            const checked = selectedAttachmentIds.includes(a.id);
-            return (
-              <li
-                key={a.id}
-                className="flex items-start gap-2 rounded-md border border-transparent bg-white/60 px-1.5 py-1 hover:border-slate-200"
-              >
-                <input
-                  type="checkbox"
-                  className="mt-0.5 shrink-0"
-                  checked={checked}
-                  onChange={(e) => {
-                    setSelectedAttachmentIds((prev) =>
-                      e.target.checked
-                        ? [...new Set([...prev, a.id])]
-                        : prev.filter((id) => id !== a.id),
-                    );
-                  }}
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="truncate font-medium text-slate-800">{a.fileName}</div>
-                  <div className="text-[11px] text-slate-500">
-                    {attachmentCategoryLabel(a.category)}
-                    {a.isCurrentVersion ? "" : " · неактуальна версія"} · v{a.version}
-                  </div>
-                  {a.fileUrl ? (
-                    <a
-                      href={a.fileUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-[11px] text-sky-700 underline-offset-2 hover:underline"
-                    >
-                      Відкрити посилання
-                    </a>
-                  ) : null}
-                </div>
-              </li>
-            );
-          })}
-          {data.attachments.length === 0 ? (
-            <li className="text-slate-500">Немає файлів. Додайте їх на вкладці «Файли».</li>
-          ) : filteredAttachments.length === 0 ? (
-            <li className="text-slate-500">Нічого не знайдено за фільтром. Змініть пошук або категорію.</li>
-          ) : null}
+        {constructorTab === "files" ? (
+          <div className="mt-3 rounded-lg border border-slate-100 bg-slate-50 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-medium text-slate-700">
+                Файли для передачі: {selectedAttachmentIds.length}/{data.attachments.length}
+              </p>
+            </div>
+            {data.attachments.length > 0 ? (
+              <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
+                <label className="block min-w-0 flex-1 text-[11px]">
+                  <span className="text-slate-500">Пошук за назвою або типом</span>
+                  <input
+                    value={fileSearch}
+                    onChange={(e) => setFileSearch(e.target.value)}
+                    placeholder="Наприклад: договір, креслення…"
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs"
+                  />
+                </label>
+                <label className="block text-[11px] sm:w-44">
+                  <span className="text-slate-500">Категорія</span>
+                  <select
+                    value={categoryFilter}
+                    onChange={(e) =>
+                      setCategoryFilter(e.target.value as "all" | AttachmentCategory)
+                    }
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs"
+                  >
+                    <option value="all">Усі категорії</option>
+                    {ATTACH_CATEGORIES.map((c) => (
+                      <option key={c.value} value={c.value}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            ) : null}
+            <ul className="mt-2 max-h-56 space-y-1.5 overflow-y-auto text-xs">
+              {filteredAttachments.map((a) => {
+                const checked = selectedAttachmentIds.includes(a.id);
+                return (
+                  <li
+                    key={a.id}
+                    className="flex items-start gap-2 rounded-md border border-transparent bg-white/60 px-1.5 py-1 hover:border-slate-200"
+                  >
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 shrink-0"
+                      checked={checked}
+                      onChange={(e) => {
+                        setSelectedAttachmentIds((prev) =>
+                          e.target.checked
+                            ? [...new Set([...prev, a.id])]
+                            : prev.filter((id) => id !== a.id),
+                        );
+                      }}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate font-medium text-slate-800">{a.fileName}</div>
+                      <div className="text-[11px] text-slate-500">
+                        {attachmentCategoryLabel(a.category)}
+                        {a.isCurrentVersion ? "" : " · неактуальна версія"} · v{a.version}
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+            <button
+              type="button"
+              disabled={busy}
+              className={cn(btnGhost, "mt-2")}
+              onClick={() =>
+                void run(async () => {
+                  const files = deriveHandoffManifestFiles(data.attachments, selectedAttachmentIds);
+                  await patchHandoff(data.deal.id, {
+                    manifestJson: {
+                      ...files,
+                      generatedDocumentIds: data.handoff.manifest.generatedDocumentIds,
+                      notes: notesDraft.trim() || undefined,
+                    },
+                  });
+                  showToast("Склад пакета передачі збережено", { tone: "info" });
+                })
+              }
+            >
+              {busy ? "Збереження…" : "Зберегти склад пакета"}
+            </button>
+          </div>
+        ) : null}
+        {constructorTab === "comments" ? (
+          <div className="mt-3">
+            <label className="block text-xs">
+              <span className="text-slate-500">Коментар конструктора / менеджера</span>
+              <textarea
+                value={notesDraft}
+                onChange={(e) => setNotesDraft(e.target.value)}
+                rows={4}
+                className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+              />
+            </label>
+            <button
+              type="button"
+              disabled={busy}
+              className={cn(btnGhost, "mt-2")}
+              onClick={() =>
+                void run(async () => {
+                  await patchHandoff(data.deal.id, { notes: notesDraft });
+                  showToast("Нотатки передачі збережено");
+                })
+              }
+            >
+              {busy ? "Збереження…" : "Зберегти коментар"}
+            </button>
+            <ConstructorRoomPanel
+              dealId={data.deal.id}
+              canUse={true}
+              initialRoom={data.constructorRoom}
+            />
+          </div>
+        ) : null}
+        {constructorTab === "versions" ? (
+          <div className="mt-3 space-y-1.5 text-xs text-slate-700">
+            <p>Договір: {data.contract?.status ?? "не створено"}</p>
+            <p>Вкладення: {data.attachments.length} файлів</p>
+            <ul className="rounded-lg border border-slate-200 bg-slate-50 p-2 text-[11px]">
+              {data.attachments.slice(0, 6).map((item) => (
+                <li key={item.id}>
+                  {item.fileName} · v{item.version} · {item.isCurrentVersion ? "актуальна" : "архів"}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+      </ConstructorWorkspace>
+      <section className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-rose-700">
+          Production blockers
+        </p>
+        <ul className="mt-2 space-y-1 text-xs text-rose-900">
+          {productionBlockers.map((item) => (
+            <li key={item.id}>- {item.title}</li>
+          ))}
+          {productionBlockers.length === 0 ? <li>- Критичних блокерів не виявлено</li> : null}
         </ul>
-        <div className="mt-2 flex flex-wrap gap-2">
-          <button
-            type="button"
-            disabled={busy}
-            className={btnGhost}
-            onClick={() =>
-              void run(async () => {
-                const files = deriveHandoffManifestFiles(data.attachments, selectedAttachmentIds);
-                await patchHandoff(data.deal.id, {
-                  manifestJson: {
-                    ...files,
-                    generatedDocumentIds: data.handoff.manifest.generatedDocumentIds,
-                    notes: notesDraft.trim() || undefined,
-                  },
-                });
-                showToast("Склад пакета передачі збережено", { tone: "info" });
-              })
-            }
-          >
-            {busy ? "Збереження…" : "Зберегти склад пакета"}
-          </button>
-        </div>
-      </div>
-      <label className="mt-3 block text-xs">
-        <span className="text-slate-500">Нотатки передачі</span>
-        <textarea
-          value={notesDraft}
-          onChange={(e) => setNotesDraft(e.target.value)}
-          rows={3}
-          className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
-        />
-      </label>
-      <button
-        type="button"
+      </section>
+      <ProductionPackage status={packageStatus} />
+      <HandoffHistory
+        notes={notesDraft}
+        historyLabel={`Статус пакета: ${handoffStatusUa(h.status)}`}
+      />
+      <FinalActionArea
+        role={role}
+        actionLabel={finalRoleActionLabel}
         disabled={busy}
-        className={cn(btnGhost, "mt-2")}
-        onClick={() =>
-          void run(async () => {
-            await patchHandoff(data.deal.id, { notes: notesDraft });
-            showToast("Нотатки передачі збережено");
-          })
-        }
-      >
-        {busy ? "Збереження…" : "Зберегти нотатки"}
-      </button>
-      <div className="mt-3 rounded-lg border border-indigo-100 bg-indigo-50 p-2 text-[11px] text-indigo-900">
-        AI summary: обрано {selectedAttachmentIds.length} файл(ів), категорій{" "}
-        {new Set(
-          data.attachments
-            .filter((a) => selectedAttachmentIds.includes(a.id))
-            .map((a) => a.category),
-        ).size}
-        . Перевірте, що є договір/специфікація, креслення або замір, і актуальні
-        версії документів.
-      </div>
+        onAction={() => {
+          if (role === "manager") onTab("handoff");
+          if (role === "constructor") onTab("production");
+          if (role === "production") onTab("production");
+        }}
+      />
       <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
         {(h.status === "DRAFT" || h.status === "REJECTED") && (
           <button
@@ -2605,6 +2660,24 @@ function ProductionTab({
                 : "Виробниче замовлення створено",
               { tone: "info" },
             );
+            try {
+              const roomResp = await postJson<{
+                room?: { publicToken: string };
+              }>(`/api/deals/${data.deal.id}/constructor-room`, {
+                action: "ensure",
+              });
+              if (roomResp.room?.publicToken && typeof window !== "undefined") {
+                window.open(`/c/${roomResp.room.publicToken}`, "_blank", "noopener,noreferrer");
+                showToast("Відкрито робочу зону конструктора для заповнення менеджером", {
+                  tone: "success",
+                });
+              }
+            } catch {
+              showToast(
+                "Передачу виконано. Кімната конструктора стане доступною після прийнятої передачі.",
+                { tone: "warning" },
+              );
+            }
           })
         }
       >
@@ -2671,6 +2744,28 @@ function FilesTab({ data }: { data: DealWorkspacePayload }) {
             </li>
           ))}
         </ul>
+      ) : null}
+      {data.attachments.length > 0 ? (
+        <div className="mt-3 rounded-lg border border-slate-200 bg-[var(--enver-surface)] p-2.5">
+          <p className="text-[11px] font-medium text-[var(--enver-text)]">
+            Останні файли в угоді (видимі після переносу)
+          </p>
+          <ul className="mt-1.5 space-y-1">
+            {data.attachments.slice(0, 20).map((item) => (
+              <li key={item.id} className="text-xs text-[var(--enver-text-muted)]">
+                <a
+                  href={item.fileUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-medium text-[var(--enver-accent-hover)] underline underline-offset-2"
+                >
+                  {item.fileName}
+                </a>
+                <span className="ml-1 text-slate-500">({item.category})</span>
+              </li>
+            ))}
+          </ul>
+        </div>
       ) : null}
       {err ? (
         <p className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-800">
@@ -3156,32 +3251,7 @@ export function DealWorkspaceTabPanels({
   const roleView = estimateVisibility;
 
   if (tab === "overview") {
-    return (
-      <div className="space-y-4">
-        <div className={wrap}>
-          <h2 className="text-base font-semibold text-[var(--enver-text)]">
-            Огляд — виконання
-          </h2>
-          <p className="mt-1 text-xs text-slate-600">
-            Чеклист, оплата, договір, монтаж та історія комунікації з ліда.
-          </p>
-          <div className="mt-4">
-            <DealExecutionPanel data={data} onTab={onTab} />
-          </div>
-        </div>
-        <div className={wrap}>
-          <h2 className="text-base font-semibold text-[var(--enver-text)]">
-            Командний центр
-          </h2>
-          <p className="mt-1 text-xs text-slate-600">
-            Контакт, наступний крок, задачі, смета та ризики.
-          </p>
-          <div className="mt-4">
-            <DealOverviewCommandCenter data={data} onTab={onTab} />
-          </div>
-        </div>
-      </div>
-    );
+    return <DealHubPage dealId={data.deal.id} />;
   }
 
   if (tab === "estimate")
@@ -3196,7 +3266,7 @@ export function DealWorkspaceTabPanels({
   if (tab === "payment") return <PaymentTab data={data} roleView={roleView} />;
   if (tab === "finance")
     return <DealFinanceProcurementTab data={data} roleView={roleView} />;
-  if (tab === "handoff") return <HandoffTab data={data} roleView={roleView} />;
+  if (tab === "handoff") return <HandoffTab data={data} roleView={roleView} onTab={onTab} />;
   if (tab === "production") return <ProductionTab data={data} roleView={roleView} />;
   if (tab === "files") return <FilesTab data={data} />;
   if (tab === "activity") return <ActivityTab data={data} />;

@@ -44,7 +44,7 @@ const TEMPLATE_GRAPH = {
     { id: "trigger", type: "trigger", config: { label: "payment.received" } },
     { id: "condition", type: "condition", config: { field: "amountPercent", op: "gte", value: 70 } },
     { id: "action1", type: "action", config: { type: "updateStage", stageId: "" } },
-    { id: "action2", type: "action", config: { type: "createTask", title: "Start production" } },
+    { id: "action2", type: "action", config: { type: "createTask", title: "Запустити виробництво" } },
   ],
   connections: [
     { from: "trigger", to: "condition" },
@@ -52,13 +52,13 @@ const TEMPLATE_GRAPH = {
     { from: "condition", to: "action2" },
   ],
   conditions: [{ field: "amountPercent", op: "gte", value: 70 }],
-  actions: [{ type: "createTask", title: "Start production", priority: "HIGH" }],
+  actions: [{ type: "createTask", title: "Запустити виробництво", priority: "HIGH" }],
 };
 
 export function AutomationBuilderClient() {
   const [flows, setFlows] = useState<Flow[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [name, setName] = useState("Payment 70% -> Start production");
+  const [name, setName] = useState("Оплата 70% -> Запустити виробництво");
   const [trigger, setTrigger] = useState(TRIGGERS[1]);
   const [graphJson, setGraphJson] = useState(
     JSON.stringify(TEMPLATE_GRAPH, null, 2),
@@ -153,10 +153,10 @@ export function AutomationBuilderClient() {
     <main className="mx-auto grid max-w-7xl grid-cols-1 gap-4 p-4 md:grid-cols-[280px_1fr] md:p-6">
       <section className="rounded-2xl border border-slate-200 bg-white p-3">
         <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-slate-900">Automation Flows</h2>
+          <h2 className="text-sm font-semibold text-slate-900">Потоки автоматизації</h2>
           <div className="flex items-center gap-2">
             <Button type="button" variant="outline" size="sm" asChild>
-              <Link href="/crm/automation/event-health">Event Health</Link>
+              <Link href="/crm/automation/event-health">Стан подій</Link>
             </Button>
             {healthStatus ? (
               <span
@@ -169,11 +169,11 @@ export function AutomationBuilderClient() {
                 }`}
                 title={
                   pendingTotal != null && pending24 != null && processedRate != null
-                    ? `Backlog: ${pendingTotal} · Pending 24h: ${pending24} · Processed 24h: ${processedRate}%`
+                    ? `Черга: ${pendingTotal} · У роботі за 24г: ${pending24} · Оброблено за 24г: ${processedRate}%`
                     : undefined
                 }
               >
-                {healthStatus}
+                {healthStatus === "ok" ? "норма" : healthStatus === "warning" ? "увага" : "черга"}
               </span>
             ) : null}
             <Button
@@ -182,12 +182,12 @@ export function AutomationBuilderClient() {
               size="sm"
               onClick={() => {
                 setSelectedId(null);
-                setName("New automation flow");
+                setName("Новий потік автоматизації");
                 setTrigger(TRIGGERS[0]);
                 setGraphJson(JSON.stringify(TEMPLATE_GRAPH, null, 2));
               }}
             >
-              New
+              Новий
             </Button>
           </div>
         </div>
@@ -206,7 +206,7 @@ export function AutomationBuilderClient() {
               <p className="font-semibold text-slate-900">{f.name}</p>
               <p className="mt-0.5 text-slate-600">{f.trigger}</p>
               <p className="mt-1 text-[10px] uppercase text-slate-500">
-                {f.enabled ? "enabled" : "disabled"}
+                {f.enabled ? "увімкнено" : "вимкнено"}
               </p>
             </button>
           ))}
@@ -216,11 +216,11 @@ export function AutomationBuilderClient() {
       <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
         <div className="grid gap-2 md:grid-cols-2">
           <label className="space-y-1 text-xs text-slate-600">
-            <span>Flow name</span>
+            <span>Назва потоку</span>
             <Input value={name} onChange={(e) => setName(e.target.value)} />
           </label>
           <label className="space-y-1 text-xs text-slate-600">
-            <span>Trigger</span>
+            <span>Тригер</span>
             <select
               value={trigger}
               onChange={(e) => setTrigger(e.target.value)}
@@ -237,10 +237,10 @@ export function AutomationBuilderClient() {
 
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
-            Visual graph preview
+            Попередній перегляд графа
           </p>
           <div className="flex flex-wrap gap-2">
-            {["Trigger", "Condition", "Action"].map((n) => (
+            {["Тригер", "Умова", "Дія"].map((n) => (
               <div
                 key={n}
                 className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800"
@@ -250,12 +250,12 @@ export function AutomationBuilderClient() {
             ))}
           </div>
           <p className="mt-2 text-xs text-slate-500">
-            Node graph is stored in JSON (`nodes` + `connections`) and executed by the internal automation engine.
+            Граф зберігається у JSON (`nodes` + `connections`) і виконується внутрішнім рушієм автоматизації.
           </p>
         </div>
 
         <label className="space-y-1 text-xs text-slate-600">
-          <span>Flow JSON (nodes, connections, conditions, actions)</span>
+          <span>JSON потоку (nodes, connections, conditions, actions)</span>
           <Textarea
             value={graphJson}
             onChange={(e) => setGraphJson(e.target.value)}
@@ -265,7 +265,7 @@ export function AutomationBuilderClient() {
 
         <div className="flex flex-wrap gap-2">
           <Button type="button" onClick={() => void save()} disabled={busy}>
-            {busy ? "Saving..." : "Save flow"}
+            {busy ? "Збереження..." : "Зберегти потік"}
           </Button>
           {selected ? (
             <>
@@ -274,7 +274,7 @@ export function AutomationBuilderClient() {
                 variant="outline"
                 onClick={() => void toggleEnabled(selected)}
               >
-                {selected.enabled ? "Disable" : "Enable"}
+                {selected.enabled ? "Вимкнути" : "Увімкнути"}
               </Button>
               <Button
                 type="button"
@@ -287,7 +287,7 @@ export function AutomationBuilderClient() {
                   await load();
                 }}
               >
-                Delete
+                Видалити
               </Button>
             </>
           ) : null}

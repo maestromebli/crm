@@ -6,6 +6,7 @@ import type { DealWorkspacePayload } from "@/features/deal-workspace/types";
 import { postJson } from "@/lib/api/patch-json";
 import { getApiErrorMessage, parseResponseJson } from "@/lib/api/parse-response-json";
 import { cn } from "@/lib/utils";
+import { buildProcurementHubNewRequestHref } from "@/features/procurement/lib/quick-actions";
 
 type Props = {
   data: DealWorkspacePayload;
@@ -138,7 +139,7 @@ export function DealFinanceProcurementTab({ data, roleView }: Props) {
               Каса CRM
             </Link>
             <Link
-              href="/crm/procurement"
+              href={buildProcurementHubNewRequestHref(data.deal.id)}
               className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
             >
               Закупівлі
@@ -205,12 +206,12 @@ export function DealFinanceProcurementTab({ data, roleView }: Props) {
         <section className="mt-4">
           <div className="mb-2 flex flex-wrap gap-2">
             {[
-              ["payments", "Payments"],
-              ["expenses", "Expenses"],
-              ["procurement", "Procurement"],
-              ["payroll", "Payroll"],
-              ["commissions", "Commissions"],
-              ["profitability", "Profitability"],
+              ["payments", "Оплати"],
+              ["expenses", "Витрати"],
+              ["procurement", "Закупівлі"],
+              ["payroll", "Зарплата"],
+              ["commissions", "Комісії"],
+              ["profitability", "Прибутковість"],
             ].map(([key, label]) => (
               <button
                 key={key}
@@ -304,7 +305,7 @@ export function DealFinanceProcurementTab({ data, roleView }: Props) {
             <ul className="space-y-1 text-sm">
               {(summary?.dealFinancialTabs.commissions ?? []).map((row) => (
                 <li key={row.id} className="flex justify-between rounded-lg border border-slate-100 px-2 py-1">
-                  <span>{row.percent != null ? `${row.percent}%` : "fixed"} · {row.status}</span>
+                  <span>{row.percent != null ? `${row.percent}%` : "фіксовано"} · {row.status}</span>
                   <span>{row.amount.toFixed(0)} ₴</span>
                 </li>
               ))}
@@ -312,10 +313,10 @@ export function DealFinanceProcurementTab({ data, roleView }: Props) {
           )}
           {!loading && activeSubtab === "profitability" && (
             <div className="rounded-lg border border-slate-100 px-3 py-2 text-sm">
-              <p>Gross: {summary?.dealFinancialSummary ? summary.dealFinancialSummary.grossProfit.toFixed(0) : "0"} ₴</p>
-              <p>Net: {summary?.dealFinancialSummary ? summary.dealFinancialSummary.netProfit.toFixed(0) : "0"} ₴</p>
-              <p>Margin: {summary?.dealFinancialSummary ? summary.dealFinancialSummary.marginPercent.toFixed(1) : "0"}%</p>
-              <p>Cash gap: {summary?.dealFinancialSummary ? summary.dealFinancialSummary.cashGap.toFixed(0) : "0"} ₴</p>
+              <p>Валовий: {summary?.dealFinancialSummary ? summary.dealFinancialSummary.grossProfit.toFixed(0) : "0"} ₴</p>
+              <p>Чистий: {summary?.dealFinancialSummary ? summary.dealFinancialSummary.netProfit.toFixed(0) : "0"} ₴</p>
+              <p>Маржа: {summary?.dealFinancialSummary ? summary.dealFinancialSummary.marginPercent.toFixed(1) : "0"}%</p>
+              <p>Касовий розрив: {summary?.dealFinancialSummary ? summary.dealFinancialSummary.cashGap.toFixed(0) : "0"} ₴</p>
             </div>
           )}
         </section>

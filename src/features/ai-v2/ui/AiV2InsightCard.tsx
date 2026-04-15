@@ -60,12 +60,12 @@ type AuditItem = {
 };
 
 const contextTitle: Record<AiV2ContextName, string> = {
-  lead: "AI V2 Smart Panel (Lead)",
-  deal: "AI V2 Smart Panel (Deal)",
-  dashboard: "AI V2 Dashboard Intelligence",
-  finance: "AI V2 Finance Guard",
-  production: "AI V2 Production Readiness",
-  procurement: "AI V2 Procurement Control",
+  lead: "AI V2 Розумна панель (лід)",
+  deal: "AI V2 Розумна панель (угода)",
+  dashboard: "AI V2 Аналітика дашборду",
+  finance: "AI V2 Фінансовий контроль",
+  production: "AI V2 Готовність виробництва",
+  procurement: "AI V2 Контроль закупівель",
 };
 
 function formatActionType(value: string): string {
@@ -75,7 +75,7 @@ function formatActionType(value: string): string {
     case "create_reminder":
       return "Нагадування";
     case "escalate_team_lead":
-      return "Ескалація Team Lead";
+      return "Ескалація керівнику команди";
     default:
       return value;
   }
@@ -87,6 +87,28 @@ export function AiV2InsightCard({ context, leadId, dealId, className }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [payload, setPayload] = useState<InsightResponse | null>(null);
   const [auditItems, setAuditItems] = useState<AuditItem[]>([]);
+
+  const loadAudit = useCallback(async () => {
+    try {
+      const q = new URLSearchParams({ context, limit: "6" });
+      if (leadId) q.set("leadId", leadId);
+      if (dealId) q.set("dealId", dealId);
+      const res = await fetch(`/api/ai-v2/audit?${q.toString()}`, {
+        method: "GET",
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        setAuditItems([]);
+        return;
+      }
+      const data = await parseJsonResponse<{ items?: AuditItem[]; error?: string }>(res, {
+        serviceLabel: "AI V2",
+      });
+      setAuditItems(Array.isArray(data.items) ? data.items : []);
+    } catch {
+      setAuditItems([]);
+    }
+  }, [context, leadId, dealId]);
 
   const runInsight = useCallback(
     async (applyLowRiskActions: boolean) => {
@@ -115,30 +137,8 @@ export function AiV2InsightCard({ context, leadId, dealId, className }: Props) {
         setApplying(false);
       }
     },
-    [context, leadId, dealId],
+    [context, leadId, dealId, loadAudit],
   );
-
-  const loadAudit = useCallback(async () => {
-    try {
-      const q = new URLSearchParams({ context, limit: "6" });
-      if (leadId) q.set("leadId", leadId);
-      if (dealId) q.set("dealId", dealId);
-      const res = await fetch(`/api/ai-v2/audit?${q.toString()}`, {
-        method: "GET",
-        cache: "no-store",
-      });
-      if (!res.ok) {
-        setAuditItems([]);
-        return;
-      }
-      const data = await parseJsonResponse<{ items?: AuditItem[]; error?: string }>(res, {
-        serviceLabel: "AI V2",
-      });
-      setAuditItems(Array.isArray(data.items) ? data.items : []);
-    } catch {
-      setAuditItems([]);
-    }
-  }, [context, leadId, dealId]);
 
   useEffect(() => {
     void loadAudit();
@@ -172,7 +172,7 @@ export function AiV2InsightCard({ context, leadId, dealId, className }: Props) {
               {contextTitle[context]}
             </h3>
             <p className="text-[11px] text-[var(--enver-text-muted)]">
-              Context-aware рішення + low-risk automations + audit trail
+              Контекстні рішення + низькоризикові автоматизації + журнал рішень
             </p>
           </div>
         </div>
@@ -192,7 +192,7 @@ export function AiV2InsightCard({ context, leadId, dealId, className }: Props) {
             className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-[11px] font-semibold text-emerald-900 disabled:opacity-60"
           >
             <Shield className="h-3.5 w-3.5" />
-            Apply low-risk
+            Застосувати низький ризик
           </button>
         </div>
       </div>
@@ -202,31 +202,31 @@ export function AiV2InsightCard({ context, leadId, dealId, className }: Props) {
           <div className="rounded-xl border border-[var(--enver-border)] bg-[var(--enver-surface)] p-3">
             <div className="flex flex-wrap items-center gap-2">
               <span className={cn("rounded-full border px-2 py-0.5 text-[10px] font-semibold", badgeTone)}>
-                Risk: {payload.decision.riskScore}/100
+                Ризик: {payload.decision.riskScore}/100
               </span>
               <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-medium text-slate-600">
-                Health: {payload.decision.healthScore}/100
+                Стан: {payload.decision.healthScore}/100
               </span>
               <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-medium text-slate-600">
-                Readiness: {payload.decision.readinessToNextStage}
+                Готовність: {payload.decision.readinessToNextStage}
               </span>
               <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-medium text-slate-600">
-                Urgency: {payload.decision.followUpUrgency}
+                Терміновість: {payload.decision.followUpUrgency}
               </span>
               {payload.context.flags.slaBreached ? (
                 <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-medium text-rose-700">
-                  SLA breach +{payload.context.flags.slaOverdueHours}h
+                  Порушення SLA +{payload.context.flags.slaOverdueHours}г
                 </span>
               ) : null}
               {payload.context.flags.missingDataCount > 0 ? (
                 <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">
-                  Missing data: {payload.context.flags.missingDataCount}
+                  Неповні дані: {payload.context.flags.missingDataCount}
                 </span>
               ) : null}
             </div>
             <p className="mt-2 text-sm text-[var(--enver-text)]">{payload.decision.summary}</p>
             <p className="mt-1 text-[12px] text-[var(--enver-text-muted)]">
-              Next best action: {payload.decision.nextBestAction}
+              Найкраща наступна дія: {payload.decision.nextBestAction}
             </p>
             {payload.decision.riskReasons.length > 0 ? (
               <ul className="mt-2 space-y-1 text-[11px] text-slate-600">
@@ -296,7 +296,7 @@ export function AiV2InsightCard({ context, leadId, dealId, className }: Props) {
 
       <div className="mt-3 border-t border-[var(--enver-border)] pt-3">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--enver-muted)]">
-          Audit trail
+          Журнал запусків
         </p>
         {auditItems.length === 0 ? (
           <p className="mt-1 text-[12px] text-[var(--enver-text-muted)]">
@@ -308,13 +308,13 @@ export function AiV2InsightCard({ context, leadId, dealId, className }: Props) {
               <li key={a.id} className="rounded-lg border border-[var(--enver-border)] bg-[var(--enver-surface)] px-2.5 py-2">
                 <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-[var(--enver-muted)]">
                   <span>{new Date(a.createdAt).toLocaleString("uk-UA")}</span>
-                  <span>Risk: {a.riskScore ?? "—"}</span>
+                  <span>Ризик: {a.riskScore ?? "—"}</span>
                 </div>
                 <p className="mt-1 text-[11px] text-[var(--enver-text)]">
-                  Planned: {a.plannedActions.map(formatActionType).join(", ") || "—"}
+                  Заплановано: {a.plannedActions.map(formatActionType).join(", ") || "—"}
                 </p>
                 <p className="text-[11px] text-emerald-700">
-                  Executed: {a.executedActions.map(formatActionType).join(", ") || "—"}
+                  Виконано: {a.executedActions.map(formatActionType).join(", ") || "—"}
                 </p>
               </li>
             ))}

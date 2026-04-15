@@ -22,12 +22,12 @@ export function LeadsList({ rows, groupBySource = false }: LeadsListProps) {
   const dupIds = duplicateLeadIdsByPhone(rows);
 
   const table = (list: LeadListRow[]) => (
-    <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-[var(--enver-card)] shadow-sm">
+    <div className="overflow-x-auto rounded-2xl border border-[var(--enver-border)] bg-[var(--enver-card)]">
       <table className="w-full min-w-[960px] text-left text-xs">
         <caption className="sr-only">
           Таблиця лідів: назва, кроки, дати, статус відповіді та швидкі дії
         </caption>
-        <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50/95 text-[10px] font-semibold uppercase tracking-wide text-slate-500 backdrop-blur-sm">
+        <thead className="sticky top-0 z-10 border-b border-[var(--enver-border)] bg-[var(--enver-surface)]/95 text-[10px] font-semibold uppercase tracking-wide text-[var(--enver-muted)] backdrop-blur-sm">
           <tr>
             <th scope="col" className="px-3 py-3 text-left" title="Назва та ключові сигнали">
               Лід
@@ -49,7 +49,7 @@ export function LeadsList({ rows, groupBySource = false }: LeadsListProps) {
             </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100">
+        <tbody className="divide-y divide-[var(--enver-border)]">
           {list.map((lead) => (
             <LeadRow
               key={lead.id}

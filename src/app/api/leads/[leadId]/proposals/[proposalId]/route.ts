@@ -15,11 +15,13 @@ import {
 } from "../../../../../../lib/prisma";
 import { CORE_EVENT_TYPES, publishEntityEvent } from "../../../../../../lib/events/crm-events";
 import { recordWorkflowEvent, WORKFLOW_EVENT_TYPES } from "../../../../../../features/event-system";
+import { syncLeadStageFromProposalStatus } from "../../../../../../lib/leads/proposal-status-stage-sync";
 
 type Ctx = { params: Promise<{ leadId: string; proposalId: string }> };
 
 const STATUSES: LeadProposalStatus[] = [
   "DRAFT",
+  "READY_TO_SEND",
   "SENT",
   "CLIENT_REVIEWING",
   "APPROVED",
@@ -207,22 +209,46 @@ export async function PATCH(req: Request, ctx: Ctx) {
       ? body.visualizationUrl.trim().slice(0, 2048) || null
       : undefined;
 
-  await prisma.leadProposal.update({
-    where: { id: row.id },
-    data: {
-      status,
-      sentAt:
-        status === "SENT"
-          ? body.markSent
-            ? new Date()
-            : (row.sentAt ?? new Date())
-          : row.sentAt,
-      ...(body.title !== undefined ? { title: body.title } : {}),
-      ...(body.summary !== undefined ? { summary: body.summary } : {}),
-      ...(body.quoteItems !== undefined ? { snapshotJson } : {}),
-      ...(canVis && visUrl !== undefined ? { visualizationUrl: visUrl } : {}),
-    },
+  await prisma.$transaction(async (tx) => {
+    if (status === "APPROVED") {
+      await tx.leadProposal.updateMany({
+        where: {
+          leadId,
+          id: { not: row.id },
+          status: "APPROVED",
+        },
+        data: { status: "SENT" },
+      });
+    }
+
+    await tx.leadProposal.update({
+      where: { id: row.id },
+      data: {
+        status,
+        sentAt:
+          status === "SENT"
+            ? body.markSent
+              ? new Date()
+              : (row.sentAt ?? new Date())
+            : row.sentAt,
+        ...(body.title !== undefined ? { title: body.title } : {}),
+        ...(body.summary !== undefined ? { summary: body.summary } : {}),
+        ...(body.quoteItems !== undefined ? { snapshotJson } : {}),
+        ...(canVis && visUrl !== undefined ? { visualizationUrl: visUrl } : {}),
+      },
+    });
+
+    if (status === "APPROVED") {
+      await tx.lead.update({
+        where: { id: leadId },
+        data: { activeProposalId: row.id },
+      });
+    }
   });
+  const stageSync =
+    status !== prevStatus
+      ? await syncLeadStageFromProposalStatus(prisma, { leadId, status })
+      : null;
   if (status !== prevStatus) {
     await publishEntityEvent({
       type: CORE_EVENT_TYPES.STATUS_CHANGED,
@@ -235,6 +261,21 @@ export async function PATCH(req: Request, ctx: Ctx) {
         to: status,
       },
     });
+    if (stageSync?.applied && stageSync.fromStageId && stageSync.toStageId) {
+      await publishEntityEvent({
+        type: CORE_EVENT_TYPES.STATUS_CHANGED,
+        entityType: "LEAD",
+        entityId: leadId,
+        userId: user.id,
+        payload: {
+          fromStageId: stageSync.fromStageId,
+          toStageId: stageSync.toStageId,
+          source: "proposal_status",
+          proposalId: row.id,
+          proposalStatus: status,
+        },
+      });
+    }
   }
   if (status === "SENT" && prevStatus !== "SENT") {
     await publishEntityEvent({
@@ -285,6 +326,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
   revalidatePath(`/leads/${leadId}`);
   revalidatePath(`/leads/${leadId}/pricing`);
   revalidatePath(`/leads/${leadId}/proposals/${proposalId}/edit`);
+  revalidatePath("/leads");
 
   return NextResponse.json({ ok: true });
 }

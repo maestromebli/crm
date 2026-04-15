@@ -33,10 +33,17 @@ Thumbs.db
 # TypeScript / збірка
 *.tsbuildinfo
 tsc.log
+**/dist/
 
 # Локальні завантаження CRM (контракти тощо) — лише .gitkeep у репозиторії
 storage/uploads/**
 !storage/uploads/.gitkeep
+
+# Локальні backup-бандли та версійні знімки
+backups/
+
+# Monorepo на pnpm: не тримаємо npm lock-файли
+package-lock.json
 
 # Local / temp dirs (розгортання, тимчасові витяжки)
 .tmp-*/

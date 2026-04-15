@@ -22,6 +22,8 @@ export type ContactPageProps = {
   tasks: ContactTaskRow[];
   attachments: ContactAttachmentRow[];
   canUpdateContact: boolean;
+  canViewMessages: boolean;
+  canViewTasks: boolean;
   canViewFiles: boolean;
 };
 
@@ -32,12 +34,22 @@ export function ContactPage({
   tasks,
   attachments,
   canUpdateContact,
+  canViewMessages,
+  canViewTasks,
   canViewFiles,
 }: ContactPageProps) {
   return (
     <div className="min-h-[calc(100vh-56px)] bg-[var(--enver-bg)]">
       <ContactHeader contact={contact} />
-      <EntitySubnav entityId={contact.id} kind="contact" />
+      <EntitySubnav
+        entityId={contact.id}
+        kind="contact"
+        hiddenTabIds={[
+          ...(canViewMessages ? [] : ["conversations"]),
+          ...(canViewFiles ? [] : ["files"]),
+          ...(canViewTasks ? [] : ["tasks"]),
+        ]}
+      />
       <div className="mx-auto max-w-7xl px-3 py-4 md:px-6">
         {!tab ? (
           <ContactOverviewClient
@@ -46,14 +58,14 @@ export function ContactPage({
           />
         ) : tab === "deals" ? (
           <ContactDealsTab deals={contact.deals} />
-        ) : tab === "conversations" ? (
+        ) : tab === "conversations" && canViewMessages ? (
           <ContactConversationsTab messages={messages} />
-        ) : tab === "files" ? (
+        ) : tab === "files" && canViewFiles ? (
           <ContactFilesTab
             attachments={attachments}
             canDownload={canViewFiles}
           />
-        ) : tab === "tasks" ? (
+        ) : tab === "tasks" && canViewTasks ? (
           <ContactTasksTab tasks={tasks} />
         ) : tab === "activity" ? (
           <ContactActivityTabClient contactId={contact.id} />

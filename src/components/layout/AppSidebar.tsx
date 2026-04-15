@@ -6,10 +6,9 @@ import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
+import { motion, useReducedMotion } from "framer-motion";
 import { cn } from "../../lib/utils";
-import { hasEffectivePermission, P } from "../../lib/authz/permissions";
-import { NAV_SECTIONS, type NavSection } from "../../config/navigation";
-import { filterNavSubItemsForUser } from "../../lib/navigation-access";
+import { getVisibleNavSections } from "../../lib/navigation-visible";
 import styles from "./AppSidebar.module.css";
 import { tryReadResponseJson } from "@/lib/http/read-response-json";
 
@@ -19,19 +18,23 @@ type AppSidebarProps = {
   variant?: "default" | "drawer";
   compact?: boolean;
 };
+const ALERTS_POLL_MS = 90_000;
 
 export function AppSidebar({
   className,
   variant = "default",
   compact = false,
 }: AppSidebarProps = {}) {
+  const reduceMotion = useReducedMotion();
   const pathname = usePathname();
   const { data } = useSession();
   const [alertsUnread, setAlertsUnread] = useState(0);
   const [hoveredSectionId, setHoveredSectionId] = useState<string | null>(null);
+  const [animationsReady, setAnimationsReady] = useState(false);
   /** Акордеон: одна відкрита група; червінь синхронізується з маршрутом. */
   const [openSectionId, setOpenSectionId] = useState<string | null>(null);
   const closeTimerRef = useRef<number | null>(null);
+  const shouldAnimate = animationsReady && !reduceMotion;
   const keys = useMemo(
     () => data?.user?.permissionKeys ?? [],
     [data?.user?.permissionKeys],
@@ -44,67 +47,50 @@ export function AppSidebar({
   );
 
   const sections = useMemo(() => {
-    const canSeeSection = (s: NavSection) => {
-      const ctx = { realRole, impersonatorId };
-      if (s.id === "finance") {
-        return [P.REPORTS_VIEW, P.MARGIN_VIEW, P.COST_VIEW, P.PAYMENTS_VIEW].some(
-          (perm) => hasEffectivePermission(keys, perm, ctx),
-        );
-      }
-      if (s.id === "production") {
-        return [
-          P.PRODUCTION_LAUNCH,
-          P.PRODUCTION_ORDERS_VIEW,
-          P.PRODUCTION_ORDERS_MANAGE,
-          P.DEALS_VIEW,
-        ].some((perm) => hasEffectivePermission(keys, perm, ctx));
-      }
-      if (s.id === "procurement") {
-        return [P.COST_VIEW, P.MARGIN_VIEW, P.PAYMENTS_VIEW, P.REPORTS_VIEW].some(
-          (perm) => hasEffectivePermission(keys, perm, ctx),
-        );
-      }
-      if (!s.permission) return true;
-      return hasEffectivePermission(keys, s.permission, ctx);
-    };
-
-    const out: NavSection[] = [];
-    for (const s of NAV_SECTIONS) {
-      if (!canSeeSection(s)) {
-        continue;
-      }
-      if (!s.subItems?.length) {
-        out.push(s);
-        continue;
-      }
-      const subs = filterNavSubItemsForUser(s.id, s.subItems, menuAccess);
-      if (subs.length === 0) continue;
-      out.push({ ...s, subItems: subs });
-    }
-    return out;
+    return getVisibleNavSections({
+      permissionKeys: keys,
+      realRole,
+      impersonatorId,
+      menuAccess,
+    });
   }, [keys, realRole, impersonatorId, menuAccess]);
 
-  useLayoutEffect(() => {
-    if (compact) return;
-    for (const s of sections) {
-      if (!s.subItems?.length) continue;
+  const routeMatchedSectionId = useMemo(() => {
+    for (const section of sections) {
+      if (!section.subItems?.length) continue;
       const hasActiveSub =
-        s.subItems.some(
+        section.subItems.some(
           (sub) =>
             pathname === sub.href || pathname.startsWith(`${sub.href}/`),
         ) ?? false;
       const parentActive =
-        pathname === s.href || pathname.startsWith(`${s.href}/`);
+        pathname === section.href || pathname.startsWith(`${section.href}/`);
       if (hasActiveSub || parentActive) {
-        setOpenSectionId(s.id);
-        return;
+        return section.id;
       }
     }
-  }, [compact, pathname, sections]);
+    return null;
+  }, [pathname, sections]);
+
+  useLayoutEffect(() => {
+    if (compact || routeMatchedSectionId === null) return;
+    const rafId = window.requestAnimationFrame(() => {
+      setOpenSectionId((prev) =>
+        prev === routeMatchedSectionId ? prev : routeMatchedSectionId,
+      );
+    });
+    return () => window.cancelAnimationFrame(rafId);
+  }, [compact, routeMatchedSectionId]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setAnimationsReady(true), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
+      if (document.visibilityState !== "visible") return;
       try {
         const r = await fetch("/api/settings/communications/alerts/summary");
         const j = await tryReadResponseJson<{ unreadCount?: number }>(r);
@@ -118,10 +104,17 @@ export function AppSidebar({
     void load();
     const timer = window.setInterval(() => {
       void load();
-    }, 30000);
+    }, ALERTS_POLL_MS);
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        void load();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
     return () => {
       cancelled = true;
       window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [canViewAlerts]);
 
@@ -176,40 +169,39 @@ export function AppSidebar({
         variant === "drawer"
           ? "h-full min-h-0 w-full"
           : compact
-            ? "min-h-screen w-16 self-stretch"
-            : "min-h-screen w-80 self-stretch",
+            ? "w-16 self-stretch"
+            : "w-80 self-stretch",
         className,
       )}
     >
       <div
         className={cn(
-          "relative z-10 flex min-h-full flex-col py-5 antialiased",
+          "relative z-10 flex h-full min-h-0 flex-col py-5 antialiased",
           compact ? "px-2" : "px-3.5",
         )}
       >
         <div
           className={cn(
             "mb-6 flex w-full min-w-0 items-center",
-            compact ? "justify-center px-0" : "justify-start px-0",
+            compact ? "justify-center px-0" : "justify-center px-0",
           )}
         >
           <Link
             href="/crm/dashboard"
-            title="ENVER CRM · CRM-ERP SYSTEM"
             className={cn(
               "relative block min-w-0 shrink-0",
-              compact ? "h-[1.6rem] w-8" : "w-[80%]",
+              compact ? "w-9" : "mx-auto w-full max-w-[260px]",
             )}
           >
             <Image
               src="/enver-logo.png"
-              alt="ENVER CRM · CRM-ERP SYSTEM"
+              alt="ENVER CRM · CRM-ERP система"
               width={1696}
               height={604}
               className={
                 compact
-                  ? "bg-transparent h-full w-full object-cover object-left"
-                  : "bg-transparent h-auto w-full max-w-full object-contain object-left"
+                  ? "bg-transparent h-auto w-full object-contain object-center"
+                  : "bg-transparent h-auto w-full max-w-full object-contain object-center"
               }
               sizes={compact ? "32px" : "240px"}
               priority
@@ -218,10 +210,16 @@ export function AppSidebar({
         </div>
 
         <nav
-          className="flex-1 min-h-0 space-y-3 overflow-visible pr-1 text-sm leading-snug"
+          className={cn(
+            "flex-1 min-h-0 space-y-3 pr-1 text-sm leading-snug",
+            styles.menuScrollArea,
+            compact
+              ? "overflow-visible"
+              : "overflow-y-auto overscroll-contain",
+          )}
           aria-label="Головне меню"
         >
-        {sections.map((section) => {
+        {sections.map((section, index) => {
           const popoverId = `sidebar-popover-${section.id}`;
           const linkId = `sidebar-link-${section.id}`;
           const hasActiveSub =
@@ -235,9 +233,20 @@ export function AppSidebar({
           const accordionOpen = !compact && hasSubmenu && openSectionId === section.id;
 
           return (
-            <div
+            <motion.div
               key={section.id}
               className={cn(styles.navRow, compact && "relative")}
+              initial={
+                shouldAnimate
+                  ? { opacity: 0, x: compact ? 0 : -6, y: compact ? 2 : 0 }
+                  : false
+              }
+              animate={shouldAnimate ? { opacity: 1, x: 0, y: 0 } : undefined}
+              transition={{
+                duration: 0.2,
+                delay: Math.min(index, 10) * 0.02,
+                ease: "easeOut",
+              }}
               onMouseEnter={compact ? () => openHoverPopover(section.id) : undefined}
               onMouseLeave={compact ? scheduleCloseHoverPopover : undefined}
               onFocus={compact ? () => openHoverPopover(section.id) : undefined}
@@ -286,22 +295,22 @@ export function AppSidebar({
                   }
                   className={cn(
                     styles.navLink,
-                    "flex min-w-0 flex-1 items-center rounded-[12px] py-2 transition-[background-color] duration-200 ease-out",
+                    "enver-interactive flex min-w-0 flex-1 items-center rounded-[10px] py-1.5 transition-[background-color] duration-200 ease-out",
                     compact
                       ? "justify-center px-2 hover:bg-[var(--enver-hover)]"
                       : "gap-3 px-2 hover:bg-[var(--enver-hover)]",
                     !compact &&
                       "group/main [&:focus-visible]:outline [&:focus-visible]:outline-2 [&:focus-visible]:outline-offset-2 [&:focus-visible]:outline-[var(--enver-accent)]/40",
                     isActive &&
-                      "bg-[var(--enver-accent-soft)] font-semibold text-[var(--enver-accent-hover)] ring-1 ring-[var(--enver-accent-ring)]",
+                      "bg-[var(--enver-accent-soft)] font-semibold text-[var(--enver-accent)] ring-1 ring-[var(--enver-accent-ring)]/80",
                   )}
-                  title={compact ? section.label : undefined}
                 >
                   <span
                     className={cn(
-                      "flex shrink-0 items-center justify-center rounded-[12px] text-[var(--enver-text-muted)] ring-1 ring-[var(--enver-border-strong)]",
+                      "flex shrink-0 items-center justify-center rounded-[10px] text-[var(--enver-text-muted)] ring-1 ring-[var(--enver-border)]",
                       compact ? "h-9 w-9" : "h-9 w-9 bg-[var(--enver-bg)]",
-                      isActive && "bg-[var(--enver-card)] text-[var(--enver-accent)] ring-[var(--enver-accent-ring)]",
+                      isActive &&
+                        "bg-[var(--enver-surface-elevated)] text-[var(--enver-accent)] ring-[var(--enver-accent-ring)]/80",
                     )}
                   >
                     <Icon className="h-5 w-5" />
@@ -321,13 +330,14 @@ export function AppSidebar({
                   <button
                     type="button"
                     className={cn(
-                      "flex w-9 shrink-0 items-center justify-center rounded-[12px] text-[var(--enver-muted)] transition-colors hover:bg-[var(--enver-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--enver-accent)]/40",
+                      "enver-interactive flex w-9 shrink-0 items-center justify-center rounded-[12px] text-[var(--enver-muted)] transition-colors hover:bg-[var(--enver-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--enver-accent)]/40",
                       accordionOpen && "bg-[var(--enver-surface)]",
                     )}
                     aria-expanded={accordionOpen}
                     aria-controls={`submenu-${section.id}`}
                     onClick={(e) => {
                       e.preventDefault();
+                      e.stopPropagation();
                       toggleAccordion(section.id);
                     }}
                   >
@@ -406,7 +416,7 @@ export function AppSidebar({
                   })}
                 </ul>
               ) : null}
-            </div>
+            </motion.div>
           );
         })}
         </nav>
