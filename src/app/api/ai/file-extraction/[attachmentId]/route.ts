@@ -10,6 +10,8 @@ import {
 import { P } from "../../../../../lib/authz/permissions";
 import { requireDatabaseUrl } from "../../../../../lib/api/route-guards";
 import { scheduleFileAiProcessing } from "../../../../../features/ai/file-intelligence/process-file-extraction";
+import { requireAiRateLimit } from "../../../../../lib/ai/route-guard";
+import { logAiEvent } from "../../../../../lib/ai/log-ai-event";
 
 export const runtime = "nodejs";
 
@@ -40,6 +42,13 @@ export async function GET(_req: Request, ctx: Ctx) {
 
   const perm = forbidUnlessPermission(user, P.FILES_VIEW);
   if (perm) return perm;
+  const limited = await requireAiRateLimit({
+    userId: user.id,
+    action: "ai_file_extraction_get",
+    maxRequests: 60,
+    windowMinutes: 10,
+  });
+  if (limited) return limited;
 
   const { attachmentId } = await ctx.params;
   if (!attachmentId?.trim()) {
@@ -77,6 +86,13 @@ export async function PATCH(request: Request, ctx: Ctx) {
 
   const perm = forbidUnlessPermission(user, P.FILES_UPLOAD);
   if (perm) return perm;
+  const limited = await requireAiRateLimit({
+    userId: user.id,
+    action: "ai_file_extraction_patch",
+    maxRequests: 30,
+    windowMinutes: 10,
+  });
+  if (limited) return limited;
 
   const { attachmentId } = await ctx.params;
   if (!attachmentId?.trim()) {
@@ -130,6 +146,15 @@ export async function PATCH(request: Request, ctx: Ctx) {
     },
     update: { userConfirmedCategory: cat },
   });
+  await logAiEvent({
+    userId: user.id,
+    action: "ai_file_extraction_patch",
+    model: null,
+    ok: true,
+    entityType: att.entityType,
+    entityId: att.entityId,
+    metadata: { attachmentId: att.id, userConfirmedCategory: cat },
+  });
 
   return NextResponse.json({ ok: true });
 }
@@ -143,6 +168,13 @@ export async function POST(_req: Request, ctx: Ctx) {
 
   const perm = forbidUnlessPermission(user, P.FILES_UPLOAD);
   if (perm) return perm;
+  const limited = await requireAiRateLimit({
+    userId: user.id,
+    action: "ai_file_extraction_queue",
+    maxRequests: 20,
+    windowMinutes: 10,
+  });
+  if (limited) return limited;
 
   const { attachmentId } = await ctx.params;
   if (!attachmentId?.trim()) {
@@ -161,5 +193,14 @@ export async function POST(_req: Request, ctx: Ctx) {
   if (denied) return denied;
 
   scheduleFileAiProcessing(att.id, user.id);
+  await logAiEvent({
+    userId: user.id,
+    action: "ai_file_extraction_queue",
+    model: null,
+    ok: true,
+    entityType: att.entityType,
+    entityId: att.entityId,
+    metadata: { attachmentId: att.id, queued: true },
+  });
   return NextResponse.json({ ok: true, queued: true });
 }

@@ -63,7 +63,7 @@ export function BehaviorEngineCard({ data }: BehaviorEngineCardProps) {
           </ul>
           <Link
             href="/crm/dashboard?view=issues"
-            className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-[var(--enver-accent-hover)] hover:underline"
+            className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-[var(--enver-accent)] underline-offset-2 hover:text-[var(--enver-accent-hover)] hover:underline"
           >
             <Gauge className="h-3.5 w-3.5" />
             Відкрити risk view

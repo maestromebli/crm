@@ -103,7 +103,7 @@ export function promptDealSummary(
 ): string {
   return `${roleLine(user)}
 
-Контекст угоди (JSON):
+Контекст замовлення (JSON):
 ${contextJson}
 
 Поверни JSON:
@@ -121,7 +121,7 @@ export function promptDealReadiness(
 ): string {
   return `${roleLine(user)}
 
-Контекст угоди (JSON):
+Контекст замовлення (JSON):
 ${contextJson}
 
 У контексті вже є чекліст готовності — погодься або уточни.

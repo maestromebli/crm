@@ -15,6 +15,16 @@ export type DealHealthStatus = {
   reasonLabel: string;
 };
 
+export type DealTabState = "ok" | "attention" | "blocked";
+
+export type DealManagerJourneyAction = {
+  id: string;
+  label: string;
+  hint: string;
+  tab: DealWorkspaceTabId;
+  state: DealTabState;
+};
+
 export type DealPrimaryNextAction = {
   label: string;
   tab: DealWorkspaceTabId;
@@ -211,7 +221,7 @@ export function getCriticalBlockers(
       return {
         id: item.id,
         title: item.label,
-        description: item.blockerMessage ?? "Потрібна дія менеджера для руху угоди далі.",
+        description: item.blockerMessage ?? "Потрібна дія менеджера для руху замовлення далі.",
         severity: "critical" as const,
         relatedModule,
         ctaLabel: blockerCta(relatedModule),
@@ -241,7 +251,7 @@ export function getCriticalBlockers(
       severity: "critical",
       relatedModule: "tasks",
       ctaLabel: "Закрити прострочки",
-      stageImpact: "Блокує контрольований рух угоди",
+      stageImpact: "Блокує контрольований рух замовлення",
     });
   }
   const ranked = blockers.slice(0, 6).sort((a, b) => {
@@ -274,7 +284,7 @@ export function getWarnings(data: DealWorkspacePayload): DealWarning[] {
   if (!data.deal.value) {
     warnings.push({
       id: "no-value",
-      title: "Сума угоди не зафіксована",
+      title: "Сума замовлення не зафіксована",
       relatedModule: "overview",
     });
   }
@@ -300,9 +310,9 @@ export function getDealHealthStatus(
       .join(", ");
     return {
       level: "blocked",
-      label: "Blocked",
+      label: "Блокер",
       reason,
-      reasonLabel: `Blocked: ${reason || "критичний блокер"}`,
+      reasonLabel: reason || "Є критичний блокер",
     };
   }
   const staleWindowMs = 5 * 24 * 60 * 60 * 1000;
@@ -319,18 +329,18 @@ export function getDealHealthStatus(
   ) {
     return {
       level: "at_risk",
-      label: "At risk",
+      label: "Ризик",
       reason: isStale
-        ? "Низька активність по угоді останні дні."
+        ? "Низька активність по замовленні останні дні."
         : "Є фактори, що можуть затримати проходження етапу.",
-      reasonLabel: isStale ? "At risk: низька активність" : "At risk: потрібна увага",
+      reasonLabel: isStale ? "Низька активність" : "Потрібна увага",
     };
   }
   return {
     level: "healthy",
-    label: "Healthy",
-    reason: "Рух угоди контрольований, критичних ризиків не виявлено.",
-    reasonLabel: "Healthy: угода рухається по плану",
+    label: "Норма",
+    reason: "Рух замовлення контрольований, критичних ризиків не виявлено.",
+    reasonLabel: "Замовлення рухається за планом",
   };
 }
 
@@ -562,7 +572,7 @@ export function getSmartInsights(
         ? "Оновіть технічні дані перед передачею"
         : role === "production"
           ? "Перевірте комплект пакета перед запуском"
-          : warnings[0]?.title ?? "Перевірте повноту ключових даних угоди",
+          : warnings[0]?.title ?? "Перевірте повноту ключових даних замовлення",
     severity: warnings[0] ? "warning" : "info",
     section: "recommendations",
   });
@@ -574,4 +584,100 @@ export function getSmartInsights(
     section: "readiness",
   });
   return insights.slice(0, 3);
+}
+
+export function getDealTabStateMap(
+  data: DealWorkspacePayload,
+  role: DealViewRole = "manager",
+): Partial<Record<DealWorkspaceTabId, DealTabState>> {
+  const stateMap: Partial<Record<DealWorkspaceTabId, DealTabState>> = {};
+  const blockers = getCriticalBlockers(data, role);
+  const warnings = getWarnings(data);
+
+  const setState = (tab: DealWorkspaceTabId, state: DealTabState) => {
+    const current = stateMap[tab] ?? "ok";
+    if (current === "blocked") return;
+    if (state === "blocked") {
+      stateMap[tab] = "blocked";
+      return;
+    }
+    if (state === "attention" && current === "ok") {
+      stateMap[tab] = "attention";
+    }
+  };
+
+  blockers.forEach((item) => setState(item.relatedModule, "blocked"));
+  warnings.forEach((item) => setState(item.relatedModule, "attention"));
+
+  if (data.operationalStats.overdueOpenTasksCount > 0) {
+    setState("tasks", "blocked");
+  }
+  if (!data.meta.nextStepLabel?.trim() || !data.meta.nextActionAt) {
+    setState("overview", "attention");
+  }
+
+  const finance = getFinanceSummary(data);
+  if (finance.hasNumeric && finance.remaining > 0) {
+    setState("payment", "attention");
+  }
+
+  return stateMap;
+}
+
+export function getManagerJourneyActions(
+  data: DealWorkspacePayload,
+  role: DealViewRole = "manager",
+): DealManagerJourneyAction[] {
+  const tabState = getDealTabStateMap(data, role);
+  const primaryAction = getPrimaryNextAction(data, role);
+
+  const actions: DealManagerJourneyAction[] = [
+    {
+      id: "next-primary",
+      label: primaryAction.label,
+      hint:
+        primaryAction.reasons[0] ??
+        "Найпріоритетніша дія для поточного етапу замовлення.",
+      tab: primaryAction.tab,
+      state: primaryAction.severity === "danger" ? "blocked" : "attention",
+    },
+    {
+      id: "messages-sync",
+      label: "Оновити комунікацію з клієнтом",
+      hint: "Зафіксуйте останній контакт і домовленості.",
+      tab: "messages",
+      state: tabState.messages ?? "ok",
+    },
+    {
+      id: "tasks-control",
+      label: "Закрити задачі поточного етапу",
+      hint:
+        data.operationalStats.overdueOpenTasksCount > 0
+          ? `Є прострочки: ${data.operationalStats.overdueOpenTasksCount}`
+          : "Підтримуйте фокус команди на дедлайнах.",
+      tab: "tasks",
+      state: tabState.tasks ?? "attention",
+    },
+    {
+      id: "contract-step",
+      label: "Погодити та перевірити договір",
+      hint: "Підготуйте замовлення до підписання без правок в останній момент.",
+      tab: "contract",
+      state: tabState.contract ?? "attention",
+    },
+    {
+      id: "payment-step",
+      label: "Перевірити оплату та фінансові віхи",
+      hint: "Упевніться, що фінансові умови виконуються вчасно.",
+      tab: "payment",
+      state: tabState.payment ?? "attention",
+    },
+  ];
+
+  const byTab = new Map<DealWorkspaceTabId, DealManagerJourneyAction>();
+  actions.forEach((item) => {
+    if (!byTab.has(item.tab)) byTab.set(item.tab, item);
+  });
+
+  return Array.from(byTab.values()).slice(0, 5);
 }

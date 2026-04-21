@@ -101,7 +101,7 @@ export function LeadSummary({
         {},
       );
       if (!data.dealId) {
-        throw new Error(data.error ?? "Не вдалося створити угоду");
+        throw new Error(data.error ?? "Не вдалося створити замовлення");
       }
       router.push(`/deals/${data.dealId}/workspace?fromLead=1`);
       router.refresh();

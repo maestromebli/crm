@@ -10,6 +10,12 @@ function money(value: number | null | undefined) {
   }).format(value);
 }
 
+function readinessLabel(value: "ready" | "not_ready" | "blocked"): string {
+  if (value === "ready") return "Готово";
+  if (value === "blocked") return "Заблоковано";
+  return "Не готово";
+}
+
 export function DealOverviewCard({ data }: { data: DealHubOverview }) {
   return (
     <DealCard title="Зріз замовлення" subtitle="Комерція + фінанси + готовність">
@@ -34,7 +40,9 @@ export function DealOverviewCard({ data }: { data: DealHubOverview }) {
         </div>
         <div>
           <p className="text-slate-500">Виробництво</p>
-          <p className="font-semibold text-slate-900">{data.production.readiness}</p>
+          <p className="font-semibold text-slate-900">
+            {readinessLabel(data.production.readiness)}
+          </p>
         </div>
         <div>
           <p className="text-slate-500">Дата монтажу</p>

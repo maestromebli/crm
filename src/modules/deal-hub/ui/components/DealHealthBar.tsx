@@ -18,9 +18,9 @@ export function DealHealthBar({ data }: { data: DealHubOverview }) {
         ? "Увага"
         : data.health.status === "RISK"
           ? "Ризик"
-          : data.health.status;
+          : "Критично";
   return (
-    <DealCard title="Стан угоди" subtitle={data.health.reasons[0] ?? "Критичних ризиків немає"}>
+    <DealCard title="Стан замовлення" subtitle={data.health.reasons[0] ?? "Критичних ризиків немає"}>
       <div className="h-2 overflow-hidden rounded-full bg-slate-100">
         <div className={`h-full ${tone}`} style={{ width: `${pct}%` }} />
       </div>

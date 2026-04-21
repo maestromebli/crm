@@ -44,7 +44,7 @@ const STEP_DEFS: StepDef[] = [
   },
   {
     id: "deal",
-    label: "Угода",
+    label: "Замовлення",
     complete: (l) => !!l.dealId,
     disabled: (l) => !l.dealId,
   },

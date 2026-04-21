@@ -86,7 +86,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
       select: { id: true, ownerId: true },
     });
     if (!existing) {
-      return NextResponse.json({ error: "Угоду не знайдено" }, { status: 404 });
+      return NextResponse.json({ error: "Замовлення не знайдено" }, { status: 404 });
     }
 
     const denied = await forbidUnlessDealAccess(user, P.DEALS_UPDATE, {

@@ -49,7 +49,7 @@ export function DealPipelineProgress({ steps, data, onTab }: Props) {
   return (
     <section className="rounded-2xl border border-[var(--enver-border)] bg-[var(--enver-card)] px-3 py-3">
       <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--enver-muted)]">
-        Pipeline progress
+        Прогрес замовлення
       </h3>
       <div className="grid gap-2 md:grid-cols-8">
         {steps.map((step) => (

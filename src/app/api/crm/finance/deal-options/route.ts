@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireSessionUser } from "@/lib/authz/api-guard";
 import { canFinanceAction } from "@/features/finance/lib/permissions";
 
-/** Короткий список угод для прив’язки проводок (фінанси). */
+/** Короткий список замовлень для прив’язки проводок (фінанси). */
 export async function GET() {
   if (!process.env.DATABASE_URL?.trim()) {
     return NextResponse.json({ error: "DATABASE_URL не задано" }, { status: 503 });

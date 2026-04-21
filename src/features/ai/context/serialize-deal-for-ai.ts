@@ -5,6 +5,7 @@ import {
   canViewMarginInAi,
   canViewPaymentsInAi,
 } from "../policies/ai-data-policy";
+import { redactContextForAi } from "../../../lib/ai/context-denylist";
 
 function truncate(s: string, max: number): string {
   const t = s.trim();
@@ -13,7 +14,7 @@ function truncate(s: string, max: number): string {
 }
 
 /**
- * Урізана вибірка з робочого місця угоди для ШІ (без повних текстів договорів).
+ * Урізана вибірка з робочого місця замовлення для ШІ (без повних текстів договорів).
  */
 export function serializeDealForAi(
   data: DealWorkspacePayload,
@@ -74,5 +75,5 @@ export function serializeDealForAi(
     },
   };
 
-  return JSON.stringify(payload, null, 0);
+  return JSON.stringify(redactContextForAi(payload), null, 0);
 }

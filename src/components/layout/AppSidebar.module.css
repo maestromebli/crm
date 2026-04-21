@@ -37,7 +37,7 @@
 }
 
 .navLinkMuted {
-  color: #8b92a3;
+  color: #b6c8de;
   text-shadow: none;
 }
 
@@ -57,6 +57,14 @@
 .menuScrollArea::-webkit-scrollbar {
   width: 0;
   height: 0;
+  display: none;
+}
+
+.logoForDarkBg {
+  display: block;
+}
+
+.logoForLightBg {
   display: none;
 }
 
@@ -91,4 +99,12 @@
 
 :global(html[data-theme="light"]) .navLink:hover {
   color: #0f172a;
+}
+
+:global(html[data-theme="light"]) .logoForDarkBg {
+  display: none;
+}
+
+:global(html[data-theme="light"]) .logoForLightBg {
+  display: block;
 }

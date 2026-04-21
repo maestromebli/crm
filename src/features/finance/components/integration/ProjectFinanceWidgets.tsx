@@ -13,7 +13,7 @@ type Props = {
 };
 
 /**
- * Компактні віджети для Hub угоди/проєкту: борги, шари закупівель, маржа, прострочення.
+ * Компактні віджети для Hub замовлення/проєкту: борги, шари закупівель, маржа, прострочення.
  */
 export function ProjectFinanceWidgets({ projectId, projectCode, summary }: Props) {
   const s = summary;

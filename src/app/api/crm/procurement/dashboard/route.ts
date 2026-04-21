@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireSessionUser } from "@/lib/authz/api-guard";
+import { ownerIdWhere, resolveAccessContext } from "@/lib/authz/data-scope";
 import { canProcurementAction } from "@/features/procurement/lib/permissions";
 import { buildOrderedLineMonitorFromPrismaRequests } from "@/features/procurement/lib/ordered-line-monitor";
 
@@ -48,6 +49,12 @@ export async function GET(req: Request) {
     if (!canProcurementAction(user, "procurement.view")) {
       return NextResponse.json({ error: "Недостатньо прав" }, { status: 403 });
     }
+    const access = await resolveAccessContext(prisma, {
+      id: user.id,
+      role: user.dbRole,
+    });
+    const ownerFilter = ownerIdWhere(access);
+    const dealWhere = ownerFilter ? { ownerId: ownerFilter } : undefined;
 
     const { searchParams } = new URL(req.url);
     const q = searchParams.get("q")?.trim() ?? "";
@@ -75,6 +82,7 @@ export async function GET(req: Request) {
       ),
       safeOptionalList("DealPurchaseOrder", () =>
         prisma.dealPurchaseOrder.findMany({
+          where: dealWhere ? { deal: { ownerId: ownerFilter } } : undefined,
           orderBy: { createdAt: "desc" },
           take: 50,
           include: {
@@ -91,6 +99,7 @@ export async function GET(req: Request) {
       ),
       safeOptionalList("ProcurementRequest", () =>
         prisma.procurementRequest.findMany({
+          where: dealWhere ? { deal: { ownerId: ownerFilter } } : undefined,
           orderBy: { createdAt: "desc" },
           take: 120,
           include: {

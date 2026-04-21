@@ -63,7 +63,7 @@ export async function transitionDealStage(args: {
     },
   });
   if (!deal) {
-    return { ok: false, status: 404, error: "Угоду не знайдено" };
+    return { ok: false, status: 404, error: "Замовлення не знайдено" };
   }
 
   const nextStage = await prisma.pipelineStage.findFirst({

@@ -66,6 +66,13 @@ export const SETTINGS_ITEMS: SettingsItem[] = [
     path: "/settings/checklists",
   },
   {
+    id: "contracts",
+    section: "Документи",
+    label: "Договори та шаблони",
+    access: "admin",
+    path: "/settings/contracts",
+  },
+  {
     id: "notifications",
     section: "Сповіщення",
     label: "Правила сповіщень",

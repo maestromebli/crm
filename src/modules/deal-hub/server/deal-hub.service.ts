@@ -6,6 +6,7 @@ import { getDealHubAggregate } from "./deal-hub.repository";
 import { evaluateDealHealth } from "./deal-health.service";
 import { buildDealNextActions } from "./deal-next-actions.service";
 import { buildDealTimeline } from "./deal-timeline.service";
+import { readDealNumberFromMeta } from "@/lib/deals/deal-number";
 
 function toNumber(value: unknown): number | null {
   if (value == null) return null;
@@ -86,7 +87,10 @@ export async function getDealHubOverview(
     deal: {
       id: deal.id,
       title: deal.title,
-      code: deal.id.slice(0, 8).toUpperCase(),
+      code:
+        readDealNumberFromMeta(deal.workspaceMeta) ||
+        deal.productionFlow?.number?.trim() ||
+        deal.id.slice(0, 8).toUpperCase(),
       status: deal.status,
       stage,
       stageLabel: DEAL_HUB_STAGE_LABELS[stage],

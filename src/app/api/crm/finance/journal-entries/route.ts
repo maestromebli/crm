@@ -88,7 +88,7 @@ export async function POST(req: Request) {
         select: { id: true },
       });
       if (!exists) {
-        return NextResponse.json({ error: "Угоду не знайдено" }, { status: 404 });
+        return NextResponse.json({ error: "Замовлення не знайдено" }, { status: 404 });
       }
     }
 

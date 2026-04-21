@@ -806,7 +806,7 @@ export async function DELETE(_req: Request, ctx: Ctx) {
 
   if (lead.dealId) {
     return NextResponse.json(
-      { error: "Неможливо видалити лід, який уже конвертовано в угоду" },
+      { error: "Неможливо видалити лід, який уже конвертовано в замовлення" },
       { status: 409 },
     );
   }

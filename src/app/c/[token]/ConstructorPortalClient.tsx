@@ -415,11 +415,11 @@ export function ConstructorPortalClient({ token }: { token: string }) {
 
       <section className="rounded-xl border border-slate-200 bg-[var(--enver-card)] p-4 shadow-sm">
         <h2 className="text-sm font-semibold text-[var(--enver-text)]">
-          Файли та зображення проєкту (з угоди)
+          Файли та зображення проєкту (з замовлення)
         </h2>
         <ul className="mt-2 space-y-1 text-xs">
           {data.dealAttachments.length === 0 ? (
-            <li className="text-slate-500">Немає вкладень у картці угоди.</li>
+            <li className="text-slate-500">Немає вкладень у картці замовлення.</li>
           ) : (
             data.dealAttachments.map((a) => (
               <li key={a.id}>
@@ -444,7 +444,7 @@ export function ConstructorPortalClient({ token }: { token: string }) {
           {data.dealAttachments.filter((a) => measurementish(a.category))
             .length === 0 ? (
             <li className="text-slate-500">
-              Немає файлів категорій «замір» / «фото об&apos;єкта» в угоді.
+              Немає файлів категорій «замір» / «фото об&apos;єкта» в замовленні.
             </li>
           ) : (
             data.dealAttachments

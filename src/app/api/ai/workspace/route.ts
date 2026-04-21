@@ -9,6 +9,8 @@ import { requireDatabaseUrl } from "../../../../lib/api/route-guards";
 import { prisma } from "../../../../lib/prisma";
 import { recordContinuousLearningEvent } from "../../../../lib/ai/continuous-learning";
 import { buildAiWorkspaceSnapshot } from "../../../../features/ai/workspace/build-workspace-snapshot";
+import { requireAiRateLimit } from "../../../../lib/ai/route-guard";
+import { logAiEvent } from "../../../../lib/ai/log-ai-event";
 
 export const runtime = "nodejs";
 
@@ -36,6 +38,13 @@ export async function GET(request: Request) {
   if (!canFetchWorkspace(user)) {
     return NextResponse.json({ error: "Недостатньо прав" }, { status: 403 });
   }
+  const limited = await requireAiRateLimit({
+    userId: user.id,
+    action: "workspace_snapshot",
+    maxRequests: 40,
+    windowMinutes: 10,
+  });
+  if (limited) return limited;
 
   const { searchParams } = new URL(request.url);
   const leadId = searchParams.get("leadId")?.trim() || null;
@@ -68,7 +77,7 @@ export async function GET(request: Request) {
       select: { id: true, ownerId: true },
     });
     if (!deal) {
-      return NextResponse.json({ error: "Угоду не знайдено" }, { status: 404 });
+      return NextResponse.json({ error: "Замовлення не знайдено" }, { status: 404 });
     }
     const denied = await forbidUnlessDealAccess(user, P.DEALS_VIEW, deal);
     if (denied) return denied;
@@ -96,6 +105,17 @@ export async function GET(request: Request) {
     entityId: snapshot.entityId,
     ok: true,
     metadata: { stage: snapshot.stageLabel },
+  });
+  await logAiEvent({
+    userId: user.id,
+    action: "workspace_snapshot",
+    model: null,
+    ok: true,
+    metadata: {
+      entity: snapshot.entity,
+      entityId: snapshot.entityId,
+      stage: snapshot.stageLabel,
+    },
   });
 
   return NextResponse.json(snapshot);

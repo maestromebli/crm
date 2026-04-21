@@ -22,13 +22,13 @@ async function gateDealUpdate(
     select: { ownerId: true },
   });
   if (!d) {
-    return NextResponse.json({ error: "Угоду не знайдено" }, { status: 404 });
+    return NextResponse.json({ error: "Замовлення не знайдено" }, { status: 404 });
   }
   return forbidUnlessDealAccess(user, P.DEALS_UPDATE, d);
 }
 
 /**
- * Оновлення полів фінансового проєкту. Зараз: прив’язка / відв’язка угоди (`dealId`).
+ * Оновлення полів фінансового проєкту. Зараз: прив’язка / відв’язка замовлення (`dealId`).
  */
 export async function PATCH(req: Request, ctx: Ctx) {
   const dbNotReady = requireDatabaseUrl();

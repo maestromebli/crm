@@ -27,7 +27,7 @@ export function buildServerDashboardAiContext(
     "",
     "=== Показники (операційний зріз) ===",
     `Нові ліди за 24 год: ${snapshot.kpiNewLeads24h} (попередні 24 год: ${snapshot.kpiNewLeadsPrev24h}).`,
-    `Відкриті угоди: ${snapshot.kpiOpenDeals}; на етапі договору: ${snapshot.kpiDealsInContractStage}.`,
+    `Відкриті замовлення: ${snapshot.kpiOpenDeals}; на етапі договору: ${snapshot.kpiDealsInContractStage}.`,
     `Прострочені задачі: ${snapshot.kpiOverdueTasks}.`,
     `Майбутні монтажі (лічильник): ${snapshot.installationUpcoming}; ризик виробництва: ${snapshot.productionRisk}.`,
     `Підпис Дія — прострочені очікування: ${snapshot.signatureStaleCount}.`,
@@ -35,7 +35,7 @@ export function buildServerDashboardAiContext(
     "=== CRM аналітика за період ===",
     `Активні ліди: ${analytics.activeLeads}; нові за період: ${analytics.newLeadsInPeriod}.`,
     `КП надіслано: ${analytics.proposalsSent}; погоджено: ${analytics.proposalsApproved}.`,
-    `Угоди виграно за період: ${analytics.dealsWonInPeriod}; сума виручки (оцінка з угод): ${Math.round(analytics.revenueInPeriod)} UAH.`,
+    `Замовлення виграно за період: ${analytics.dealsWonInPeriod}; сума виручки (оцінка з замовлень): ${Math.round(analytics.revenueInPeriod)} UAH.`,
     `КП без руху >48 год: ${analytics.staleProposals48h}; ліди без контакту >24 год: ${analytics.leadsNoContact24h}.`,
     "",
     "=== Увага (короткий список) ===",
@@ -57,7 +57,7 @@ export function buildServerDashboardAiContext(
     "=== Тренд по днях (остання частина періоду) ===",
     ...analytics.trend.slice(-10).map(
       (t) =>
-        `- ${t.label}: ліди ${t.leads}, виграні угоди ${t.dealsWon}, виручка ~${Math.round(t.revenue)} UAH`,
+        `- ${t.label}: ліди ${t.leads}, виграні замовлення ${t.dealsWon}, виручка ~${Math.round(t.revenue)} UAH`,
     ),
   ];
 

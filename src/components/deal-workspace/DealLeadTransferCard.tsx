@@ -29,7 +29,7 @@ export function DealLeadTransferCard({ data }: Props) {
 
       <ul className="mt-2 space-y-1 text-xs text-[var(--enver-text-muted)]">
         <li>
-          Файли в угоді:{" "}
+          Файли в замовленні:{" "}
           <span className="font-medium text-[var(--enver-text)]">{data.attachmentsCount}</span>
           {summary ? ` (мігровано: ${summary.filesMigrated})` : ""}
         </li>

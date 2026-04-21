@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
+import { allocateDealNumber } from "@/lib/deals/deal-number";
 import type { SessionUser } from "@/lib/authz/api-guard";
-import { calculatePricing } from "@/modules/leads/lead-pricing/ultra";
+import { calculatePricing } from "@/modules/leads/lead-pricing/ultra/engine/calculate-pricing";
 import type { PricingItemInput } from "@/modules/leads/lead-pricing/ultra/engine/types";
 import { toLeadHubSessionDto } from "../adapters/session-dto";
 
@@ -170,6 +171,7 @@ export async function convertLeadHubToDeal(params: {
         .totalRevenue ?? 0,
     );
 
+    const dealNumber = await allocateDealNumber(tx);
     const deal = await tx.deal.create({
       data: {
         title: params.dealTitle?.trim() || session.title || "Deal from Lead Hub",
@@ -181,6 +183,7 @@ export async function convertLeadHubToDeal(params: {
         ownerId: params.ownerId,
         value: totalRevenue,
         currency: session.pricingSession.currency,
+        workspaceMeta: { dealNumber },
       },
     });
 

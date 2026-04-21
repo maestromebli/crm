@@ -51,7 +51,7 @@ export function DailyOperatingCard({ data }: DailyOperatingCardProps) {
               <p className="text-xs text-[var(--enver-text-muted)]">{p.reason}</p>
               <Link
                 href={p.href}
-                className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-[var(--enver-accent-hover)] hover:underline"
+                className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-[var(--enver-accent)] underline-offset-2 hover:text-[var(--enver-accent-hover)] hover:underline"
               >
                 <CalendarClock className="h-3.5 w-3.5" />
                 {p.ctaLabel}
@@ -77,7 +77,7 @@ export function DailyOperatingCard({ data }: DailyOperatingCardProps) {
 
       <Link
         href="/tasks/today"
-        className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-[var(--enver-accent-hover)] hover:underline"
+        className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-[var(--enver-accent)] underline-offset-2 hover:text-[var(--enver-accent-hover)] hover:underline"
       >
         <CheckSquare className="h-3.5 w-3.5" />
         Відкрити пріоритети дня

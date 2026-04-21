@@ -1,5 +1,5 @@
 /**
- * Кваліфікація ліда до угоди (зберігається в Lead.qualification JSON).
+ * Кваліфікація ліда до замовлення (зберігається в Lead.qualification JSON).
  */
 export type LeadQualification = {
   furnitureType?: string | null;

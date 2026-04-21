@@ -60,7 +60,7 @@ export async function patchDealById(
     body: JSON.stringify(body),
   });
   const j = await parseResponseJson<{ error?: string; message?: string }>(r);
-  if (!r.ok) throw new Error(j.error ?? j.message ?? "Не вдалося зберегти угоду");
+  if (!r.ok) throw new Error(j.error ?? j.message ?? "Не вдалося зберегти замовлення");
 }
 
 export async function patchDealStageById(

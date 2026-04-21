@@ -13,7 +13,7 @@ export function getAssistantGreeting(ctx: AssistantResolvedContext): string {
     case "lead":
       return "Вітаю. Допоможу з кваліфікацією ліда та наступним контактом.";
     case "deal":
-      return "Вітаю. Тримаємо угоду під контролем — від КП до передачі.";
+      return "Вітаю. Тримаємо замовлення під контролем — від КП до передачі.";
     case "calculation":
       return "Вітаю. Поясню версії розрахунку та активну КП.";
     case "quote":

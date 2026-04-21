@@ -49,9 +49,9 @@ export function DealsKpiStrip({
       icon: ListChecks,
       label: countLabel,
       value: String(total),
-      sub: total === 1 ? "угода" : "угод",
+      sub: total === 1 ? "замовлення" : "замовлень",
       tone: "slate" as const,
-      hint: "Кількість угод у поточному відфільтрованому списку.",
+      hint: "Кількість замовлень у поточному відфільтрованому списку.",
     },
     {
       icon: CircleDollarSign,
@@ -59,7 +59,7 @@ export function DealsKpiStrip({
       value: hasValue > 0 ? formatMoney(sumValue, curSample) : "—",
       sub: hasValue ? `${hasValue} з сумою` : "немає сум",
       tone: "emerald" as const,
-      hint: "Сума значень угод, де вказана вартість; валюта з першого рядка з сумою.",
+      hint: "Сума значень замовлень, де вказана вартість; валюта з першого рядка з сумою.",
     },
     {
       icon: AlertTriangle,
@@ -77,7 +77,7 @@ export function DealsKpiStrip({
           : warning > 0
             ? ("amber" as const)
             : ("slate" as const),
-      hint: "Угоди з прапорцем критичного ризику або попередження за SLA та оплатами.",
+      hint: "Замовлення з прапорцем критичного ризику або попередження за SLA та оплатами.",
     },
     {
       icon: Banknote,
@@ -85,7 +85,7 @@ export function DealsKpiStrip({
       value: String(noNext),
       sub: "лише відкриті",
       tone: noNext > 0 ? ("amber" as const) : ("slate" as const),
-      hint: "Відкриті угоди без запланованого наступного кроку та дати.",
+      hint: "Відкриті замовлення без запланованого наступного кроку та дати.",
     },
   ];
 
@@ -114,7 +114,7 @@ export function DealsKpiStrip({
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-white/80">
                   {c.label}
                 </p>
-                <p className="truncate text-xl font-bold tabular-nums tracking-tight">
+                <p className="truncate text-xl font-bold tabular-nums tracking-tight text-white">
                   {c.value}
                 </p>
                 <p className="text-[10px] text-white/75">{c.sub}</p>

@@ -3,5 +3,5 @@ export {
   getLeadHubSession,
   convertLeadHubToDeal,
   updatePricingFromState,
-  recalculatePricingSession,
-} from "@/modules/leads/ultra";
+} from "@/modules/leads/lead-hub/ultra/server/lead-hub-service";
+export { recalculatePricingSession } from "@/modules/leads/lead-pricing/ultra/services/pricing-session-service";

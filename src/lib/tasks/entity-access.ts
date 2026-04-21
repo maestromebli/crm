@@ -19,7 +19,7 @@ export async function assertTaskEntityAccess(
       select: { ownerId: true },
     });
     if (!deal) {
-      return NextResponse.json({ error: "Угоду не знайдено" }, { status: 404 });
+      return NextResponse.json({ error: "Замовлення не знайдено" }, { status: 404 });
     }
     return await forbidUnlessDealAccess(user, P.TASKS_VIEW, deal);
   }

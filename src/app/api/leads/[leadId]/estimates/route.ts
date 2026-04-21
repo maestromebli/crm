@@ -141,7 +141,7 @@ export async function POST(req: Request, ctx: Ctx) {
   }
   if (lead.dealId) {
     return NextResponse.json(
-      { error: "Лід уже привʼязаний до угоди — прорахунки ведуться в угоді" },
+      { error: "Лід уже привʼязаний до замовлення — прорахунки ведуться в замовленні" },
       { status: 409 },
     );
   }
@@ -404,7 +404,7 @@ export async function POST(req: Request, ctx: Ctx) {
       }
       if (code === ESTIMATE_CREATE_PRECONDITION.LEAD_ALREADY_CONVERTED) {
         return NextResponse.json(
-          { error: "Лід уже привʼязаний до угоди — прорахунки ведуться в угоді" },
+          { error: "Лід уже привʼязаний до замовлення — прорахунки ведуться в замовленні" },
           { status: 409 },
         );
       }

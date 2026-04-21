@@ -14,7 +14,7 @@ export function verifyMetaSignature(args: {
   appSecret?: string;
 }): boolean {
   const secret = args.appSecret?.trim();
-  if (!secret) return true;
+  if (!secret) return false;
   if (!args.signatureHeader?.startsWith("sha256=")) return false;
   const expected =
     "sha256=" + createHmac("sha256", secret).update(args.rawBody).digest("hex");

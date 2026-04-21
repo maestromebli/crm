@@ -4,8 +4,8 @@ const TITLE_UA: Partial<Record<ActivityType, string>> = {
   LEAD_CREATED: "Лід створено",
   LEAD_UPDATED: "Оновлення картки",
   FILE_UPLOADED: "Файл додано",
-  DEAL_CREATED: "Угоду створено",
-  DEAL_UPDATED: "Угоду оновлено",
+  DEAL_CREATED: "Замовлення створено",
+  DEAL_UPDATED: "Замовлення оновлено",
   DEAL_STAGE_CHANGED: "Стадію змінено",
   DEAL_WORKSPACE_META_UPDATED: "Робоче місце оновлено",
   CONTRACT_CREATED: "Договір створено",
@@ -33,7 +33,7 @@ const FIELD_UA: Record<string, string> = {
   contactId: "контакт",
   pipelineId: "воронка",
   lastActivityAt: "остання активність",
-  dealId: "угода",
+  dealId: "замовлення",
   lostReason: "причина втрати",
   nextStepAt: "наступний крок",
 };
@@ -82,7 +82,7 @@ export function leadActivityHeadline(
       return "Стадія за рекомендацією AI";
     }
     if (data.convertedToDealId) {
-      return "Конверсія в угоду";
+      return "Конверсія в замовлення";
     }
     if (data.createdContactId) {
       return "Контакт привʼязано";
@@ -167,7 +167,7 @@ export function leadActivityDetail(type: ActivityType, data: unknown): string {
       return "Стадію оновлено автоматично за підсумком AI-аналізу.";
     }
     if (typeof data.convertedToDealId === "string") {
-      return "Лід повʼязано з новою угодою — подальші дії ведуться в угоді.";
+      return "Лід повʼязано з новою замовленням — подальші дії ведуться в замовленні.";
     }
     if (data.createdContactId) {
       return "Створено та привʼязано контакт до ліда.";

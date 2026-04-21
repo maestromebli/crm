@@ -124,7 +124,7 @@ export type DealEstimateWorkspaceProps = {
   dealId: string;
   dealTitle: string;
   estimateVisibility: EstimateVisibility;
-  /** Для синхронізації суми угоди з сметою (кнопка над таблицею). */
+  /** Для синхронізації суми замовлення з сметою (кнопка над таблицею). */
   workspacePayload?: DealWorkspacePayload;
 };
 
@@ -224,7 +224,7 @@ export function DealEstimateWorkspace({
             Розрахунок ще не створено
           </h2>
           <p className={cn("mt-2 text-[14px]", muted)}>
-            Створіть першу версію комерційного розрахунку для угоди «{dealTitle}
+            Створіть першу версію комерційного розрахунку для замовлення «{dealTitle}
             ».
           </p>
           <button
@@ -255,7 +255,7 @@ export function DealEstimateWorkspace({
       {showDealValueSync ? (
         <div className="enver-card-appear mx-4 mt-2 shrink-0 rounded-xl border border-amber-200 bg-amber-50/95 px-3 py-2.5 shadow-sm">
           <p className="text-[11px] leading-relaxed text-amber-950">
-            <span className="font-semibold">Сума в шапці угоди</span> не збігається з
+            <span className="font-semibold">Сума в шапці замовлення</span> не збігається з
             останньою сметою (або не задана). Підставте для договору, КП та
             звітів.
           </p>
@@ -1004,7 +1004,7 @@ export function DealEstimateWorkspace({
             }
           }
           const parts = [
-            `КП з угоди · ${dealTitle}`,
+            `КП з замовлення · ${dealTitle}`,
             `Секції: ${opts.sectionIds.length}`,
             opts.includeBreakdown ? "з деталізацією" : "підсумки по секціях",
             opts.includeDelivery ? "доставка" : "",

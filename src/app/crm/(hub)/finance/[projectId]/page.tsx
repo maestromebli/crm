@@ -40,7 +40,7 @@ export default async function FinanceProjectPage({ params, searchParams }: Props
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-4">
-          <SectionCard title="Об'єкти угоди та зв'язки" subtitle="Адреси монтажу, закупівля та фінанси по проєкту">
+          <SectionCard title="Об'єкти замовлення та зв'язки" subtitle="Адреси монтажу, закупівля та фінанси по проєкту">
             <div className="space-y-2">
               {data.objects.map((o) => (
                 <div

@@ -30,13 +30,13 @@ const PRE_CONTRACT_SLUGS = new Set([
 /** Системна рекомендація з урахуванням етапу продажу (не договір першим для ранніх стадій). */
 export function deriveNextBestAction(data: DealWorkspacePayload): string {
   if (data.deal.status === "LOST") {
-    return "Угода втрачена — за потреби зафіксуйте причину в нотатках.";
+    return "Замовлення втрачена — за потреби зафіксуйте причину в нотатках.";
   }
   if (data.deal.status === "WON") {
-    return "Угода виграна — контролюйте оплату та передачу у виробництво.";
+    return "Замовлення виграна — контролюйте оплату та передачу у виробництво.";
   }
   if (data.deal.status === "ON_HOLD") {
-    return "Угода на паузі — заплануйте повторний контакт (наступний крок + дата).";
+    return "Замовлення на паузі — заплануйте повторний контакт (наступний крок + дата).";
   }
 
   const slug = data.stage.slug;
@@ -63,7 +63,7 @@ export function deriveNextBestAction(data: DealWorkspacePayload): string {
 
   const c = data.contract;
   if (!c || c.status === "DRAFT") {
-    return "Підготуйте договір після узгодження умов — блок «Угода → Договір».";
+    return "Підготуйте договір після узгодження умов — блок «Замовлення → Договір».";
   }
   if (
     c.status === "GENERATED" ||
@@ -90,15 +90,15 @@ export function deriveNextBestAction(data: DealWorkspacePayload): string {
   }
 
   if (slug === "payment" || slug === "handoff" || slug === "production") {
-    return "Контролюйте оплату, файли та передачу — блок «Угода» та «Після продажу».";
+    return "Контролюйте оплату, файли та передачу — блок «Замовлення» та «Після продажу».";
   }
 
-  return "Оновіть наступний крок і дату контакту в шапці угоди.";
+  return "Оновіть наступний крок і дату контакту в шапці замовлення.";
 }
 
 export function deriveAiSummary(data: DealWorkspacePayload): string {
   const parts: string[] = [];
-  parts.push(`Угода «${data.deal.title}», клієнт ${data.client.name}.`);
+  parts.push(`Замовлення «${data.deal.title}», клієнт ${data.client.name}.`);
   parts.push(`Стадія воронки: ${data.stage.name}.`);
   parts.push(contractLabel(data.contract?.status ?? null));
   if (!data.readinessAllMet) {

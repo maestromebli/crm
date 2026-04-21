@@ -30,7 +30,7 @@ export function deriveDealPrimaryCta(data: DealWorkspacePayload): DealPrimaryCta
 
   if (data.deal.status !== "OPEN") {
     return {
-      label: "Переглянути угоду",
+      label: "Переглянути замовлення",
       tab: "overview",
       disabled: false,
       disabledReason: null,

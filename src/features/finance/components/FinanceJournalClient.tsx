@@ -159,7 +159,7 @@ export function FinanceJournalClient() {
     [],
   );
 
-  /** Первинне завантаження рахунків і угод. */
+  /** Первинне завантаження рахунків і замовлень. */
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -178,7 +178,7 @@ export function FinanceJournalClient() {
     };
   }, [loadAccountsAndDeals]);
 
-  /** Список проводок після готовності даних або зміни фільтра угоди. */
+  /** Список проводок після готовності даних або зміни фільтра замовлення. */
   useEffect(() => {
     if (loading) return;
     let cancelled = false;
@@ -326,13 +326,13 @@ export function FinanceJournalClient() {
               </select>
             </label>
             <label className="text-xs font-medium text-slate-600 sm:col-span-2">
-              Угода (опційно)
+              Замовлення (опційно)
               <select
                 value={dealId}
                 onChange={(e) => setDealId(e.target.value)}
                 className="mt-1 flex h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-sm"
               >
-                <option value="">— без привʼязки до угоди —</option>
+                <option value="">— без привʼязки до замовлення —</option>
                 {dealOptions.map((d) => (
                   <option key={d.id} value={d.id}>
                     {d.title.slice(0, 72)}
@@ -469,7 +469,7 @@ export function FinanceJournalClient() {
           <h2 className="text-sm font-semibold text-slate-900">Останні проводки</h2>
           <div className="flex flex-wrap items-center gap-2">
             <label className="flex items-center gap-2 text-xs text-slate-600">
-              Фільтр угоди
+              Фільтр замовлення
               <select
                 value={listFilterDealId}
                 onChange={(e) => setListFilterDealId(e.target.value)}

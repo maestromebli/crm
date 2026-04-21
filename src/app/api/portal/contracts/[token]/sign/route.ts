@@ -1,5 +1,5 @@
-import { randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
+import { randomBytes } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { hashShareToken } from "@/lib/contracts/service";
 
@@ -13,7 +13,7 @@ function providerMode() {
 export async function POST(_req: Request, ctx: Ctx) {
   const { token } = await ctx.params;
   const tokenHash = hashShareToken(token);
-  const share = await (prisma as any).contractShareLink.findUnique({
+  const share = await (prisma as any).dealContractShareLink.findUnique({
     where: { tokenHash },
     include: { contract: true },
   });

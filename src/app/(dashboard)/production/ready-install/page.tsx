@@ -43,7 +43,7 @@ export default async function ProductionReadyInstallPage() {
 
       <ProductionSubpageTable
         rows={tableRows}
-        emptyText="Немає угод у статусі «лінія завершена»."
+        emptyText="Немає замовлень у статусі «лінія завершена»."
       />
     </main>
   );

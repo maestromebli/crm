@@ -19,6 +19,21 @@ const DEAL_HUB_SECTIONS = [
 ] as const;
 
 export type DealHubSectionId = (typeof DEAL_HUB_SECTIONS)[number];
+const DEAL_HUB_SECTION_LABELS: Record<DealHubSectionId, string> = {
+  overview: "Огляд",
+  pricing: "Ціноутворення",
+  contract: "Договір",
+  measurement: "Замір",
+  constructor: "Конструктор",
+  production: "Виробництво",
+  procurement: "Закупівля",
+  logistics: "Логістика",
+  installation: "Монтаж",
+  finance: "Фінанси",
+  documents: "Документи",
+  communication: "Комунікація",
+  timeline: "Таймлайн",
+};
 
 export function useDealSections(initialSection: DealHubSectionId = "overview") {
   const [activeSection, setActiveSection] = useState<DealHubSectionId>(initialSection);
@@ -26,7 +41,7 @@ export function useDealSections(initialSection: DealHubSectionId = "overview") {
     () =>
       DEAL_HUB_SECTIONS.map((id) => ({
         id,
-        label: id.charAt(0).toUpperCase() + id.slice(1),
+        label: DEAL_HUB_SECTION_LABELS[id],
       })),
     [],
   );

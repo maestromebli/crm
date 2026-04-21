@@ -49,6 +49,7 @@ import {
 const POLL_MS = 45_000;
 
 type Tone = "cyan" | "violet" | "amber" | "red";
+type CommandCenterTab = "overview" | "queue" | "workshops";
 
 function formatRelative(iso: string, nowMs: number): string {
   const t = new Date(iso).getTime();
@@ -85,11 +86,11 @@ function riskLabelByDays(days: number | null): string {
   return `Залишилося ${days}дн`;
 }
 
-function getDueInDays(iso: string | null): number | null {
+function getDueInDays(iso: string | null, nowMs: number): number | null {
   if (!iso) return null;
   const dueTime = new Date(iso).getTime();
   if (Number.isNaN(dueTime)) return null;
-  return Math.ceil((dueTime - Date.now()) / (24 * 60 * 60 * 1000));
+  return Math.ceil((dueTime - nowMs) / (24 * 60 * 60 * 1000));
 }
 
 function getOperationalStyle(key: string) {
@@ -334,9 +335,17 @@ export function ProductionCommandCenter({ data: initial }: { data: ProductionCom
   const [data, setData] = useState(initial);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(initial.queue[0]?.id ?? null);
   const [targetSlot, setTargetSlot] = useState(1);
+  const [activeTab, setActiveTab] = useState<CommandCenterTab>("queue");
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
   const [fetching, setFetching] = useState(false);
+  const isOverviewTab = activeTab === "overview";
+  const isQueueTab = activeTab === "queue";
+  const isWorkshopsTab = activeTab === "workshops";
+  const [nowMs, setNowMs] = useState<number>(() => {
+    const syncedAtTime = new Date(initial.syncedAt).getTime();
+    return Number.isNaN(syncedAtTime) ? 0 : syncedAtTime;
+  });
 
   const refresh = useCallback(async () => {
     if (document.visibilityState !== "visible") return;
@@ -444,6 +453,7 @@ export function ProductionCommandCenter({ data: initial }: { data: ProductionCom
   );
 
   const capacityTrend = useMemo(() => {
+    if (!isOverviewTab) return [];
     return data.workshopKanban.map((stage, idx) => {
       const station = data.stationLoads[idx % Math.max(1, data.stationLoads.length)];
       const load = station?.loadPercent ?? Math.min(98, stage.tasks.length * 7);
@@ -456,28 +466,41 @@ export function ProductionCommandCenter({ data: initial }: { data: ProductionCom
         pressure,
       };
     });
-  }, [capacitySummary.utilization, data.queue.length, data.stationLoads, data.workshopKanban]);
+  }, [capacitySummary.utilization, data.queue.length, data.stationLoads, data.workshopKanban, isOverviewTab]);
 
-  const throughputTrend = useMemo(() => buildThroughputSeries(data.recentEvents), [data.recentEvents]);
+  const throughputTrend = useMemo(() => {
+    if (!isOverviewTab) return [];
+    return buildThroughputSeries(data.recentEvents);
+  }, [data.recentEvents, isOverviewTab]);
 
   const loadDistribution = useMemo(
-    () =>
-      [...data.stationLoads]
+    () => {
+      if (!isOverviewTab) return [];
+      return [...data.stationLoads]
         .sort((a, b) => b.loadPercent - a.loadPercent)
         .slice(0, 6)
         .map((item, idx) => ({
           name: item.stationLabel,
           load: item.loadPercent,
           fill: ["#22d3ee", "#8b5cf6", "#38bdf8", "#f59e0b", "#fb7185", "#60a5fa"][idx % 6],
-        })),
-    [data.stationLoads],
+        }));
+    },
+    [data.stationLoads, isOverviewTab],
   );
 
   const deadlinePressure = useMemo(() => {
-    const overdue = filteredQueue.filter((item) => getDeadlineRiskState(item) === "overdue").length;
-    const promiseMiss = filteredQueue.filter((item) => getDeadlineRiskState(item) === "will_miss_promise").length;
-    const dueSoon = filteredQueue.filter((item) => getDeadlineRiskState(item) === "due_soon").length;
-    const dueToday = filteredQueue.filter((item) => getDeadlineRiskState(item) === "due_today").length;
+    if (!isOverviewTab) return [];
+    let overdue = 0;
+    let promiseMiss = 0;
+    let dueSoon = 0;
+    let dueToday = 0;
+    for (const item of filteredQueue) {
+      const risk = getDeadlineRiskState(item);
+      if (risk === "overdue") overdue += 1;
+      else if (risk === "will_miss_promise") promiseMiss += 1;
+      else if (risk === "due_soon") dueSoon += 1;
+      else if (risk === "due_today") dueToday += 1;
+    }
     const safe = Math.max(0, filteredQueue.length - overdue - promiseMiss - dueSoon - dueToday);
     return [
       { label: "Прострочено", value: overdue, fill: "#fb7185" },
@@ -486,9 +509,10 @@ export function ProductionCommandCenter({ data: initial }: { data: ProductionCom
       { label: "Незабаром термін", value: dueSoon, fill: "#38bdf8" },
       { label: "Безпечно", value: safe, fill: "#34d399" },
     ];
-  }, [filteredQueue]);
+  }, [filteredQueue, isOverviewTab]);
 
   const heatmapRows = useMemo(() => {
+    if (!isWorkshopsTab) return [];
     return data.stationLoads.map((station) => {
       const inQueue = orderRows.filter((row) => row.workshopAssignment === station.stationLabel).length;
       const blocked = orderRows.filter(
@@ -507,7 +531,7 @@ export function ProductionCommandCenter({ data: initial }: { data: ProductionCom
         state: getWorkshopLoadState({ loadPercent: station.loadPercent }).key,
       };
     });
-  }, [data.stationLoads, orderRows]);
+  }, [data.stationLoads, isWorkshopsTab, orderRows]);
 
   const alerts = useMemo(() => {
     const live = [
@@ -525,12 +549,20 @@ export function ProductionCommandCenter({ data: initial }: { data: ProductionCom
   }, [data.criticalBlockers, data.workshopBottleneck, insights]);
 
   const selectedOrderBlockers = useMemo(
-    () => data.criticalBlockers.filter((item) => item.flowId === selectedOrder?.order.id),
-    [data.criticalBlockers, selectedOrder],
+    () => (isQueueTab ? data.criticalBlockers.filter((item) => item.flowId === selectedOrder?.order.id) : []),
+    [data.criticalBlockers, isQueueTab, selectedOrder],
   );
   const selectedOrderActions = useMemo(
-    () => data.nextActions.filter((item) => item.flowId === selectedOrder?.order.id),
-    [data.nextActions, selectedOrder],
+    () => (isQueueTab ? data.nextActions.filter((item) => item.flowId === selectedOrder?.order.id) : []),
+    [data.nextActions, isQueueTab, selectedOrder],
+  );
+  const tabs = useMemo(
+    () => [
+      { id: "overview" as const, label: "Огляд", hint: "Ключові метрики й тренди" },
+      { id: "queue" as const, label: "Черга і задачі", hint: `${orderRows.length} активних замовлень` },
+      { id: "workshops" as const, label: "Цехи", hint: `${data.stationLoads.length} зон навантаження` },
+    ],
+    [data.stationLoads.length, orderRows.length],
   );
 
   useEffect(() => {
@@ -540,8 +572,12 @@ export function ProductionCommandCenter({ data: initial }: { data: ProductionCom
     }
   }, [orderRows, selectedOrder]);
 
+  useEffect(() => {
+    setNowMs(Date.now());
+  }, []);
+
   return (
-    <div className="relative overflow-hidden rounded-[32px] bg-[#060b16] p-3 text-white md:p-4">
+    <div className="relative overflow-hidden rounded-[32px] bg-[#060b16] p-3 text-white [&_h1]:!text-white [&_h2]:text-white [&_h3]:text-white md:p-4">
       <BackgroundFX reduceMotion={reduceMotion} />
       <div className="relative z-10 space-y-4">
         <Panel className="p-5 md:p-6">
@@ -551,7 +587,7 @@ export function ProductionCommandCenter({ data: initial }: { data: ProductionCom
                 <Factory className="h-5 w-5 text-cyan-200" />
               </div>
               <div>
-                <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Командний центр виробництва</h1>
+                <h1 className="text-2xl font-semibold tracking-tight text-white md:text-3xl">Командний центр виробництва</h1>
                 <p className="mt-1 text-sm text-white/50">
                   Живі виробничі операції, тиск черги, ризики вузьких місць та аналітика перепланування
                 </p>
@@ -560,7 +596,7 @@ export function ProductionCommandCenter({ data: initial }: { data: ProductionCom
 
             <div className="flex flex-wrap items-center gap-2">
               <div className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-xs uppercase tracking-[0.24em] text-white/65">
-                Синхронізовано {formatRelative(data.syncedAt, Date.now())}
+                Синхронізовано {formatRelative(data.syncedAt, nowMs)}
               </div>
               <div className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-xs uppercase tracking-[0.24em] text-white/65">
                 Усі цехи
@@ -576,6 +612,28 @@ export function ProductionCommandCenter({ data: initial }: { data: ProductionCom
                 {fetching ? "Оновлення..." : "Оновити зараз"}
               </button>
             </div>
+          </div>
+        </Panel>
+
+        <Panel className="p-3">
+          <div className="mb-2 px-1 text-[11px] uppercase tracking-[0.22em] text-white/45">Режими екрану</div>
+          <div className="grid gap-2 md:grid-cols-3">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={cn(
+                  "rounded-2xl border px-4 py-3 text-left transition",
+                  activeTab === tab.id
+                    ? "border-cyan-300/25 bg-cyan-300/12 text-cyan-100 shadow-[0_0_0_1px_rgba(34,211,238,0.2)]"
+                    : "border-white/10 bg-white/[0.03] text-white/70 hover:bg-white/[0.06]",
+                )}
+              >
+                <div className="text-sm font-medium">{tab.label}</div>
+                <div className="mt-1 text-xs text-white/55">{tab.hint}</div>
+              </button>
+            ))}
           </div>
         </Panel>
 
@@ -602,7 +660,8 @@ export function ProductionCommandCenter({ data: initial }: { data: ProductionCom
           ))}
         </div>
 
-        <div className="grid gap-4 xl:grid-cols-12">
+        {activeTab === "overview" ? (
+          <div className="grid gap-4 xl:grid-cols-12">
           <div className="grid gap-4 md:grid-cols-2 xl:col-span-4">
             <RadialGauge title="Завантаження цехів" value={capacitySummary.utilization} color="#22d3ee" />
             <RadialGauge
@@ -732,9 +791,11 @@ export function ProductionCommandCenter({ data: initial }: { data: ProductionCom
               </ChartCard>
             </div>
           </div>
-        </div>
+          </div>
+        ) : null}
 
-        <div className="grid gap-4 xl:grid-cols-12">
+        {activeTab === "queue" ? (
+          <div className="grid gap-4 xl:grid-cols-12">
           <div className="xl:col-span-8">
             <Panel className="p-5">
               <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
@@ -780,7 +841,7 @@ export function ProductionCommandCenter({ data: initial }: { data: ProductionCom
               <div className="space-y-3">
                 {orderRows.map((row) => {
                   const style = getOperationalStyle(row.operationalState.key);
-                  const dueDays = getDueInDays(row.order.dueDate);
+                  const dueDays = getDueInDays(row.order.dueDate, nowMs);
                   return (
                     <motion.button
                       key={row.order.id}
@@ -880,7 +941,7 @@ export function ProductionCommandCenter({ data: initial }: { data: ProductionCom
                       </div>
                       <div>
                         <div className="text-[10px] uppercase tracking-[0.24em] text-white/35">Дедлайн</div>
-                        <div className="mt-1 text-white">{riskLabelByDays(getDueInDays(selectedOrder.order.dueDate))}</div>
+                        <div className="mt-1 text-white">{riskLabelByDays(getDueInDays(selectedOrder.order.dueDate, nowMs))}</div>
                       </div>
                     </div>
                   </div>
@@ -1001,58 +1062,62 @@ export function ProductionCommandCenter({ data: initial }: { data: ProductionCom
                 </div>
               )}
             </Panel>
+          </div>
+          </div>
+        ) : null}
 
-            <Panel className="p-5">
-              <div className="mb-4 flex items-center justify-between">
-                <div>
-                  <div className="text-sm font-medium text-white">Теплова мапа вузьких місць і тиску</div>
-                  <div className="mt-1 text-xs text-white/45">Перевантажені зони, заблоковані кластери та тиск черги</div>
-                </div>
-                <Radar className="h-5 w-5 text-cyan-300" />
+        {activeTab === "workshops" ? (
+          <Panel className="p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <div className="text-sm font-medium text-white">Теплова мапа вузьких місць і тиску</div>
+                <div className="mt-1 text-xs text-white/45">Перевантажені зони, заблоковані кластери та тиск черги</div>
               </div>
-              <div className="space-y-3">
-                {heatmapRows.map((w) => {
-                  const intensity =
-                    w.state === "overloaded"
-                      ? "from-rose-500/60 via-orange-400/35 to-transparent"
-                      : w.state === "near_capacity"
-                        ? "from-amber-400/45 via-yellow-300/20 to-transparent"
-                        : w.state === "balanced"
-                          ? "from-cyan-400/35 via-sky-300/15 to-transparent"
-                          : "from-sky-400/25 via-cyan-300/10 to-transparent";
-                  return (
-                    <div key={w.id} className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
-                      <div className="mb-2 flex items-center justify-between">
-                        <div>
-                          <div className="text-sm font-medium text-white">{w.name}</div>
-                          <div className="text-xs text-white/55">{w.state.replace("_", " ").toUpperCase()}</div>
-                        </div>
-                        <div className="text-right text-xs text-white/50">
-                          <div>Черга {w.inQueue}</div>
-                          <div>
-                            O:{w.overdue} / B:{w.blocked}
-                          </div>
-                        </div>
+              <Radar className="h-5 w-5 text-cyan-300" />
+            </div>
+            <div className="space-y-3">
+              {heatmapRows.map((w) => {
+                const intensity =
+                  w.state === "overloaded"
+                    ? "from-rose-500/60 via-orange-400/35 to-transparent"
+                    : w.state === "near_capacity"
+                      ? "from-amber-400/45 via-yellow-300/20 to-transparent"
+                      : w.state === "balanced"
+                        ? "from-cyan-400/35 via-sky-300/15 to-transparent"
+                        : "from-sky-400/25 via-cyan-300/10 to-transparent";
+                return (
+                  <div key={w.id} className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+                    <div className="mb-2 flex items-center justify-between">
+                      <div>
+                        <div className="text-sm font-medium text-white">{w.name}</div>
+                        <div className="text-xs text-white/55">{w.state.replace("_", " ").toUpperCase()}</div>
                       </div>
-                      <div className="relative h-3 overflow-hidden rounded-full bg-white/5">
-                        <motion.div
-                          className={cn("absolute inset-y-0 left-0 rounded-full bg-gradient-to-r", intensity)}
-                          initial={{ width: 0 }}
-                          animate={reduceMotion ? undefined : { width: `${Math.min(w.load, 100)}%` }}
-                          transition={{ duration: 0.8 }}
-                          style={reduceMotion ? { width: `${Math.min(w.load, 100)}%` } : undefined}
-                        />
-                        <div className="absolute inset-0 rounded-full ring-1 ring-inset ring-white/10" />
+                      <div className="text-right text-xs text-white/50">
+                        <div>Черга {w.inQueue}</div>
+                        <div>
+                          O:{w.overdue} / B:{w.blocked}
+                        </div>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            </Panel>
-          </div>
-        </div>
+                    <div className="relative h-3 overflow-hidden rounded-full bg-white/5">
+                      <motion.div
+                        className={cn("absolute inset-y-0 left-0 rounded-full bg-gradient-to-r", intensity)}
+                        initial={{ width: 0 }}
+                        animate={reduceMotion ? undefined : { width: `${Math.min(w.load, 100)}%` }}
+                        transition={{ duration: 0.8 }}
+                        style={reduceMotion ? { width: `${Math.min(w.load, 100)}%` } : undefined}
+                      />
+                      <div className="absolute inset-0 rounded-full ring-1 ring-inset ring-white/10" />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </Panel>
+        ) : null}
 
-        <div className="grid gap-4 md:grid-cols-3">
+        {activeTab !== "queue" ? (
+          <div className="grid gap-4 md:grid-cols-3">
           <Panel className="p-4">
             <div className="flex items-center gap-3">
               <div className="rounded-2xl border border-emerald-300/20 bg-emerald-300/10 p-2">
@@ -1086,7 +1151,8 @@ export function ProductionCommandCenter({ data: initial }: { data: ProductionCom
               </div>
             </div>
           </Panel>
-        </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );

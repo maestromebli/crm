@@ -1,9 +1,8 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "../auth/options";
 import { prisma } from "../prisma";
 import { resolveAccessContext, type AccessContext } from "./data-scope";
 import { normalizeRole, type EffectiveRole } from "./roles";
 import type { SessionUser } from "./api-guard";
+import { getCachedServerSession } from "./server-session";
 
 export type SessionAccess = {
   userId: string;
@@ -28,7 +27,7 @@ export function sessionUserFromAccess(a: SessionAccess): SessionUser {
 
 /** Для RSC: сесія + контекст видимості даних за роллю. */
 export async function getSessionAccess(): Promise<SessionAccess | null> {
-  const session = await getServerSession(authOptions);
+  const session = await getCachedServerSession();
   if (!session?.user?.id) return null;
   const ctx = await resolveAccessContext(prisma, session.user);
   return {

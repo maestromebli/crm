@@ -52,7 +52,7 @@ export function deriveConvertReadinessBanner(
   if (gate.warnings.length > 0) {
     return {
       variant: "warn",
-      title: "Можна створити угоду з зауваженнями",
+      title: "Можна створити замовлення з зауваженнями",
       subtitle: gate.warnings.map((w) => w.messageUa).join(" · "),
     };
   }
@@ -60,7 +60,7 @@ export function deriveConvertReadinessBanner(
     variant: "ready",
     title: "Готово до конверсії",
     subtitle:
-      "Перевірте перенос файлів і комерції — далі угода отримає стабільні знімки.",
+      "Перевірте перенос файлів і комерції — далі замовлення отримає стабільні знімки.",
   };
 }
 

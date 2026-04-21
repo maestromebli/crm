@@ -149,10 +149,10 @@ export const LEAD_STAGE_CONFIG: Record<LeadStageKey, StageConfigEntry> = {
   APPROVED: {
     key: "APPROVED",
     labelUa: "Погоджене КП",
-    descriptionUa: "Умови КП прийняті — готуємо конверсію в угоду.",
+    descriptionUa: "Умови КП прийняті — готуємо конверсію в замовлення.",
     group: "closing",
     dominantCta: {
-      labelUa: "Конвертувати в угоду",
+      labelUa: "Конвертувати в замовлення",
       actionKey: "convert_to_deal",
       routePattern: "/leads/:leadId",
       anchorSection: "hub",
@@ -203,7 +203,7 @@ export const LEAD_STAGE_CONFIG: Record<LeadStageKey, StageConfigEntry> = {
     descriptionUa: "Юридичне оформлення перед виробництвом.",
     group: "closing",
     dominantCta: {
-      labelUa: "Перейти до договору в угоді",
+      labelUa: "Перейти до договору в замовленні",
       actionKey: "open_contract",
       routePattern: "/deals/:dealId/workspace",
       anchorSection: "contract",
@@ -216,11 +216,11 @@ export const LEAD_STAGE_CONFIG: Record<LeadStageKey, StageConfigEntry> = {
   },
   DEAL: {
     key: "DEAL",
-    labelUa: "Угода",
-    descriptionUa: "Лід конвертовано; основна робота в картці угоди.",
+    labelUa: "Замовлення",
+    descriptionUa: "Лід конвертовано; основна робота в картці замовлення.",
     group: "handoff",
     dominantCta: {
-      labelUa: "Відкрити угоду",
+      labelUa: "Відкрити замовлення",
       actionKey: "open_deal",
       routePattern: "/deals/:dealId/workspace",
       anchorSection: null,
@@ -251,7 +251,7 @@ export const LEAD_STAGE_CONFIG: Record<LeadStageKey, StageConfigEntry> = {
   LOST: {
     key: "LOST",
     labelUa: "Втрачено",
-    descriptionUa: "Лід закрито без угоди.",
+    descriptionUa: "Лід закрито без замовлення.",
     group: "terminal",
     dominantCta: {
       labelUa: "Переглянути причини",

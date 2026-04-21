@@ -39,7 +39,7 @@ export const DEAL_WORKSPACE_TAB_GROUPS: Array<{
   },
   {
     id: "docs",
-    label: "Угода",
+    label: "Замовлення",
     defaultTab: "contract",
     tabs: ["contract", "payment", "finance", "files"],
   },

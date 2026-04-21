@@ -9,10 +9,8 @@ import { NewAssistantWidget } from "@/components/layout/NewAssistantWidget";
 export default function CrmLayout({ children }: { children: ReactNode }) {
   return (
     <ErpBridgeProvider>
-      <div className="crm-force-dark-text">
-        {children}
-        <NewAssistantWidget />
-      </div>
+      {children}
+      <NewAssistantWidget />
     </ErpBridgeProvider>
   );
 }

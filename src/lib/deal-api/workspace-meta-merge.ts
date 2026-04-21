@@ -5,7 +5,7 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
-/** Поверхневе злиття patch у workspaceMeta угоди. */
+/** Поверхневе злиття patch у workspaceMeta замовлення. */
 export function mergeWorkspaceMeta(
   existing: Prisma.JsonValue | null,
   patch: Partial<DealWorkspaceMeta>,

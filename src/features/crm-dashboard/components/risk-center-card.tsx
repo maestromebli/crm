@@ -58,14 +58,14 @@ export function RiskCenterCard({ rows }: RiskCenterCardProps) {
                       ? "bg-rose-100 text-rose-800"
                       : r.score >= 50
                         ? "bg-amber-100 text-amber-900"
-                        : "bg-slate-100 text-slate-700",
+                        : "border border-[var(--enver-border)] bg-[var(--enver-surface)] text-[var(--enver-text)]",
                   )}
                 >
                   {r.score}
                 </span>
                 <Link
                   href={r.href}
-                  className="text-[11px] font-semibold text-[var(--enver-accent-hover)] hover:underline"
+                  className="text-[11px] font-semibold text-[var(--enver-accent)] underline-offset-2 hover:text-[var(--enver-accent-hover)] hover:underline"
                 >
                   Відкрити
                 </Link>

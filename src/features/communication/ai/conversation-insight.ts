@@ -45,7 +45,18 @@ const SYSTEM = `Ти аналітик переписки для меблевої
 export async function generateConversationInsight(input: {
   transcript: string;
 }): Promise<
-  | { ok: true; data: ConversationInsightPayload }
+  | {
+      ok: true;
+      data: ConversationInsightPayload;
+      usage: {
+        promptTokens: number;
+        completionTokens: number;
+        totalTokens: number;
+      } | null;
+      tokensApprox: number;
+      costUsdApprox: number | null;
+      model: string;
+    }
   | { ok: false; error: string }
 > {
   const user = `Переписка (хронологічно):\n${input.transcript.slice(0, 28_000)}`;
@@ -65,7 +76,14 @@ export async function generateConversationInsight(input: {
     const content = res.content;
     if (!content) return { ok: false, error: "empty" };
     const parsed = extractFirstJsonObject(content) as ConversationInsightPayload;
-    return { ok: true, data: parsed };
+    return {
+      ok: true,
+      data: parsed,
+      usage: res.usage,
+      tokensApprox: res.tokensApprox,
+      costUsdApprox: res.costUsdApprox,
+      model: res.model,
+    };
   } catch (e) {
     return {
       ok: false,

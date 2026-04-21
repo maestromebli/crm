@@ -130,7 +130,7 @@ export function LeadDetailOverviewClient({
         ...(dealTitleDraft.trim() ? { dealTitle: dealTitleDraft.trim() } : {}),
       });
       if (!data.dealId) {
-        setErr(data.error ?? "Не вдалося створити угоду");
+        setErr(data.error ?? "Не вдалося створити замовлення");
         return;
       }
       router.push(`/deals/${data.dealId}/workspace?fromLead=1`);
@@ -175,7 +175,7 @@ export function LeadDetailOverviewClient({
       >
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-            Угода з ліда
+            Замовлення з ліда
           </h2>
           {lead.linkedDeal ? (
             <Link
@@ -191,7 +191,7 @@ export function LeadDetailOverviewClient({
                 type="text"
                 value={dealTitleDraft}
                 onChange={(e) => setDealTitleDraft(e.target.value)}
-                placeholder="Назва угоди"
+                placeholder="Назва замовлення"
                 className="min-w-[12rem] rounded-lg border border-slate-200 px-2 py-1 text-xs text-[var(--enver-text)] outline-none focus:border-slate-400"
               />
               <button
@@ -200,20 +200,20 @@ export function LeadDetailOverviewClient({
                 onClick={convertToDeal}
                 className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-slate-800 disabled:opacity-50"
               >
-                {converting ? "Створення…" : "Створити угоду"}
+                {converting ? "Створення…" : "Створити замовлення"}
               </button>
             </div>
           ) : (
             <p className="text-xs text-slate-500">
-              Потрібні права на оновлення ліда та створення угод.
+              Потрібні права на оновлення ліда та створення замовлень.
             </p>
           )}
         </div>
         {!lead.linkedDeal && canConvertToDeal ? (
           <p className="mt-2 text-[11px] text-slate-500">
             Дані ліда оновлять картку контакту; файли та прорахунки з хаба ліда
-            переносяться в угоду. Лід переводиться в архів (воронка лідів).
-            Відповідальний за угоду — як у ліда.
+            переносяться в замовлення. Лід переводиться в архів (воронка лідів).
+            Відповідальний за замовлення — як у ліда.
           </p>
         ) : null}
       </section>

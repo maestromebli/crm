@@ -59,7 +59,7 @@ export const FORM_CONFIGS: FormConfigMap = {
     ],
   },
   deal: {
-    name: "Форма угоди",
+    name: "Форма замовлення",
     mode: "create",
     layout: "sheet",
     linkedEntities: ["lead", "contact"],
@@ -69,7 +69,7 @@ export const FORM_CONFIGS: FormConfigMap = {
     sections: [
       {
         id: "overview",
-        label: "Огляд угоди",
+        label: "Огляд замовлення",
         requiredFields: ["Назва", "Воронка", "Стадія"],
         optionalFields: ["Ймовірність"],
       },
@@ -110,8 +110,8 @@ export const FORM_CONFIGS: FormConfigMap = {
     sections: [
       {
         id: "deal",
-        label: "Угода",
-        requiredFields: ["ID угоди"],
+        label: "Замовлення",
+        requiredFields: ["ID замовлення"],
         optionalFields: ["Імʼя клієнта"],
       },
       {

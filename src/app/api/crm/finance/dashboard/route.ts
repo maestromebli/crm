@@ -18,6 +18,21 @@ function n(v: unknown): number {
   return moneyFromDb(v);
 }
 
+type FinanceObjectStatus = "ON_TRACK" | "DUE_SOON" | "OVERDUE" | "BLOCKED";
+
+function resolveFinanceObjectStatus(args: {
+  overdueDays: number;
+  daysToNextPayment: number | null;
+  netMarginPct: number;
+}): FinanceObjectStatus {
+  if (args.overdueDays > 0) return "OVERDUE";
+  if (args.daysToNextPayment !== null && args.daysToNextPayment >= 0 && args.daysToNextPayment <= 3) {
+    return "DUE_SOON";
+  }
+  if (args.netMarginPct < 0) return "BLOCKED";
+  return "ON_TRACK";
+}
+
 function agingBucket(diffDays: number): "current" | "d1_7" | "d7_30" | "d30_plus" {
   if (diffDays <= 0) return "current";
   if (diffDays <= 7) return "d1_7";
@@ -139,7 +154,7 @@ export async function GET() {
         ),
         safeOptionalList("PurchaseOrder", () =>
           prisma.purchaseOrder.findMany({
-            where: { status: { in: ["SENT", "CONFIRMED", "PARTIAL"] } },
+            where: { status: { in: ["SENT", "CONFIRMED", "PARTIAL", "PAID"] } },
             select: { id: true, totalAmount: true, expectedDate: true, status: true, dealId: true },
           }),
         ),
@@ -283,6 +298,105 @@ export async function GET() {
       .sort((a, b) => b.outstanding - a.outstanding)
       .slice(0, 12);
 
+    const financeByDeal = new Map<
+      string,
+      {
+        plannedInflow: number;
+        actualInflow: number;
+        actualOutflow: number;
+        openCommitment: number;
+        nextPaymentDate: Date | null;
+        overdueDays: number;
+      }
+    >();
+    for (const deal of deals) {
+      financeByDeal.set(deal.id, {
+        plannedInflow: 0,
+        actualInflow: 0,
+        actualOutflow: 0,
+        openCommitment: 0,
+        nextPaymentDate: null,
+        overdueDays: 0,
+      });
+    }
+    for (const p of paymentPlanEntries) {
+      const target = financeByDeal.get(p.dealId);
+      if (!target) continue;
+      const planned = n(p.amount);
+      const remaining = n(p.remainingAmount);
+      const actual = Math.max(planned - Math.max(remaining, 0), 0);
+      target.plannedInflow += planned;
+      target.actualInflow += actual;
+      if (remaining > 0) {
+        if (!target.nextPaymentDate || p.dueDate < target.nextPaymentDate) {
+          target.nextPaymentDate = p.dueDate;
+        }
+        if (p.dueDate < now) {
+          const overdue = Math.floor((now.getTime() - p.dueDate.getTime()) / (24 * 60 * 60 * 1000));
+          target.overdueDays = Math.max(target.overdueDays, overdue);
+        }
+      }
+    }
+    for (const tx of financeTx.filter((row) => row.dealId)) {
+      const target = financeByDeal.get(tx.dealId as string);
+      if (!target) continue;
+      const amount = n(tx.amount);
+      if (tx.type === "EXPENSE") {
+        if (tx.status === "CONFIRMED") {
+          target.actualOutflow += amount;
+        } else {
+          target.openCommitment += amount;
+        }
+      }
+    }
+    for (const po of purchaseOrders.filter((row) => row.dealId)) {
+      const target = financeByDeal.get(po.dealId as string);
+      if (!target) continue;
+      const amount = n(po.totalAmount);
+      if (po.status === "PAID") {
+        target.actualOutflow += amount;
+      } else {
+        target.openCommitment += amount;
+      }
+    }
+
+    const objectLedger = deals.map((deal) => {
+      const row = financeByDeal.get(deal.id) ?? {
+        plannedInflow: 0,
+        actualInflow: 0,
+        actualOutflow: 0,
+        openCommitment: 0,
+        nextPaymentDate: null,
+        overdueDays: 0,
+      };
+      const clientDebt = Math.max(row.plannedInflow - row.actualInflow, 0);
+      const grossMargin = row.actualInflow - row.actualOutflow;
+      const netMarginPct = row.actualInflow > 0 ? Math.round((grossMargin / row.actualInflow) * 1000) / 10 : 0;
+      const daysToNextPayment =
+        row.nextPaymentDate ?
+          Math.floor((row.nextPaymentDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000))
+        : null;
+      const status = resolveFinanceObjectStatus({
+        overdueDays: row.overdueDays,
+        daysToNextPayment,
+        netMarginPct,
+      });
+      return {
+        dealId: deal.id,
+        dealTitle: deal.title,
+        plannedInflow: row.plannedInflow,
+        actualInflow: row.actualInflow,
+        actualOutflow: row.actualOutflow,
+        openCommitment: row.openCommitment,
+        clientDebt,
+        grossMargin,
+        netMarginPct,
+        nextPaymentDate: row.nextPaymentDate?.toISOString() ?? null,
+        overdueDays: row.overdueDays,
+        status,
+      };
+    });
+
     const apLedger = purchaseOrders
       .map((po) => {
         const total = n(po.totalAmount);
@@ -353,7 +467,7 @@ export async function GET() {
         `Net projection 30 днів: ${(forecast.inflow30 - forecast.outflow30).toFixed(0)} ₴`,
       actions: [
         overduePayments > 0 ? `Є прострочені платежі клієнтів: ${overduePayments}` : null,
-        marginLeaks > 0 ? `Зафіксовано угоди з просіданням маржі: ${marginLeaks}` : null,
+        marginLeaks > 0 ? `Зафіксовано замовлення з просіданням маржі: ${marginLeaks}` : null,
         payrollDue > 0 ? `Невиплачені payroll записи: ${payrollDue}` : null,
       ].filter((x): x is string => Boolean(x)),
     };
@@ -407,6 +521,7 @@ export async function GET() {
       enterprise: {
         arLedger,
         apLedger,
+        objectLedger,
         cashflowForecast8w,
         riskIndex,
         riskLabel,

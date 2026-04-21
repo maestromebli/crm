@@ -31,7 +31,7 @@ export async function GET(_req: Request, ctx: Ctx) {
       select: { id: true, ownerId: true },
     });
     if (!deal) {
-      return NextResponse.json({ error: "Угоду не знайдено" }, { status: 404 });
+      return NextResponse.json({ error: "Замовлення не знайдено" }, { status: 404 });
     }
 
     const denied = await forbidUnlessDealAccess(sessionUser, P.PRODUCTION_LAUNCH, {

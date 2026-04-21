@@ -184,7 +184,7 @@ export async function saveLeadBufferPrivate(opts: {
   };
 }
 
-/** Зберігає буфер (PDF тощо) у приватне сховище для угоди. */
+/** Зберігає буфер (PDF тощо) у приватне сховище для замовлення. */
 export async function saveDealBufferPrivate(opts: {
   dealId: string;
   attachmentId: string;

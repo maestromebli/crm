@@ -78,7 +78,7 @@ export function LeadFilesTabClient({ leadId, attachments, canUpload }: Props) {
       <h2 className="text-sm font-semibold text-[var(--enver-text)]">Файли</h2>
       <p className="mt-1 text-xs text-slate-600">
         Файли зберігаються на сервері та привʼязані до ліда (у т.ч. при конвертації в
-        угоду).
+        замовлення).
       </p>
 
       {banner ? (

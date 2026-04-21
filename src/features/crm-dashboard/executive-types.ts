@@ -15,11 +15,11 @@ export type ExecutiveDashboardQuery = {
   trendRange: TrendRange;
   trendMetric: TrendMetric;
   savedView: SavedViewId;
-  /** Обмежити угоди/ліди менеджером (user id). */
+  /** Обмежити замовлення/ліди менеджером (user id). */
   managerId: string | null;
   /** Фільтр джерела ліда. */
   source: string | null;
-  /** Фільтр статусу угоди (OPEN | …) — опційно. */
+  /** Фільтр статусу замовлення (OPEN | …) — опційно. */
   dealStatus: string | null;
   q: string;
 };

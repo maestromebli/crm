@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { SettingsShell } from "../../../../../components/settings/SettingsShell";
 import { SettingsCard } from "../../../../../components/settings/SettingsCard";
+import { P, requirePermissionForPage } from "../../../../../lib/authz/page-auth";
 
 export const metadata: Metadata = {
   title: "Instagram / Meta таргет · ENVER CRM",
@@ -11,7 +12,9 @@ const META_DOCS = "https://developers.facebook.com/docs/marketing-api/";
 const LEAD_DOCS =
   "https://developers.facebook.com/docs/marketing-api/guides/lead-ads/";
 
-export default function SettingsMetaTargetPage() {
+export default async function SettingsMetaTargetPage() {
+  await requirePermissionForPage(P.SETTINGS_VIEW);
+
   return (
     <SettingsShell
       title="Instagram / Meta таргет"

@@ -77,7 +77,7 @@ export default async function ProductionDelaysPage() {
         <h2 className="text-sm font-semibold text-slate-800">Завислі на етапі лінії</h2>
         <ProductionSubpageTable
           rows={stageRows}
-          emptyText="Немає угод з довгим етапом."
+          emptyText="Немає замовлень з довгим етапом."
         />
       </section>
     </main>

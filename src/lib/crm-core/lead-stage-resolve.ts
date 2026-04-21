@@ -57,7 +57,7 @@ export function resolveLeadStageKey(
   if (name.includes("розрах")) return "CALCULATION";
   if (name.includes("замір")) return "MEASUREMENT";
   if (name.includes("контакт")) return "CONTACT";
-  if (name.includes("угода")) return "DEAL";
+  if (name.includes("замовлення")) return "DEAL";
   if (opts?.isFinal) {
     if (opts.finalType === "LOST") return "LOST";
     return "ARCHIVED";

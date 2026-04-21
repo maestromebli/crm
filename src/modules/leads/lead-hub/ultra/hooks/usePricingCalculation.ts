@@ -6,7 +6,7 @@ import {
   buildPricingSummary,
   buildPricingTotals,
   calculatePricingItem,
-} from "@/modules/leads/lead-pricing/ultra";
+} from "@/modules/leads/lead-pricing/ultra/engine/calculate-pricing";
 import type { PricingComputedItem } from "@/modules/leads/lead-pricing/ultra/engine/types";
 
 export function usePricingCalculation() {

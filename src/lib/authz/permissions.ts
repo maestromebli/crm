@@ -65,9 +65,9 @@ const LEGACY_ALIASES: Partial<Record<Phase1Permission, readonly string[]>> = {
   [P.FILES_UPLOAD]: ["FILE_UPLOAD"],
   [P.FILES_DELETE]: ["FILE_DELETE"],
   [P.DEALS_VIEW]: ["DEAL_WORKSPACE_VIEW"],
-  /** Створення угоди з ліда — той самий доступ, що й робоче місце угоди. */
+  /** Створення замовлення з ліда — той самий доступ, що й робоче місце замовлення. */
   [P.DEALS_CREATE]: ["DEAL_WORKSPACE_VIEW"],
-  /** Перехідний період: workspace раніше був основним «редагуванням» угоди. */
+  /** Перехідний період: workspace раніше був основним «редагуванням» замовлення. */
   [P.DEALS_UPDATE]: ["DEAL_WORKSPACE_VIEW"],
   [P.DEALS_STAGE_CHANGE]: ["DEAL_WORKSPACE_VIEW"],
   [P.HANDOFF_ACCEPT]: ["HANDOFF_SUBMIT"],
@@ -97,7 +97,7 @@ export function hasAnyPermission(
 }
 
 /**
- * Ураховує імпersonацію: SUPER_ADMIN без активної імпersonації проходить усі перевірки.
+ * Ураховує імпersonацію: SUPER_ADMIN/ADMIN/DIRECTOR без активної імпersonації проходять усі перевірки.
  * `impersonatorId` у сесії = id того, хто увійшов, коли показуємо іншого користувача.
  */
 export function hasEffectivePermission(
@@ -109,7 +109,12 @@ export function hasEffectivePermission(
   },
 ): boolean {
   const impersonating = Boolean(ctx.impersonatorId);
-  if (!impersonating && ctx.realRole === "SUPER_ADMIN") {
+  if (
+    !impersonating &&
+    (ctx.realRole === "SUPER_ADMIN" ||
+      ctx.realRole === "ADMIN" ||
+      ctx.realRole === "DIRECTOR")
+  ) {
     return true;
   }
   return hasPermission(granted, required);

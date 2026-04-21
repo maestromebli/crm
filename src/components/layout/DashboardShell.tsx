@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
 import {
@@ -22,22 +22,12 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   const [sidebarCompact, setSidebarCompact] = useState(
     () => !isDashboardPath(pathname),
   );
-  const isDashboardRef = useRef(isDashboardPath(pathname));
   const shouldAnimate = animationsReady && !reduceMotion;
 
   useEffect(() => {
     const timer = window.setTimeout(() => setAnimationsReady(true), 0);
     return () => window.clearTimeout(timer);
   }, []);
-
-  useEffect(() => {
-    const nowDashboard = isDashboardPath(pathname);
-    if (nowDashboard !== isDashboardRef.current) {
-      // При зміні секції повертаємо дефолт для відповідного маршруту.
-      setSidebarCompact(!nowDashboard);
-      isDashboardRef.current = nowDashboard;
-    }
-  }, [pathname]);
 
   const toggleSidebar = () => {
     setSidebarCompact((prev) => !prev);

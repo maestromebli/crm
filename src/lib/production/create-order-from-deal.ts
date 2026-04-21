@@ -96,7 +96,7 @@ export async function createProductionOrderFromDeal(
     return {
       ok: false,
       code: "ALREADY_EXISTS",
-      message: "Виробничий потік для цієї угоди вже створено.",
+      message: "Виробничий потік для цієї замовлення вже створено.",
     };
   }
 
@@ -107,7 +107,7 @@ export async function createProductionOrderFromDeal(
     },
   });
   if (!deal) {
-    return { ok: false, code: "VALIDATION", message: "Угоду не знайдено." };
+    return { ok: false, code: "VALIDATION", message: "Замовлення не знайдено." };
   }
 
   const plan = await prisma.dealPaymentPlan.findUnique({

@@ -18,7 +18,7 @@ function dedupeRecommendations(
 }
 
 /**
- * Накладає дані зі сторінки (лід/угода) на базовий резолв без зміни маршрутної логіки.
+ * Накладає дані зі сторінки (лід/замовлення) на базовий резолв без зміни маршрутної логіки.
  */
 export function mergePageEntityIntoResolved(
   base: AssistantResolvedContext,

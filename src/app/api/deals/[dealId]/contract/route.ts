@@ -85,7 +85,7 @@ export async function POST(_req: Request, ctx: Ctx) {
       },
     });
     if (!deal) {
-      return NextResponse.json({ error: "Угоду не знайдено" }, { status: 404 });
+      return NextResponse.json({ error: "Замовлення не знайдено" }, { status: 404 });
     }
 
     const paymentMilestones =
@@ -99,7 +99,7 @@ export async function POST(_req: Request, ctx: Ctx) {
     const userId = user.id;
     if (deal.contract) {
       return NextResponse.json(
-        { error: "Договір для цієї угоди вже існує" },
+        { error: "Договір для цієї замовлення вже існує" },
         { status: 409 },
       );
     }
@@ -218,7 +218,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
       },
     });
     if (!deal) {
-      return NextResponse.json({ error: "Угоду не знайдено" }, { status: 404 });
+      return NextResponse.json({ error: "Замовлення не знайдено" }, { status: 404 });
     }
 
     const paymentMilestones =

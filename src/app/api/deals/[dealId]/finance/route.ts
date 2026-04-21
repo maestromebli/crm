@@ -15,7 +15,7 @@ export async function GET(_req: Request, ctx: Ctx) {
     mapEffectiveRoleToDealHubRole(access.user.dbRole),
   );
   if (!overview) {
-    return NextResponse.json({ error: "Угоду не знайдено" }, { status: 404 });
+    return NextResponse.json({ error: "Замовлення не знайдено" }, { status: 404 });
   }
   return NextResponse.json({
     ok: true,

@@ -64,7 +64,7 @@ export async function POST(req: Request, ctx: Ctx) {
       },
     });
     if (!deal) {
-      return NextResponse.json({ error: "Угоду не знайдено" }, { status: 404 });
+      return NextResponse.json({ error: "Замовлення не знайдено" }, { status: 404 });
     }
 
     const denied = await forbidUnlessDealAccess(user, P.DEALS_UPDATE, {
@@ -146,7 +146,7 @@ export async function POST(req: Request, ctx: Ctx) {
         steps.push({
           key: "sync_deal_value",
           status: "skipped",
-          message: "Сума угоди вже синхронізована",
+          message: "Сума замовлення вже синхронізована",
         });
       } else {
         await prisma.deal.update({
@@ -156,7 +156,7 @@ export async function POST(req: Request, ctx: Ctx) {
         steps.push({
           key: "sync_deal_value",
           status: "success",
-          message: "Суму угоди синхронізовано зі сметою",
+          message: "Суму замовлення синхронізовано зі сметою",
           details: {
             previousValue: deal.value,
             nextValue: latestEstimateTotal,
@@ -167,7 +167,7 @@ export async function POST(req: Request, ctx: Ctx) {
       steps.push({
         key: "sync_deal_value",
         status: "failed",
-        message: "Не вдалося синхронізувати суму угоди",
+        message: "Не вдалося синхронізувати суму замовлення",
         details: { error: error instanceof Error ? error.message : String(error) },
       });
     }
@@ -226,7 +226,7 @@ export async function POST(req: Request, ctx: Ctx) {
         steps.push({
           key: "advance_stage",
           status: "skipped",
-          message: "Угода вже на фінальному етапі",
+          message: "Замовлення вже на фінальному етапі",
         });
       } else {
         const transition = await transitionDealStage({

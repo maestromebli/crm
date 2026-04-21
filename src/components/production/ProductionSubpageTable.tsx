@@ -28,7 +28,7 @@ export function ProductionSubpageTable({
       <table className="w-full min-w-[640px] border-collapse text-left text-sm">
         <thead>
           <tr className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-600">
-            <th className="px-3 py-2.5">Угода</th>
+            <th className="px-3 py-2.5">Замовлення</th>
             <th className="px-3 py-2.5">Клієнт</th>
             <th className="px-3 py-2.5">Відповідальний</th>
             <th className="px-3 py-2.5">Додатково</th>

@@ -183,7 +183,7 @@ export async function buildAiV2ContextSnapshot(
         openConstructorQuestions: ctorQuestions,
       },
       timelineFacts: [
-        `Стадія угоди: ${deal.stage.name}`,
+        `Стадія замовлення: ${deal.stage.name}`,
         `Прострочені задачі: ${overdueTasks}`,
         `Невирішені питання конструктора: ${ctorQuestions}`,
         `Очікуючі платежі: ${paymentsPending}`,
@@ -237,7 +237,7 @@ export async function buildAiV2ContextSnapshot(
       timelineFacts: [
         `Очікувані надходження: ${pendingPayments}`,
         `Прострочені очікувані оплати: ${overduePayments}`,
-        `Активні угоди у фінансовому контурі: ${riskyDeals}`,
+        `Активні замовлення у фінансовому контурі: ${riskyDeals}`,
       ],
     };
   }

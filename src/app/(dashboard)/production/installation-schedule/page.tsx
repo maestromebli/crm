@@ -45,7 +45,7 @@ export default async function ProductionInstallationSchedulePage() {
       <header>
         <h1 className="text-xl font-semibold text-[var(--enver-text)]">Графік монтажів</h1>
         <p className="mt-1 text-sm text-slate-600">
-          Угоди з призначеною датою монтажу (від найближчої).
+          Замовлення з призначеною датою монтажу (від найближчої).
         </p>
       </header>
 

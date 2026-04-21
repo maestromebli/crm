@@ -56,7 +56,7 @@ export function AiWorkspaceBlocks({ workspace, loading, error }: Props) {
   if (!workspace) {
     return (
       <p className="text-[11px] text-slate-500">
-        Відкрийте картку ліда або угоди — тут з’явиться контекстний аналіз.
+        Відкрийте картку ліда або замовлення — тут з’явиться контекстний аналіз.
       </p>
     );
   }

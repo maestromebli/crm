@@ -50,12 +50,12 @@ export function LeadHubNextStepBanner({
         {},
       );
       if (!j.dealId) {
-        throw new Error(j.error ?? "Не вдалося створити угоду");
+        throw new Error(j.error ?? "Не вдалося створити замовлення");
       }
       router.push(`/deals/${j.dealId}/workspace?fromLead=1`);
       router.refresh();
     } catch (e) {
-      setConvertErr(e instanceof Error ? e.message : "Не вдалося створити угоду");
+      setConvertErr(e instanceof Error ? e.message : "Не вдалося створити замовлення");
     } finally {
       setConvertBusy(false);
     }
@@ -82,7 +82,7 @@ export function LeadHubNextStepBanner({
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [handleConvertToDeal, href, isConvertToDealAction]);
+  }, [handleConvertToDeal, href, isConvertToDealAction, router]);
 
   const ctaButton = href || isConvertToDealAction ? (
     isConvertToDealAction ? (
@@ -99,7 +99,7 @@ export function LeadHubNextStepBanner({
               : "px-5 py-3 text-[14px]",
         )}
       >
-        {convertBusy ? "Створення угоди..." : "Наступний крок"}
+        {convertBusy ? "Створення замовлення..." : "Наступний крок"}
         <ArrowRight className="h-4 w-4" aria-hidden />
       </button>
     ) : (

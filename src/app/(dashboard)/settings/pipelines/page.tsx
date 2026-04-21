@@ -14,7 +14,7 @@ export default function SettingsPipelinesPage() {
     >
       <SettingsCard
         title="Воронка продажів"
-        description="Базова воронка для угод ENVER CRM."
+        description="Базова воронка для замовлень ENVER CRM."
       >
         <ol className="list-decimal space-y-0.5 pl-4 text-[11px] text-slate-700">
           <li>Новий лід</li>
@@ -43,7 +43,7 @@ export default function SettingsPipelinesPage() {
             Тип сутності
           </label>
           <select className="w-full rounded-md border border-slate-200 bg-[var(--enver-card)] px-2 py-1 text-xs outline-none focus:border-slate-900">
-            <option>Угоди</option>
+            <option>Замовлення</option>
             <option>Виробництво</option>
             <option>Передача</option>
           </select>

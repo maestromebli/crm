@@ -18,9 +18,11 @@ import { parseResponseJson } from "../../lib/api/parse-response-json";
 import { getVisibleDealWorkspaceTabs } from "../../lib/deal-workspace-visibility";
 import {
   getCriticalBlockers,
+  getDealTabStateMap,
   getDealViewRole,
   getDealHealthStatus,
   getFinanceSummary,
+  getManagerJourneyActions,
   getPipelineStageState,
   getPrimaryNextAction,
   getProductionReadiness,
@@ -80,7 +82,7 @@ export function DealWorkspaceShell({
         error?: string;
       }>(r);
       if (!r.ok || !j.data) {
-        throw new Error(j.error ?? "Не вдалося завантажити угоду");
+        throw new Error(j.error ?? "Не вдалося завантажити замовлення");
       }
       return j.data;
     },
@@ -234,6 +236,17 @@ export function DealWorkspaceShell({
     [workspaceData, viewRole],
   );
   const warnings = useMemo(() => getWarnings(workspaceData), [workspaceData]);
+  const tabStateMap = useMemo(
+    () => getDealTabStateMap(workspaceData, viewRole),
+    [workspaceData, viewRole],
+  );
+  const managerJourneyActions = useMemo(
+    () =>
+      getManagerJourneyActions(workspaceData, viewRole).filter((item) =>
+        visibleTabIds.includes(item.tab),
+      ),
+    [workspaceData, viewRole, visibleTabIds],
+  );
   const productionReadiness = useMemo(
     () => getProductionReadiness(workspaceData),
     [workspaceData],
@@ -249,6 +262,14 @@ export function DealWorkspaceShell({
     },
     [blockers, setTab],
   );
+  const openJourneyAction = useCallback(
+    (tab: DealWorkspaceTabId) => {
+      setTab(tab);
+    },
+    [setTab],
+  );
+  const progressLabel = `Готовність: ${productionReadiness.done}/${productionReadiness.total}`;
+  const focusLabel = primaryAction.reasons[0] ?? "Оновіть наступний крок по замовленню";
 
   return (
     <DealWorkspaceToastProvider>
@@ -257,12 +278,12 @@ export function DealWorkspaceShell({
           <DealCommandHeader
             data={workspaceData}
             health={health}
-            primaryAction={primaryAction}
-            onPrimaryAction={openPrimaryAction}
             onTab={setTab}
             viewRole={viewRole}
             canSwitchRole={resolvedRole === "admin"}
             onRoleChange={setViewRole}
+            progressLabel={progressLabel}
+            focusLabel={focusLabel}
           />
           {showLeadBridge ? (
             <div
@@ -272,7 +293,7 @@ export function DealWorkspaceShell({
               <div className="min-w-0">
                 <p className="font-semibold text-emerald-950">Продовження з Lead Hub</p>
                 <p className="mt-0.5 max-w-2xl text-[11px] leading-snug text-emerald-900/90">
-                  Контакт, файли і попередні домовленості з ліда вже в цій угоді.
+                  Контакт, файли і попередні домовленості з ліда вже у цьому замовленні.
                 </p>
                 {workspaceData.leadId ? (
                   <Link
@@ -293,7 +314,12 @@ export function DealWorkspaceShell({
             </div>
           ) : null}
 
-          <DealHeroAction action={primaryAction} onAction={openPrimaryAction} />
+          <DealHeroAction
+            action={primaryAction}
+            onAction={openPrimaryAction}
+            nextActions={managerJourneyActions.filter((item) => item.tab !== primaryAction.tab)}
+            onOpenAction={openJourneyAction}
+          />
           <DealCriticalBlockers blockers={blockers} onOpenBlocker={openBlocker} />
           <DealPipelineBar steps={pipeline} data={workspaceData} onTab={setTab} />
 
@@ -304,6 +330,9 @@ export function DealWorkspaceShell({
                 activeTab={safeActiveTab}
                 visibleTabIds={visibleTabIds}
                 onTab={setTab}
+                recommendedTab={primaryAction.tab}
+                tabStateMap={tabStateMap}
+                quickActions={managerJourneyActions}
               />
               <DealModules
                 tab={safeActiveTab}

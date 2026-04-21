@@ -164,7 +164,7 @@ export function ContactsList({ rows }: ContactsListProps) {
             <option value="name_asc">Імʼя (А-Я)</option>
             <option value="name_desc">Імʼя (Я-А)</option>
             <option value="leads_desc">Більше лідів</option>
-            <option value="deals_desc">Більше угод</option>
+            <option value="deals_desc">Більше замовлень</option>
           </select>
         </label>
       </div>
@@ -179,7 +179,7 @@ export function ContactsList({ rows }: ContactsListProps) {
               <th className="px-4 py-3">Тип контакту</th>
               <th className="px-4 py-3">Клієнт</th>
               <th className="px-4 py-3 text-center">Ліди</th>
-              <th className="px-4 py-3 text-center">Угоди</th>
+              <th className="px-4 py-3 text-center">Замовлення</th>
               <th className="px-4 py-3">Оновлено</th>
               <th className="w-10 px-2 py-3" aria-hidden />
             </tr>

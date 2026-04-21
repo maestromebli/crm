@@ -90,7 +90,7 @@ export function getLeadDominantNextStep(lead: LeadCoreInput): LeadDominantCta {
     !lead.dealId
   ) {
     disabled = true;
-    reasonUa = "Спочатку створіть угоду з ліда";
+    reasonUa = "Спочатку створіть замовлення з ліда";
   }
 
   if (base.actionKey === "create_proposal" && !lead.commercial.activeEstimateId) {

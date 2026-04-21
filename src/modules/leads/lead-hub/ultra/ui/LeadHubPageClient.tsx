@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { Loader2, Sparkles, Upload, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -258,10 +259,12 @@ export function LeadHubPageClient({ id }: { id: string }) {
             <p className="mb-2 text-xs font-medium uppercase text-slate-500">Image preview</p>
             <div className="grid grid-cols-3 gap-2">
               {imageFiles.slice(0, 6).map((file) => (
-                <img
+                <Image
                   key={file.id}
                   src={file.fileUrl}
                   alt={file.fileName}
+                  width={80}
+                  height={80}
                   className="h-20 w-full rounded-md object-cover"
                 />
               ))}

@@ -2,6 +2,7 @@
 
 import { Suspense } from "react";
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import type { EffectiveRole } from "../../lib/authz/roles";
 import type { ExecutiveDashboardPerms } from "../dashboard/queries";
 import type { ExecutiveDashboardPayload } from "./executive-types";
@@ -56,6 +57,7 @@ export function ExecutiveDashboardView({
   perms,
   data,
 }: ExecutiveDashboardViewProps) {
+  const router = useRouter();
   const aiContext = buildExecutiveDashboardAiContext(data);
   const subtitle =
     data.layout === "measurer"
@@ -79,7 +81,7 @@ export function ExecutiveDashboardView({
           <button
             type="button"
             className="mt-4 rounded-lg bg-[var(--enver-danger)] px-4 py-2 text-sm font-semibold text-white"
-            onClick={() => window.location.reload()}
+            onClick={() => router.refresh()}
           >
             Повторити
           </button>

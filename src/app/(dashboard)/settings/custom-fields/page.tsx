@@ -10,7 +10,7 @@ export default function SettingsCustomFieldsPage() {
   return (
     <SettingsShell
       title="Кастомні поля"
-      description="Додайте власні поля для лідів, контактів, угод та передачі у виробництво."
+      description="Додайте власні поля для лідів, контактів, замовлень та передачі у виробництво."
     >
       <SettingsCard
         title="Поля за сутністю"
@@ -33,7 +33,7 @@ export default function SettingsCustomFieldsPage() {
               <td className="py-1">так</td>
             </tr>
             <tr className="border-b border-slate-100">
-              <td className="py-1">Угода</td>
+              <td className="py-1">Замовлення</td>
               <td className="py-1">Тип обʼєкта</td>
               <td className="py-1">список</td>
               <td className="py-1">ні</td>
@@ -53,7 +53,7 @@ export default function SettingsCustomFieldsPage() {
           <select className="w-full rounded-md border border-slate-200 bg-[var(--enver-card)] px-2 py-1 text-xs outline-none focus:border-slate-900">
             <option>Лід</option>
             <option>Контакт</option>
-            <option>Угода</option>
+            <option>Замовлення</option>
             <option>Передача у виробництво</option>
           </select>
         </div>

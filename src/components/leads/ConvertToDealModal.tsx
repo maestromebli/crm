@@ -227,7 +227,7 @@ export function ConvertToDealModal({
   const submit = useCallback(async () => {
     if (!canConvert) return;
     if (contactRows.length > 0 && selectedContacts.size === 0) {
-      setErr("Оберіть хоча б один контакт для угоди.");
+      setErr("Оберіть хоча б один контакт для замовлення.");
       return;
     }
     setBusy(true);
@@ -265,7 +265,7 @@ export function ConvertToDealModal({
         alreadyLinked?: boolean;
       }>(`/api/leads/${lead.id}/convert-to-deal`, input);
       if (!data.dealId) {
-        throw new Error(data.error ?? "Не вдалося створити угоду");
+        throw new Error(data.error ?? "Не вдалося створити замовлення");
       }
       onConverted(data.dealId);
       onClose();
@@ -315,7 +315,7 @@ export function ConvertToDealModal({
           id="convert-deal-title"
           className="text-sm font-semibold text-[var(--enver-text)]"
         >
-          Лід → угода
+          Лід → замовлення
         </h3>
         <p className="mt-1 text-xs text-slate-600">
           Перевірте готовність, оберіть перенос і мінімальні поля для виконання.
@@ -429,7 +429,7 @@ export function ConvertToDealModal({
               checked={currentEstimate}
               onChange={(e) => setCurrentEstimate(e.target.checked)}
             />
-            Поточні прорахунки на угоду
+            Поточні прорахунки на замовлення
           </label>
           <label className="flex items-center gap-2 text-xs">
             <input
@@ -510,7 +510,7 @@ export function ConvertToDealModal({
 
         <section className="mt-4 space-y-2">
           <p className="text-[10px] font-semibold uppercase text-slate-500">
-            Угода
+            Замовлення
           </p>
           <label className="block text-xs">
             <span className="text-slate-500">Назва</span>
@@ -583,7 +583,7 @@ export function ConvertToDealModal({
             onClick={() => void submit()}
             className="rounded-lg bg-emerald-700 px-4 py-2 text-xs font-medium text-white disabled:opacity-50"
           >
-            {busy ? "Створення…" : "Створити угоду"}
+            {busy ? "Створення…" : "Створити замовлення"}
           </button>
         </div>
       </div>

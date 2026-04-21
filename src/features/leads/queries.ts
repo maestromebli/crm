@@ -198,7 +198,7 @@ export type LeadContactLinkRow = {
   role: string | null;
 };
 
-/** Розширені дані для сторінки картки ліда (стадії воронки, відкрита угода з ліда). */
+/** Розширені дані для сторінки картки ліда (стадії воронки, відкрита замовлення з ліда). */
 export type LeadCalendarEventSummary = {
   id: string;
   title: string;
@@ -244,7 +244,7 @@ export type LeadDetailRow = LeadListRow & {
     name: string | null;
     contactsCount: number | null;
   } | null;
-  /** Підтвердження умов до угоди (для конверсії / CRM Core). */
+  /** Підтвердження умов до замовлення (для конверсії / CRM Core). */
   projectAgreed?: boolean;
 };
 

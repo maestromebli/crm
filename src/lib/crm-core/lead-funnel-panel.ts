@@ -11,7 +11,7 @@ export type LeadFunnelPanelRow = {
   state: "done" | "current" | "upcoming";
 };
 
-/** Етапи для лівої панелі ліда (без «готовності до виробництва» — це вже угода). */
+/** Етапи для лівої панелі ліда (без «готовності до виробництва» — це вже замовлення). */
 const PANEL_ORDER: LeadStageKey[] = LEAD_FUNNEL_LINEAR.filter(
   (k) => k !== "PRODUCTION_READY",
 ) as LeadStageKey[];

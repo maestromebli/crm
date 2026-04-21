@@ -3,7 +3,7 @@ import { prisma } from "../prisma";
 import { computeDealFinanceRollup } from "./deal-finance-rollup";
 import { logDealFinanceActivity } from "./log-deal-finance-activity";
 
-/** Зберігає знімок P&L по угоді (append-only рядок). */
+/** Зберігає знімок P&L по замовленні (append-only рядок). */
 export async function saveDealFinanceSnapshot(args: {
   dealId: string;
   source?: string;

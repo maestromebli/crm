@@ -363,11 +363,11 @@ function TargetAttributionPanel({
   return (
     <div className="space-y-3">
       <p className="text-[11px] text-slate-600">
-        Звʼязок UTM і рекламних позначок з сесіями та угодами (агрегація з
+        Звʼязок UTM і рекламних позначок з сесіями та замовленнями (агрегація з
         демо-даних).
       </p>
       <DataTableShell
-        columns={["source", "medium", "campaign", "Сесії", "Ліди", "Угоди"]}
+        columns={["source", "medium", "campaign", "Сесії", "Ліди", "Замовлення"]}
       >
         {snapshot.attribution.map((r, i) => (
           <tr key={i} className="border-t border-slate-100 text-slate-700">

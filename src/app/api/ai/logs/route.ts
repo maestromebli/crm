@@ -38,6 +38,8 @@ export async function GET(request: Request) {
       entityType: true,
       entityId: true,
       model: true,
+      tokensApprox: true,
+      metadata: true,
       ok: true,
       errorMessage: true,
       createdAt: true,

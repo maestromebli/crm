@@ -10,6 +10,7 @@ import {
 } from "./lead-to-deal-transfer";
 import { moveLeadEstimatesToDeal } from "./move-lead-estimates-to-deal";
 import { applyCommercialSnapshotFromApprovedProposal } from "../deals/apply-deal-from-proposal";
+import { allocateDealNumber } from "../deals/deal-number";
 
 export type {
   ConvertLeadCommunicationTransfer,
@@ -117,8 +118,10 @@ function buildWorkspaceMeta(
   leadId: string,
   transfer: ConvertLeadTransferInput,
   installationDateIso: string | null,
+  dealNumber: string,
 ): Prisma.InputJsonValue {
   return {
+    dealNumber,
     conversion: {
       fromLeadId: leadId,
       communicationMode: transfer.communication.mode,
@@ -151,7 +154,7 @@ export type ConvertLeadToDealTxResult = {
 };
 
 /**
- * Логіка в одній транзакції: клієнт, контакти, угода, файли, смети, аудит.
+ * Логіка в одній транзакції: клієнт, контакти, замовлення, файли, смети, аудит.
  */
 export async function convertLeadToDeal(
   tx: Prisma.TransactionClient,
@@ -172,7 +175,7 @@ export async function convertLeadToDeal(
       ? args.input.dealTitle.trim()
       : "") ||
     args.lead.title.trim() ||
-    "Угода";
+    "Замовлення";
 
   const installationDate = setup.installationDate?.trim()
     ? new Date(setup.installationDate)
@@ -293,7 +296,7 @@ export async function convertLeadToDeal(
   }
 
   // У legacy-схемі Contact Prisma update може падати через відсутні колонки.
-  // Не блокуємо конверсію ліда в угоду через синхронізацію додаткових полів контакту.
+  // Не блокуємо конверсію ліда в замовлення через синхронізацію додаткових полів контакту.
   if (primaryContactId && prismaContactWritesEnabled) {
     await syncContactFromLead(tx, args.lead, primaryContactId);
   }
@@ -303,10 +306,12 @@ export async function convertLeadToDeal(
   const handoffNote =
     typeof setup.handoffNote === "string" ? setup.handoffNote.trim() : "";
 
+  const dealNumber = await allocateDealNumber(tx);
   const meta = buildWorkspaceMeta(
     args.lead.id,
     transfer,
     installationValid ? installationValid.toISOString() : null,
+    dealNumber,
   );
 
   const supportsColumn = (name: string): boolean =>
@@ -335,11 +340,13 @@ export async function convertLeadToDeal(
 
   const deal = await tx.deal.create({ data: dealCreateData });
 
-  await applyCommercialSnapshotFromApprovedProposal(tx, {
-    dealId: deal.id,
-    baseWorkspaceMeta: meta,
-    activeProposalId: args.lead.activeProposalId,
-  });
+  if (transfer.commercial.lastProposal) {
+    await applyCommercialSnapshotFromApprovedProposal(tx, {
+      dealId: deal.id,
+      baseWorkspaceMeta: meta,
+      activeProposalId: args.lead.activeProposalId,
+    });
+  }
 
   if (handoffNote) {
     await tx.dealHandoff.create({

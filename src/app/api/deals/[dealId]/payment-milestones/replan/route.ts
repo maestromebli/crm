@@ -84,7 +84,7 @@ export async function POST(req: Request, ctx: Ctx) {
       },
     });
     if (!deal) {
-      return NextResponse.json({ error: "Угоду не знайдено" }, { status: 404 });
+      return NextResponse.json({ error: "Замовлення не знайдено" }, { status: 404 });
     }
 
     const denied = await forbidUnlessDealAccess(user, P.DEALS_UPDATE, {
@@ -96,7 +96,7 @@ export async function POST(req: Request, ctx: Ctx) {
     const currency = deal.currency?.trim() || "UAH";
     if (total <= 0) {
       return NextResponse.json(
-        { error: "Спочатку задайте суму угоди." },
+        { error: "Спочатку задайте суму замовлення." },
         { status: 400 },
       );
     }

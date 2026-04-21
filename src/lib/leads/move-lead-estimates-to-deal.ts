@@ -9,7 +9,7 @@ export type MoveLeadEstimatesOptions = {
 };
 
 /**
- * Після конверсії ліда в угоду: переносить смети з leadId на dealId з новими номерами версій.
+ * Після конверсії ліда в замовлення: переносить смети з leadId на dealId з новими номерами версій.
  */
 export async function moveLeadEstimatesToDeal(
   tx: Prisma.TransactionClient,

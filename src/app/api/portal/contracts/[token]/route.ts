@@ -4,6 +4,12 @@ import { hashShareToken, mapContractDetails } from "@/lib/contracts/service";
 
 type Ctx = { params: Promise<{ token: string }> };
 
+function normalizeLegacyContractStatus(status: string): string {
+  if (status === "VIEWED_BY_CUSTOMER") return "VIEWED_BY_CLIENT";
+  if (status === "SENT_TO_CUSTOMER") return "SENT_FOR_SIGNATURE";
+  return status;
+}
+
 function toPortalError(status: number, message: string) {
   return NextResponse.json({ ok: false, error: message }, { status });
 }
@@ -11,7 +17,7 @@ function toPortalError(status: number, message: string) {
 export async function GET(_req: Request, ctx: Ctx) {
   const { token } = await ctx.params;
   const tokenHash = hashShareToken(token);
-  const share = await (prisma as any).contractShareLink.findUnique({
+  const share = await (prisma as any).dealContractShareLink.findUnique({
     where: { tokenHash },
     include: { contract: true },
   });
@@ -19,7 +25,7 @@ export async function GET(_req: Request, ctx: Ctx) {
   if (!share) return toPortalError(404, "Посилання не знайдено");
   if (share.status !== "ACTIVE") return toPortalError(410, "Посилання деактивоване");
   if (share.expiresAt < new Date()) {
-    await (prisma as any).contractShareLink.update({
+    await (prisma as any).dealContractShareLink.update({
       where: { id: share.id },
       data: { status: "EXPIRED" },
     });
@@ -47,10 +53,15 @@ export async function GET(_req: Request, ctx: Ctx) {
     },
   });
 
+  const details = mapContractDetails(share.contract);
+
   return NextResponse.json({
     ok: true,
     data: {
-      contract: mapContractDetails(share.contract),
+      contract: {
+        ...details,
+        status: normalizeLegacyContractStatus(details.status),
+      },
       share: {
         expiresAt: share.expiresAt.toISOString(),
         status: share.status,

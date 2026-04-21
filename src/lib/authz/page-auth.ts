@@ -1,17 +1,16 @@
-import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
-import { authOptions } from "../auth/options";
 import {
   hasEffectivePermission,
   type Phase1Permission,
   P,
 } from "./permissions";
+import { getCachedServerSession } from "./server-session";
 
 /**
  * RSC layout CRM: сесія обовʼязкова (дубль до middleware).
  */
 export async function requireSessionForAppLayout() {
-  const session = await getServerSession(authOptions);
+  const session = await getCachedServerSession();
   if (!session?.user?.id) {
     redirect("/login");
   }

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-/** Вбудовані чіпи «збережених виглядів» у DealsHub (лише відкриті угоди). */
+/** Вбудовані чіпи «збережених виглядів» у DealsHub (лише відкриті замовлення). */
 export const SAVED_VIEW_CHIP_IDS = [
   "all_open",
   "no_next",

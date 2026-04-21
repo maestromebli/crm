@@ -107,7 +107,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
     return NextResponse.json(
       {
         error:
-          "Лід привʼязаний до угоди — редагуйте прорахунок у картці угоди",
+          "Лід привʼязаний до замовлення — редагуйте прорахунок у картці замовлення",
       },
       { status: 409 },
     );

@@ -150,7 +150,7 @@ export function ContactOverviewClient({
             </h2>
             <p className="mt-1 text-xs text-slate-600">
               {canUpdate
-                ? "Поля збережуться в профілі картки для всіх повʼязаних лідів та угод."
+                ? "Поля збережуться в профілі картки для всіх повʼязаних лідів та замовлень."
                 : "Редагування доступне з правами на оновлення лідів (LEADS_UPDATE)."}
             </p>
           </div>
@@ -423,7 +423,7 @@ export function ContactOverviewClient({
 
       <section className="rounded-2xl border border-slate-200 bg-[var(--enver-card)] p-4 shadow-sm md:p-5">
         <h2 className="text-sm font-semibold text-[var(--enver-text)]">
-          Ліди та угоди
+          Ліди та замовлення
         </h2>
         <p className="mt-1 text-xs text-slate-600">
           Швидкі посилання на картки, де цей контакт фігурує.
@@ -473,11 +473,11 @@ export function ContactOverviewClient({
           </div>
           <div>
             <h3 className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-              Угоди
+              Замовлення
             </h3>
             <ul className="mt-2 space-y-2">
               {contact.deals.length === 0 ? (
-                <li className="text-xs text-slate-500">Немає угод як основний контакт.</li>
+                <li className="text-xs text-slate-500">Немає замовлень як основний контакт.</li>
               ) : null}
               {contact.deals.map((d) => (
                 <li key={d.id}>

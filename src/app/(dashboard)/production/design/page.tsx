@@ -41,14 +41,14 @@ export default async function ProductionDesignPage() {
       <header>
         <h1 className="text-xl font-semibold text-[var(--enver-text)]">Підготовка проєкту</h1>
         <p className="mt-1 text-sm text-slate-600">
-          Угоди прийняті у виробництво, але лінія ще не запущена: креслення, кімната конструктора,
+          Замовлення прийняті у виробництво, але лінія ще не запущена: креслення, кімната конструктора,
           погодження перед порізкою.
         </p>
       </header>
 
       <ProductionSubpageTable
         rows={tableRows}
-        emptyText="Немає угод у стадії підготовки за вашим фільтром доступу."
+        emptyText="Немає замовлень у стадії підготовки за вашим фільтром доступу."
       />
     </main>
   );

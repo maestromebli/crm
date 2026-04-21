@@ -14,8 +14,8 @@ import {
 type Ctx = { params: Promise<{ dealId: string }> };
 
 const TYPE_UA: Record<string, string> = {
-  DEAL_CREATED: "Угода створена",
-  DEAL_UPDATED: "Угода оновлена",
+  DEAL_CREATED: "Замовлення створена",
+  DEAL_UPDATED: "Замовлення оновлена",
   DEAL_STAGE_CHANGED: "Зміна стадії",
   DEAL_WORKSPACE_META_UPDATED: "Оновлено дані воркспейсу",
   CONTRACT_CREATED: "Створено договір",
@@ -37,7 +37,7 @@ const TYPE_UA: Record<string, string> = {
   FINANCE_INVOICE_UPDATED: "Оновлено рахунок",
   CLIENT_PAYMENT_RECORDED: "Зареєстровано оплату від клієнта",
   CLIENT_PAYMENT_VOIDED: "Скасовано запис оплати",
-  DEAL_FINANCE_SNAPSHOT_SAVED: "Збережено фінансовий знімок угоди",
+  DEAL_FINANCE_SNAPSHOT_SAVED: "Збережено фінансовий знімок замовлення",
   payment_received: "Отримано оплату",
   status_changed: "Змінено статус",
   file_uploaded: "Завантажено файл",
@@ -65,7 +65,7 @@ export async function GET(req: Request, ctx: Ctx) {
       select: { id: true, ownerId: true },
     });
     if (!deal) {
-      return NextResponse.json({ error: "Угоду не знайдено" }, { status: 404 });
+      return NextResponse.json({ error: "Замовлення не знайдено" }, { status: 404 });
     }
 
     const denied = await forbidUnlessDealAccess(user, P.DEALS_VIEW, deal);

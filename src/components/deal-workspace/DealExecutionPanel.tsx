@@ -188,7 +188,7 @@ export function DealExecutionPanel({ data, onTab }: Props) {
       <section className="rounded-2xl border border-slate-200 bg-[var(--enver-card)] p-4 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-semibold text-[var(--enver-text)]">
-            Комунікація (лід + угода)
+            Комунікація (лід + замовлення)
           </h2>
           {leadHref ? (
             <Link
@@ -200,7 +200,7 @@ export function DealExecutionPanel({ data, onTab }: Props) {
           ) : null}
         </div>
         <p className="mt-1 text-[11px] text-slate-500">
-          Історія з ліда підтягується за посиланням; нотатки по угоді — у вкладці
+          Історія з ліда підтягується за посиланням; нотатки по замовленню — у вкладці
           «Повідомлення».
         </p>
         {messages.length > 0 ? (
@@ -225,7 +225,7 @@ export function DealExecutionPanel({ data, onTab }: Props) {
           onClick={() => onTab("messages")}
           className="mt-3 text-[11px] font-medium text-[var(--enver-text)] underline"
         >
-          Повідомлення по угоді
+          Повідомлення по замовленню
         </button>
       </section>
     </div>

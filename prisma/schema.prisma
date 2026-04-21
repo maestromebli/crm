@@ -536,7 +536,7 @@ enum DealContractStatus {
   SUPERSEDED
 }
 
-enum ContractShareLinkStatus {
+enum DealContractShareLinkStatus {
   ACTIVE
   EXPIRED
   REVOKED
@@ -598,6 +598,13 @@ enum AttachmentEntityType {
   EVENT
   TASK
   CONSTRUCTOR_ROOM
+  PROJECT
+  FINANCE_TRANSACTION
+  PROCUREMENT_REQUEST
+  PURCHASE_ORDER
+  GOODS_RECEIPT
+  PAYROLL
+  COMMISSION
 }
 
 enum HandoffStatus {
@@ -631,6 +638,7 @@ enum ActivityEntityType {
   EVENT
   HANDOFF
   FINANCE
+  PRODUCTION_ORCHESTRATION
 }
 
 enum ActivityType {
@@ -677,6 +685,27 @@ enum ActivityType {
   PRODUCTION_NOTIFICATION
   FINANCE_JOURNAL_POSTED
   FINANCE_JOURNAL_VOIDED
+  PRODUCTION_LAUNCH_QUEUED
+  PRODUCTION_LAUNCHED
+  PRODUCTION_LAUNCH_FAILED
+  PRODUCTION_LAUNCH_RETRIED
+  LEAD_PROPOSAL_CREATED
+  LEAD_PROPOSAL_UPDATED
+  LEAD_PROPOSAL_CLIENT_VIEWED
+  PRODUCTION_WORKFLOW_STAGE_CHANGED
+  PRODUCTION_ORDER_CREATED
+  PRODUCTION_ORDER_STATUS_CHANGED
+  PRODUCTION_STAGE_COMPLETED
+  PRODUCTION_ISSUE_CREATED
+  PRODUCTION_ISSUE_RESOLVED
+  PRODUCTION_ORDER_COMPLETED
+  PRODUCTION_ORCHESTRATION_CREATED
+  PRODUCTION_ORCHESTRATION_ACCEPTED
+  PRODUCTION_ORCHESTRATION_CLARIFICATION_REQUESTED
+  PRODUCTION_ORCHESTRATION_REJECTED
+  PRODUCTION_CONSTRUCTOR_ASSIGNED
+  PRODUCTION_DESIGN_APPROVED
+  PRODUCTION_DESIGN_REVISION_REQUESTED
 }
 
 /**
@@ -713,6 +742,7 @@ enum LeadProposalStatus {
   APPROVED
   REJECTED
   SUPERSEDED
+  ARCHIVED
 }
 
 enum LeadAiChecklistOutcome {
@@ -1257,6 +1287,8 @@ model Deal {
   commercialSnapshotFrozenAt         DateTime?
 
   orders                   Order[]
+  quotations               Quotation[]
+  legacyContracts          Contract[]
   stageHistory             DealStageHistory[]
   contract                 DealContract?
   readinessEvaluations     ReadinessEvaluation[]
@@ -1563,15 +1595,15 @@ model DealContract {
   currentVersionId String?               @unique
   currentVersion   DealContractVersion?  @relation("ContractCurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
   versions         DealContractVersion[] @relation("ContractVersionsRoot")
-  shareLinks       ContractShareLink[]
+  shareLinks       DealContractShareLink[]
 }
 
-model ContractShareLink {
+model DealContractShareLink {
   id          String                  @id @default(cuid())
   contractId  String
   contract    DealContract            @relation(fields: [contractId], references: [id], onDelete: Cascade)
-  tokenHash   String                  @unique
-  status      ContractShareLinkStatus @default(ACTIVE)
+  tokenHash   String                      @unique
+  status      DealContractShareLinkStatus @default(ACTIVE)
   expiresAt   DateTime
   maxViews    Int?
   viewCount   Int                     @default(0)
@@ -2297,6 +2329,7 @@ enum MoneyTransactionStatus {
   PENDING
   PAID
   CANCELLED
+  OVERDUE
 }
 
 enum MoneyTransactionCategory {
@@ -3031,6 +3064,7 @@ enum CommEntityType {
   LEAD
   DEAL
   CONTACT
+  CLIENT
 }
 
 model CommConversationInsight {
@@ -3146,6 +3180,11 @@ enum CommChannelType {
   CALL_LOG
   INTERNAL_NOTE
   OTHER
+  WHATSAPP
+  VIBER
+  SMS
+  EMAIL
+  WEBCHAT
 }
 
 enum CommMessageDirection {
@@ -3159,17 +3198,28 @@ enum CommMessageKind {
   ATTACHMENT
   NOTE
   OTHER
+  IMAGE
+  FILE
+  VOICE
+  SYSTEM
 }
 
 enum CommSenderType {
   CLIENT
   MANAGER
   SYSTEM
+  INTERNAL
+  BOT
 }
 
 enum CommThreadStatus {
   OPEN
   ARCHIVED
+  NEEDS_REPLY
+  WAITING_CLIENT
+  COMPLETED
+  FOLLOW_UP_OVERDUE
+  DORMANT
 }
 
 model CommChannelAccount {
@@ -3570,4 +3620,218 @@ model SignatureSession {
   updatedAt         DateTime               @updatedAt
 
   @@index([contractId, status])
+}
+
+enum EnverContractStatus {
+  DRAFT
+  READY_FOR_REVIEW
+  APPROVED_INTERNAL
+  ISSUED
+  SENT_FOR_SIGNATURE
+  PARTIALLY_SIGNED
+  SIGNED
+  DECLINED
+  EXPIRED
+  VOIDED
+}
+
+enum EnverSignatureStatus {
+  NOT_STARTED
+  LINK_SENT
+  OPENED
+  IDENTIFIED
+  SIGNING_IN_PROGRESS
+  SIGNED
+  FAILED
+  CANCELLED
+  EXPIRED
+}
+
+enum EnverContractPartyRole {
+  CUSTOMER
+  COMPANY
+  GUARANTOR
+}
+
+enum EnverPartyType {
+  INDIVIDUAL
+  FOP
+  LEGAL_ENTITY
+}
+
+enum EnverSignatureProvider {
+  VCHASNO
+  DIIA
+  PAPERLESS
+}
+
+enum EnverTemplateStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model EnverContractTemplate {
+  id                  String              @id @default(cuid())
+  code                String
+  name                String
+  documentType        String
+  language            String              @default("uk")
+  version             Int
+  status              EnverTemplateStatus @default(DRAFT)
+  bodyHtml            String?
+  bodyDocxTemplateUrl String?
+  variablesSchemaJson Json
+  settingsJson        Json?
+  approvalRequired    Boolean             @default(false)
+  isActive            Boolean             @default(true)
+  createdById         String?
+  updatedById         String?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  contracts EnverContract[]
+
+  @@unique([code, version])
+  @@index([code, status, isActive])
+}
+
+model EnverContract {
+  id                  String                @id @default(cuid())
+  contractNumber      String                @unique
+  orderId             String
+  dealId              String?
+  clientId            String
+  templateId          String
+  templateCode        String
+  templateVersion     Int
+  status              EnverContractStatus   @default(DRAFT)
+  signatureStatus     EnverSignatureStatus  @default(NOT_STARTED)
+  provider            EnverSignatureProvider?
+  payloadJson         Json
+  pricingSnapshotJson Json?
+  renderedHtmlHash    String?
+  renderedPdfUrl      String?
+  renderedPdfHash     String?
+  issuedAt            DateTime?
+  expiresAt           DateTime?
+  signedAt            DateTime?
+  cancelledAt         DateTime?
+  createdById         String?
+  updatedById         String?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  template   EnverContractTemplate   @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  parties    EnverContractParty[]
+  sessions   EnverSigningSession[]
+  artifacts  EnverSignatureArtifact[]
+  auditEvents EnverContractAuditEvent[]
+  reminders  EnverContractReminder[]
+
+  @@index([orderId])
+  @@index([dealId])
+  @@index([clientId])
+  @@index([status, signatureStatus])
+}
+
+model EnverContractParty {
+  id         String                @id @default(cuid())
+  contractId String
+  role       EnverContractPartyRole
+  partyType  EnverPartyType
+  fullName   String
+  taxId      String?
+  email      String?
+  phone      String?
+  signOrder  Int                   @default(1)
+  mustSign   Boolean               @default(true)
+  signStatus EnverSignatureStatus  @default(NOT_STARTED)
+  signedAt   DateTime?
+  createdAt  DateTime              @default(now())
+  updatedAt  DateTime              @updatedAt
+
+  contract EnverContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@index([contractId])
+}
+
+model EnverSigningSession {
+  id                  String                @id @default(cuid())
+  contractId          String
+  provider            EnverSignatureProvider
+  providerEnvelopeId  String?
+  providerSessionId   String?
+  status              EnverSignatureStatus  @default(NOT_STARTED)
+  startUrl            String?
+  deepLink            String?
+  qrCodeUrl           String?
+  expiresAt           DateTime?
+  lastWebhookAt       DateTime?
+  providerPayloadJson Json?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  contract EnverContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@index([contractId, createdAt])
+  @@index([provider, providerEnvelopeId])
+}
+
+model EnverSignatureArtifact {
+  id                   String                @id @default(cuid())
+  contractId           String
+  partyId              String?
+  provider             EnverSignatureProvider
+  signatureType        String
+  signedDocumentUrl    String?
+  signatureContainerUrl String?
+  verificationResultJson Json?
+  certificateInfoJson  Json?
+  hash                 String?
+  timestampedAt        DateTime?
+  createdAt            DateTime              @default(now())
+
+  contract EnverContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@index([contractId, createdAt])
+}
+
+model EnverContractAuditEvent {
+  id           String   @id @default(cuid())
+  contractId   String
+  eventType    String
+  actorType    String?
+  actorId      String?
+  metadataJson Json?
+  createdAt    DateTime @default(now())
+
+  contract EnverContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@index([contractId, createdAt])
+}
+
+model EnverContractReminder {
+  id           String   @id @default(cuid())
+  contractId   String
+  channel      String
+  recipient    String
+  scheduledAt  DateTime
+  sentAt       DateTime?
+  status       String   @default("PENDING")
+  metadataJson Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  contract EnverContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@index([contractId, status, scheduledAt])
+}
+
+model EnverContractSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  valueJson Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

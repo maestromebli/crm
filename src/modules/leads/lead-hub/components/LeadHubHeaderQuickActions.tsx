@@ -105,7 +105,7 @@ export function LeadHubHeaderQuickActions({
             disabled={convertingToDeal}
             onClick={onConvertToDeal}
           >
-            {convertingToDeal ? "..." : "Створити угоду"}
+            {convertingToDeal ? "..." : "Створити замовлення"}
           </button>
         ) : null}
         {canArchiveAction ? (

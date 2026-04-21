@@ -70,6 +70,7 @@ export async function getDealHubAggregate(dealId: string): Promise<DealHubAggreg
       productionFlow: {
         select: {
           id: true,
+          number: true,
           status: true,
           acceptedAt: true,
         },

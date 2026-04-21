@@ -123,7 +123,7 @@ export function ProductionQueueTableClient({
 
   const exportCsv = () => {
     const header = [
-      "ID угоди",
+      "ID замовлення",
       "Назва",
       "Клієнт",
       "Власник",
@@ -222,7 +222,7 @@ export function ProductionQueueTableClient({
       <table className="min-w-full divide-y divide-slate-200 text-sm">
         <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
           <tr>
-            <th className="px-4 py-3">Угода</th>
+            <th className="px-4 py-3">Замовлення</th>
             <th className="px-4 py-3">Клієнт</th>
             <th className="px-4 py-3">Власник</th>
             <th className="px-4 py-3">Передача</th>
@@ -250,7 +250,7 @@ export function ProductionQueueTableClient({
                     href={`/deals/${r.id}/workspace?tab=production`}
                     className="ml-2 text-xs font-normal text-slate-500 hover:underline"
                   >
-                    угода
+                    замовлення
                   </a>
                 </td>
                 <td className="px-4 py-3.5 text-slate-700">{r.clientName}</td>
@@ -339,7 +339,7 @@ export function ProductionQueueTableClient({
           {visibleRows.length === 0 ? (
             <tr>
               <td colSpan={8} className="px-4 py-6 text-center text-sm text-slate-500">
-                Немає угод за поточним фільтром.
+                Немає замовлень за поточним фільтром.
               </td>
             </tr>
           ) : null}

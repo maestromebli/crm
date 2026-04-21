@@ -145,7 +145,7 @@ export function AdminAiAdvisorChat() {
           onChange={(e) => setKnowledgeNote(e.target.value)}
           rows={4}
           disabled={knowledgeBusy}
-          placeholder="Напр.: Наш стандарт відповіді ліду — до 15 хв у робочий час; усі угоди > 200 000 грн проходять контроль маржі перед КП."
+          placeholder="Напр.: Наш стандарт відповіді ліду — до 15 хв у робочий час; усі замовлення > 200 000 грн проходять контроль маржі перед КП."
           className="mt-2 w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs text-slate-900 outline-none focus:border-emerald-400"
         />
         <div className="mt-2 flex items-center gap-2">

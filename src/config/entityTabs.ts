@@ -32,7 +32,7 @@ export const ENTITY_TABS: EntityTabsConfig = {
   ],
   contact: [
     { id: "overview", label: "Огляд", href: (id) => `/contacts/${id}` },
-    { id: "deals", label: "Угоди", href: (id) => `/contacts/${id}/deals` },
+    { id: "deals", label: "Замовлення", href: (id) => `/contacts/${id}/deals` },
     { id: "conversations", label: "Діалоги", href: (id) => `/contacts/${id}/conversations` },
     { id: "files", label: "Файли", href: (id) => `/contacts/${id}/files` },
     { id: "tasks", label: "Задачі", href: (id) => `/contacts/${id}/tasks` },

@@ -23,7 +23,7 @@ export async function POST(_req: Request, ctx: Ctx) {
     },
   });
   if (!deal) {
-    return NextResponse.json({ error: "Угоду не знайдено" }, { status: 404 });
+    return NextResponse.json({ error: "Замовлення не знайдено" }, { status: 404 });
   }
   const denied = await forbidUnlessDealAccess(user, P.DEALS_STAGE_CHANGE, deal);
   if (denied) return denied;
@@ -33,7 +33,7 @@ export async function POST(_req: Request, ctx: Ctx) {
     select: { id: true },
   });
   if (!next) {
-    return NextResponse.json({ ok: true, message: "Угода вже на фінальному етапі." });
+    return NextResponse.json({ ok: true, message: "Замовлення вже на фінальному етапі." });
   }
 
   const origin = new URL(_req.url);

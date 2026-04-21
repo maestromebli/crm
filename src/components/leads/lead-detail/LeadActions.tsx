@@ -68,7 +68,7 @@ export function LeadActions({
           href={`/deals/${lead.linkedDeal.id}/workspace`}
           className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-900 hover:bg-emerald-100"
         >
-          Відкрити угоду
+          Відкрити замовлення
         </Link>
       ) : canConvertToDeal ? (
         <button
@@ -77,7 +77,7 @@ export function LeadActions({
           onClick={() => onConvert()}
           className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-800 hover:bg-[var(--enver-hover)] disabled:opacity-50"
         >
-          {converting ? "…" : "У угоду"}
+          {converting ? "…" : "В замовлення"}
         </button>
       ) : null}
     </div>

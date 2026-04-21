@@ -40,7 +40,7 @@ export function detectDealMissingData(input: {
 }): string[] {
   const missing: string[] = [];
   if (!input.expectedCloseDate) missing.push("Не вказано очікувану дату закриття");
-  if (input.value == null) missing.push("Не вказано суму угоди");
+  if (input.value == null) missing.push("Не вказано суму замовлення");
 
   const measurement = asObject(input.controlMeasurementJson);
   const measurementDone =

@@ -221,7 +221,7 @@ export function CalculationPage({
       <div className="grid grid-cols-1 gap-4 p-4 lg:grid-cols-[minmax(0,7fr)_minmax(280px,3fr)]">
         <div className="space-y-3">
           <div className="rounded-xl border border-blue-100 bg-blue-50/70 px-3 py-2 text-xs text-blue-900">
-            Угода: <span className="font-semibold">{dealTitle}</span>. Enter додає рядок, вставка з Excel підтримує формат
+            Замовлення: <span className="font-semibold">{dealTitle}</span>. Enter додає рядок, вставка з Excel підтримує формат
             `Назва\tКіль\tКоеф\tЦіна`.
           </div>
           <CalculationTable

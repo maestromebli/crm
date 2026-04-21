@@ -7,7 +7,7 @@ type Props = {
   dealId: string;
 };
 
-/** Швидкі посилання в модуль закупівель по поточній угоді. */
+/** Швидкі посилання в модуль закупівель по поточній замовленні. */
 export function DealProcurementLink({ dealId }: Props) {
   return (
     <div className="rounded-xl border border-emerald-200/90 bg-emerald-50/55 px-3 py-2 text-sm shadow-sm shadow-slate-900/5">
@@ -19,7 +19,7 @@ export function DealProcurementLink({ dealId }: Props) {
           href={`/crm/procurement/${dealId}`}
           className="font-medium text-emerald-950 underline decoration-emerald-300 underline-offset-2 hover:text-emerald-900"
         >
-          Закупівлі по угоді
+          Закупівлі по замовленню
         </Link>
         <span className="text-emerald-800/50" aria-hidden>
           ·

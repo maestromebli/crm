@@ -1,4 +1,5 @@
 import type { DealHubOverview } from "../../domain/deal.types";
+import { DEAL_HUB_STAGE_LABELS } from "../../domain/deal.constants";
 import { DEAL_HUB_STAGE_ORDER } from "../../domain/deal.status";
 import { DealCard } from "./_shared";
 
@@ -23,7 +24,7 @@ export function DealStageRail({ data }: { data: DealHubOverview }) {
                         : "text-slate-500"
                   }
                 >
-                  {stage}
+                  {DEAL_HUB_STAGE_LABELS[stage]}
                 </span>
                 {!gate?.passed && gate?.missing.length ? (
                   <span className="text-[10px] text-rose-600">{gate.missing.length} відсутньо</span>

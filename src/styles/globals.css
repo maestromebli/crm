@@ -178,7 +178,7 @@
   }
 
   :where(.text-slate-700, .text-slate-800, .text-slate-900) {
-  color: #0f172a;
+    color: var(--enver-text);
   }
 
   :where(img, svg, video, canvas, iframe) {
@@ -509,6 +509,104 @@
   box-shadow: 0 0 0 2px var(--enver-accent-ring);
 }
 
+.enver-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  border-radius: 0.625rem;
+  border: 1px solid transparent;
+  font-weight: 600;
+  line-height: 1.2;
+  text-decoration: none;
+  transition:
+    background-color var(--enver-transition-fast),
+    color var(--enver-transition-fast),
+    border-color var(--enver-transition-fast),
+    box-shadow var(--enver-transition-fast),
+    transform var(--enver-transition-fast);
+}
+
+.enver-cta:hover {
+  transform: translateY(-0.5px);
+}
+
+.enver-cta:active {
+  transform: translateY(0) scale(0.985);
+}
+
+.enver-cta:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--enver-accent-ring);
+}
+
+.enver-cta-xs {
+  padding: 0.275rem 0.55rem;
+  font-size: 0.6875rem;
+}
+
+.enver-cta-sm {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.75rem;
+}
+
+.enver-cta-md {
+  padding: 0.5rem 0.9rem;
+  font-size: 0.8125rem;
+}
+
+.enver-cta-pill {
+  border-radius: 9999px;
+}
+
+.enver-cta-primary {
+  border-color: var(--enver-accent);
+  background: var(--enver-accent);
+  color: #fff;
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--enver-accent) 30%, transparent);
+}
+
+.enver-cta-primary:hover {
+  background: var(--enver-accent-hover);
+  border-color: var(--enver-accent-hover);
+  color: #fff;
+}
+
+.enver-cta-secondary {
+  border-color: var(--enver-border);
+  background: var(--enver-surface);
+  color: var(--enver-text-muted);
+}
+
+.enver-cta-secondary:hover {
+  border-color: var(--enver-border-strong);
+  background: var(--enver-hover);
+  color: var(--enver-text);
+}
+
+.enver-cta-ghost {
+  border-color: color-mix(in srgb, var(--enver-border) 70%, transparent);
+  background: transparent;
+  color: var(--enver-text-muted);
+}
+
+.enver-cta-ghost:hover {
+  border-color: var(--enver-border);
+  background: color-mix(in srgb, var(--enver-hover) 65%, transparent);
+  color: var(--enver-text);
+}
+
+.enver-cta-critical {
+  border-color: color-mix(in srgb, var(--enver-danger) 55%, transparent);
+  background: var(--enver-danger-soft);
+  color: var(--enver-danger);
+}
+
+.enver-cta-critical:hover {
+  border-color: var(--enver-danger);
+  background: color-mix(in srgb, var(--enver-danger-soft) 80%, transparent);
+}
+
 .enver-status-chip {
   display: inline-flex;
   align-items: center;
@@ -604,11 +702,11 @@
 
 /* Contrast pass for dense CRM screens (keeps palette, improves legibility). */
 .enver-readable :where(.text-slate-500, .text-\[var\(--enver-text-muted\)\]) {
-  color: #475569;
+  color: color-mix(in srgb, var(--enver-text-muted) 92%, var(--enver-text) 8%);
 }
 
 .enver-readable :where(.text-slate-600) {
-  color: #334155;
+  color: color-mix(in srgb, var(--enver-text-muted) 82%, var(--enver-text) 18%);
 }
 
 .enver-readable :where(.border-slate-100) {
@@ -619,8 +717,8 @@
   border-color: #c6d1e2;
 }
 
-/* Prevent browser default blue links and keep readable contrast in dense cards. */
-.enver-readable :where(a) {
+/* Keep native inheritance for plain links, but do not override explicit text-* utilities. */
+.enver-readable :where(a:not([class*="text-"])) {
   color: inherit;
 }
 
@@ -661,6 +759,14 @@
 
 :root[data-theme="light"] .enver-readable :where(a.text-\[var\(--enver-accent-hover\)\]) {
   color: #0f766e;
+}
+
+:root[data-theme="light"] .enver-readable :where(.text-slate-500, .text-\[var\(--enver-text-muted\)\]) {
+  color: #475569;
+}
+
+:root[data-theme="light"] .enver-readable :where(.text-slate-600) {
+  color: #334155;
 }
 
 :root[data-theme="light"] .enver-readable :where(.text-rose-900, .text-amber-900, .text-emerald-900, .text-slate-900) :where(p, span, a, strong) {

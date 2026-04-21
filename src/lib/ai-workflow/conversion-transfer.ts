@@ -28,7 +28,7 @@ export function deriveConversionTransferSuggestion(
     reasonParts.push(`КП v${prop.version} для передачі контексту.`);
   }
   if (recommendedFileIds.length > 0) {
-    reasonParts.push("Додайте креслення / фото обʼєкта до угоди.");
+    reasonParts.push("Додайте креслення / фото обʼєкта до замовлення.");
   }
   reasonParts.push("Повна історія листування зазвичай надлишкова — достатньо останніх подій.");
 
@@ -43,7 +43,7 @@ export function deriveConversionTransferSuggestion(
 }
 
 /**
- * Чернетка handoff-тексту для угоди (§7.2) — короткі рядки.
+ * Чернетка handoff-тексту для замовлення (§7.2) — короткі рядки.
  */
 export function deriveConversionHandoffSummaryLines(
   lead: LeadDetailRow,
@@ -68,7 +68,7 @@ export function deriveConversionHandoffSummaryLines(
     lines.push(`Очікування по термінах: ${q.timeline.trim()}.`);
   }
   lines.push(
-    "Перевірте перенесення файлів заміру та креслень у пакет угоди.",
+    "Перевірте перенесення файлів заміру та креслень у пакет замовлення.",
   );
   lines.push("Наступний крок у виконанні: договір та передоплата за шаблоном компанії.");
   return lines.slice(0, 5);

@@ -7,10 +7,11 @@ import type {
 import type { DealCommercialSnapshotV1 } from "../deals/commercial-snapshot";
 import type { DealControlMeasurementV1 } from "../deals/control-measurement";
 
-/** Метаєдані угоди для єдиного робочого місця (JSON у `Deal.workspaceMeta`). */
+/** Метаєдані замовлення для єдиного робочого місця (JSON у `Deal.workspaceMeta`). */
 export type DealWorkspaceMeta = {
+  dealNumber?: string;
   nextActionAt?: string;
-  /** Конкретна дія менеджера (не плутати з subStatusLabel / статусом угоди). */
+  /** Конкретна дія менеджера (не плутати з subStatusLabel / статусом замовлення). */
   nextStepLabel?: string;
   /** Підказка для автоматизацій і фільтрів: call | visit | send_quote | follow_up | payment | other */
   nextStepKind?:
@@ -25,7 +26,7 @@ export type DealWorkspaceMeta = {
   subStatusLabel?: string;
   measurementComplete?: boolean;
   proposalSent?: boolean;
-  /** Кваліфікація ліда/угоди на ранньому етапі. */
+  /** Кваліфікація ліда/замовлення на ранньому етапі. */
   qualificationComplete?: boolean;
   qualificationNotes?: string;
   measurementNotes?: string;
@@ -57,7 +58,7 @@ export type DealWorkspaceMeta = {
     communicationMode?: "full" | "recent";
     communicationRecentCount?: number;
   };
-  /** Чеклист виконання (угода, не продаж). */
+  /** Чеклист виконання (замовлення, не продаж). */
   executionChecklist?: {
     contactConfirmed?: boolean;
     estimateApproved?: boolean;
@@ -162,6 +163,7 @@ export type DealAttachmentSummary = {
 export type DealWorkspacePayload = {
   deal: {
     id: string;
+    number?: string | null;
     title: string;
     description: string | null;
     status: string;
@@ -195,7 +197,7 @@ export type DealWorkspacePayload = {
     estimatesMoved: number;
     communicationMode: "full" | "recent";
   } | null;
-  /** Останні повідомлення ліда (історія до угоди). */
+  /** Останні повідомлення ліда (історія до замовлення). */
   leadMessagesPreview: Array<{
     id: string;
     body: string;
@@ -257,7 +259,7 @@ export type DealWorkspacePayload = {
       totalPrice: number | null;
     } | null;
   };
-  /** Проєкти фінансів/закупівель у БД, прив’язані до цієї угоди. */
+  /** Проєкти фінансів/закупівель у БД, прив’язані до цієї замовлення. */
   linkedFinanceProjects: Array<{
     id: string;
     code: string;

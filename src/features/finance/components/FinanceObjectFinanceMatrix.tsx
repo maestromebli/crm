@@ -14,7 +14,7 @@ export function FinanceObjectFinanceMatrix({ rows, consolidated }: Props) {
         <table className="min-w-[960px] w-full text-left text-sm">
           <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-100/95 text-[11px] font-semibold uppercase tracking-wide text-slate-600 backdrop-blur-sm">
             <tr>
-              <th className="px-4 py-3 text-left">Угода</th>
+              <th className="px-4 py-3 text-left">Замовлення</th>
               <th className="px-4 py-3 text-left">Об&apos;єкт</th>
               <th className="border-l border-slate-200/90 bg-emerald-50/50 px-3 py-3 text-right text-emerald-900" title="Надходження готівкою">
                 Надх.
@@ -103,7 +103,7 @@ export function FinanceObjectFinanceMatrix({ rows, consolidated }: Props) {
       </div>
       <p className="rounded-lg bg-slate-50/90 px-3 py-2 text-xs leading-relaxed text-slate-600">
         <strong className="font-medium text-slate-700">Як читати:</strong> закупівлі з позицій по об&apos;єкту; cash — з проводок.
-        Відкриті PO — на рівні угоди; у демо один об&apos;єкт на проєкт — цифри узгоджуються з закупівлями.
+        Відкриті PO — на рівні замовлення; у демо один об&apos;єкт на проєкт — цифри узгоджуються з закупівлями.
       </p>
     </div>
   );

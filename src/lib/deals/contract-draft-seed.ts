@@ -6,7 +6,7 @@ import {
   type DealDocumentTemplate,
 } from "@/lib/deals/document-templates";
 
-/** Дані угоди для підстановки в змінні договору (без Prisma-типів). */
+/** Дані замовлення для підстановки в змінні договору (без Prisma-типів). */
 export type DealForContractSeed = {
   id: string;
   title: string;
@@ -75,7 +75,7 @@ function formatPaymentMilestones(
 }
 
 /**
- * Заповнює порожні змінні з контексту угоди (без перезапису вже введених значень).
+ * Заповнює порожні змінні з контексту замовлення (без перезапису вже введених значень).
  */
 export function mergeDealContextIntoContractVariables(
   base: Record<string, string>,
@@ -201,7 +201,7 @@ export function defaultContractTemplateForAutomation(): DealDocumentTemplate {
   );
 }
 
-/** Зведення рядка угоди з Prisma у форму для сиду договору. */
+/** Зведення рядка замовлення з Prisma у форму для сиду договору. */
 export function toDealForContractSeed(
   deal: {
     id: string;

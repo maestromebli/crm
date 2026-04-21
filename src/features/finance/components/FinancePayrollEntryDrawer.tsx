@@ -36,7 +36,7 @@ export function FinancePayrollEntryDrawer({ projects, objects }: Props) {
                 <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Операційний облік</p>
                 <h3 className="text-lg font-semibold text-slate-900">Введення нарахування зарплати</h3>
                 <p className="mt-1 text-xs text-slate-600">
-                  Прив&apos;язка до угоди та об&apos;єкта — для P&amp;L по адресі. Демо: дані не зберігаються на сервері.
+                  Прив&apos;язка до замовлення та об&apos;єкта — для P&amp;L по адресі. Демо: дані не зберігаються на сервері.
                 </p>
               </div>
               <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
@@ -45,7 +45,7 @@ export function FinancePayrollEntryDrawer({ projects, objects }: Props) {
             </div>
             <div className="grid gap-3">
               <label className="text-xs font-medium text-slate-700">
-                Проєкт (угода)
+                Проєкт (замовлення)
                 <select
                   className="mt-1 w-full rounded-md border border-slate-200 px-2 py-2 text-sm"
                   value={projectId}

@@ -46,7 +46,7 @@ export function LeadCommercialCard({
       <h3 className="text-xs font-semibold text-[var(--enver-text)]">Комерція</h3>
       <p className="mt-0.5 text-[11px] text-slate-600">
         Смета й КП змінюються разом із діалогом — версії зберігають історію, фінал
-        після узгодження та угоди.
+        після узгодження та оформлення замовлення.
       </p>
       {microHints.length > 0 ? (
         <ul className="mt-2 space-y-1 border-t border-emerald-100/80 pt-2 text-[10px] leading-snug text-emerald-950/90">

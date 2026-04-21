@@ -10,5 +10,5 @@ export {
   calculatePricingItem,
   buildPricingSummary,
   buildPricingTotals,
-  recalculatePricingSession,
 } from "./lead-pricing/ultra";
+export { recalculatePricingSession } from "./lead-pricing/ultra/services/pricing-session-service";

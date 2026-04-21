@@ -42,7 +42,7 @@ function scoreSignals(metrics: ScoreMetrics): string[] {
     out.push("Є прострочені follow-up без закриття.");
   }
   if (metrics.dealMovement < 65) {
-    out.push("Угоди рухаються повільно між оновленнями.");
+    out.push("Замовлення рухаються повільно між оновленнями.");
   }
   if (metrics.managerResponsiveness < 65) {
     out.push("Накопичуються прострочені задачі.");
@@ -72,7 +72,7 @@ function primaryIssue(metrics: ScoreMetrics): string {
     case "leadVelocity":
       return "Швидкість руху лідів";
     case "dealMovement":
-      return "Рух угод";
+      return "Рух замовлень";
     case "managerResponsiveness":
       return "Реакція по задачах";
     case "conversionHygiene":

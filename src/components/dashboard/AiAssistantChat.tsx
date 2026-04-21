@@ -21,7 +21,7 @@ import { cn } from "../../lib/utils";
 const SUGGESTIONS: { text: string; label: string }[] = [
   {
     label: "Огляд",
-    text: "Скільки у мене зараз лідів, угод і відкритих задач?",
+    text: "Скільки у мене зараз лідів, замовлень і відкритих задач?",
   },
   {
     label: "Навігація",
@@ -32,8 +32,8 @@ const SUGGESTIONS: { text: string; label: string }[] = [
     text: "Які найближчі події в календарі на цьому тижні?",
   },
   {
-    label: "Угода",
-    text: "Як змінити етап угоди та відкрити робоче місце проєкту?",
+    label: "Замовлення",
+    text: "Як змінити етап замовлення та відкрити робоче місце проєкту?",
   },
 ];
 
@@ -154,7 +154,7 @@ export function AiAssistantChat() {
                 <div className="rounded-2xl border border-dashed border-white/15 bg-[var(--enver-card)]/5 px-6 py-8">
                   <Bot className="mx-auto h-10 w-10 text-violet-300/80" />
                   <p className="mt-3 text-sm font-medium text-slate-200">
-                    Запитайте про ліди, угоди, задачі чи де знайти розділ у меню
+                    Запитайте про ліди, замовлення, задачі чи де знайти розділ у меню
                   </p>
                   <p className="mt-1 text-xs text-slate-400">
                     Або оберіть швидку підказку вище
@@ -266,7 +266,7 @@ export function AiAssistantChat() {
                   void send(input, () => setInput(""));
                 }
               }}
-              placeholder="Питання про CRM, ліди, угоди, навігацію…"
+              placeholder="Питання про CRM, ліди, замовлення, навігацію…"
               rows={2}
               disabled={loading}
               className={cn(

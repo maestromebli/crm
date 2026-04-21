@@ -114,7 +114,7 @@ function csvEscape(s: string): string {
 
 function downloadMonitorCsv(rows: OrderedLineMonitorRow[], filename: string) {
   const header = [
-    "Угода",
+    "Замовлення",
     "ID заявки",
     "Позиція",
     "Потрібно до",
@@ -310,7 +310,7 @@ export function ProcurementOrderedMonitorTable({
               value={q}
               onChange={(e) => setQ(e.target.value)}
               onKeyDown={onSearchKeyDown}
-              placeholder="Пошук: угода, позиція, ID заявки… (Esc — скинути)"
+              placeholder="Пошук: замовлення, позиція, ID заявки… (Esc — скинути)"
               className="min-w-[200px] max-w-md flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none ring-slate-300 placeholder:text-slate-400 focus:ring-2"
               aria-label="Пошук по моніторингу позицій"
               autoComplete="off"
@@ -348,7 +348,7 @@ export function ProcurementOrderedMonitorTable({
                 <option value="crm">За ризиком (прострочення → дата)</option>
                 <option value="days">За днями до дедлайну</option>
                 <option value="remaining">За залишком бюджету</option>
-                <option value="deal">За угодою (А-Я)</option>
+                <option value="deal">За замовленням (А-Я)</option>
                 <option value="fulfill">За % виконання</option>
               </select>
             </label>
@@ -425,7 +425,7 @@ export function ProcurementOrderedMonitorTable({
           <table className="min-w-[1040px] w-full text-left">
             <thead className="sticky top-0 z-10 bg-gradient-to-b from-slate-50 to-slate-50/95 text-[11px] font-semibold uppercase tracking-wide text-slate-600 shadow-[0_1px_0_0_rgb(226_232_240)]">
               <tr>
-                <th className={cell}>Угода</th>
+                <th className={cell}>Замовлення</th>
                 <th className={`${cell} w-10`} aria-label="Робочий простір" />
                 <th className={cell}>Заявка</th>
                 <th className={cell}>Позиція</th>
@@ -464,7 +464,7 @@ export function ProcurementOrderedMonitorTable({
                       <Link
                         href={`/deals/${row.dealId}/workspace`}
                         className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-xs font-semibold text-slate-500 ring-1 ring-slate-200/80 hover:bg-white hover:text-sky-800 hover:ring-sky-200"
-                        title="Робочий простір угоди"
+                        title="Робочий простір замовлення"
                       >
                         WS
                       </Link>

@@ -311,7 +311,7 @@ export function ConstructorsBoardClient({
 
       <div className="flex flex-wrap items-end gap-2">
         <label className="min-w-[200px] flex-1 text-xs">
-          <span className="text-slate-500">Пошук (угода / клієнт)</span>
+          <span className="text-slate-500">Пошук (замовлення / клієнт)</span>
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -350,7 +350,7 @@ export function ConstructorsBoardClient({
             onChange={(e) => setSortMode(e.target.value as SortMode)}
             className="mt-1 block w-[min(100%,220px)] rounded-lg border border-slate-200 bg-[var(--enver-card)] px-2 py-1.5 text-sm text-[var(--enver-text)]"
           >
-            <option value="updated">За оновленням угоди</option>
+            <option value="updated">За оновленням замовлення</option>
             <option value="dueAsc">Дедлайн (найближчі першими)</option>
             <option value="priority">Пріоритет (термінові першими)</option>
           </select>
@@ -379,7 +379,7 @@ export function ConstructorsBoardClient({
           disabled={exportBusy}
           onClick={() => void exportServerCsv()}
           className="rounded-lg border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
-          title="До 2000 угод з БД, UTF-8 для Excel"
+          title="До 2000 замовлень з БД, UTF-8 для Excel"
         >
           {exportBusy ? "Завантаження…" : "CSV (сервер)"}
         </button>
@@ -390,7 +390,7 @@ export function ConstructorsBoardClient({
           <table className="min-w-[900px] w-full divide-y divide-slate-200 text-sm">
             <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
               <tr>
-                <th className="px-4 py-3">Угода</th>
+                <th className="px-4 py-3">Замовлення</th>
                 <th className="px-4 py-3">Клієнт</th>
                 <th className="px-4 py-3">Пріоритет</th>
                 <th className="px-4 py-3">Дедлайн</th>
@@ -473,7 +473,7 @@ export function ConstructorsBoardClient({
                         {cr?.publicToken ? (
                           <CopyConstructorLinkButton publicToken={cr.publicToken} />
                         ) : (
-                          <span className="text-slate-400">Створіть у вкладці угоди</span>
+                          <span className="text-slate-400">Створіть у вкладці замовлення</span>
                         )}
                       </div>
                     </td>

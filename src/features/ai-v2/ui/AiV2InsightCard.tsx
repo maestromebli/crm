@@ -61,7 +61,7 @@ type AuditItem = {
 
 const contextTitle: Record<AiV2ContextName, string> = {
   lead: "AI V2 Розумна панель (лід)",
-  deal: "AI V2 Розумна панель (угода)",
+  deal: "AI V2 Розумна панель (замовлення)",
   dashboard: "AI V2 Аналітика дашборду",
   finance: "AI V2 Фінансовий контроль",
   production: "AI V2 Готовність виробництва",

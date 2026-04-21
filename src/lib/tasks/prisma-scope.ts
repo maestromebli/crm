@@ -5,7 +5,7 @@ import { resolveAccessContext } from "../authz/data-scope";
 
 /**
  * Обмеження списку задач: SUPER_ADMIN/DIRECTOR — усі; HEAD_MANAGER — команда продажів;
- * SALES_MANAGER — свої та по своїх угодах/лідах.
+ * SALES_MANAGER — свої та по своїх замовленнях/лідах.
  */
 export async function taskListWhereForUser(
   prisma: PrismaClient,

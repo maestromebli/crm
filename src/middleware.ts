@@ -104,7 +104,8 @@ export default withAuth(
       const role = token.role as string | undefined;
       const impersonating = Boolean(token.impersonateUserId);
       const bypassMenuNav =
-        !impersonating && (role === "SUPER_ADMIN" || role === "ADMIN");
+        !impersonating &&
+        (role === "SUPER_ADMIN" || role === "ADMIN" || role === "DIRECTOR");
       if (!bypassMenuNav) {
         const raw = token.menuAccess;
         const menuAccess =

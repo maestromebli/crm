@@ -52,7 +52,7 @@ function firstBlockingMessage(
 }
 
 /**
- * Машиночитаний гейт готовності до виробництва (для воркспейсу угоди, `/production`, AI).
+ * Машиночитаний гейт готовності до виробництва (для воркспейсу замовлення, `/production`, AI).
  * Базується на `evaluateReadiness` + додаткові правила ENVER.
  */
 export function evaluateProductionReadinessGate(
@@ -96,7 +96,7 @@ export function evaluateProductionReadinessGate(
       id: "commercial_snapshot",
       severity: "hard",
       messageUk:
-        "Відсутній погоджений комерційний знімок (узгоджене КП у картці угоди).",
+        "Відсутній погоджений комерційний знімок (узгоджене КП у картці замовлення).",
       section: "snapshot",
     });
     missingItems.push("Погоджений комерційний знімок");

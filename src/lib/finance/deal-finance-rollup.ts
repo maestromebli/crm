@@ -20,7 +20,7 @@ function toDecimal(n: number): Prisma.Decimal {
 }
 
 /**
- * Агрегат по угоді: виручка з КП / value, витрати та надходження з `MoneyTransaction`.
+ * Агрегат по замовленні: виручка з КП / value, витрати та надходження з `MoneyTransaction`.
  */
 export async function computeDealFinanceRollup(dealId: string): Promise<DealFinanceRollup> {
   const deal = await prisma.deal.findUnique({

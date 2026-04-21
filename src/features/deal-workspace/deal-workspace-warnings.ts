@@ -103,7 +103,7 @@ export function derivePaymentStripSummary(
   };
 }
 
-/** Повертає текст попередження, якщо сума угоди суттєво не збігається з останньою сметою (або не задана). */
+/** Повертає текст попередження, якщо сума замовлення суттєво не збігається з останньою сметою (або не задана). */
 export function getEstimateVersusDealValueHint(
   data: DealWorkspacePayload,
 ): string | null {
@@ -117,13 +117,13 @@ export function getEstimateVersusDealValueHint(
     return null;
   }
   if (dealVal == null) {
-    return `Сума угоди не задана. Остання смета v${latest.version}: ${latest.totalPrice.toLocaleString("uk-UA")} грн — можна підставити одним кліком.`;
+    return `Сума замовлення не задана. Остання смета v${latest.version}: ${latest.totalPrice.toLocaleString("uk-UA")} грн — можна підставити одним кліком.`;
   }
   const diff = Math.abs(latest.totalPrice - dealVal);
   const threshold = Math.max(1, Math.abs(dealVal) * 0.005);
   if (diff <= threshold) return null;
   const cur = (data.deal.currency ?? "UAH").trim() || "UAH";
-  return `Сума угоди (${dealVal.toLocaleString("uk-UA")} ${cur}) не збігається з останньою сметою v${latest.version} (${latest.totalPrice.toLocaleString("uk-UA")} грн). Оновіть суму в картці угоди або актуалізуйте смету.`;
+  return `Сума замовлення (${dealVal.toLocaleString("uk-UA")} ${cur}) не збігається з останньою сметою v${latest.version} (${latest.totalPrice.toLocaleString("uk-UA")} грн). Оновіть суму в картці замовлення або актуалізуйте смету.`;
 }
 
 /** Чи варто показувати кнопку «Підставити суму з смети». */
@@ -193,7 +193,7 @@ export function deriveDealWarnings(data: DealWorkspacePayload): DealWarningItem[
     items.push({
       level: "warning",
       key: "no_estimate",
-      message: "Немає прорахунку (смети) по угоді.",
+      message: "Немає прорахунку (смети) по замовленні.",
     });
   }
 
@@ -237,7 +237,7 @@ export function deriveDealWarnings(data: DealWorkspacePayload): DealWarningItem[
     items.push({
       level: "warning",
       key: "stale_deal",
-      message: "Угода давно не оновлювалась — перевірте актуальність.",
+      message: "Замовлення давно не оновлювалась — перевірте актуальність.",
     });
   }
 
@@ -344,7 +344,7 @@ export function deriveAssistantCards(data: DealWorkspacePayload): AssistantCard[
       id: "assist_no_next",
       tone: "rose",
       title: "Немає наступного кроку",
-      body: "Вкажіть конкретну дію та дату — це видно керівнику в списках проблемних угод.",
+      body: "Вкажіть конкретну дію та дату — це видно керівнику в списках проблемних замовлень.",
       ctaLabel: "Запланувати",
     });
   }
@@ -435,7 +435,7 @@ export function deriveAssistantCards(data: DealWorkspacePayload): AssistantCard[
 
 export type ListWarningBadge = "critical" | "warning" | null;
 
-/** Короткі операційні сигнали для правої колонки угоди (додатково до основної рекомендації). */
+/** Короткі операційні сигнали для правої колонки замовлення (додатково до основної рекомендації). */
 export function deriveDealRailMicroHints(
   data: DealWorkspacePayload,
 ): string[] {
@@ -461,13 +461,13 @@ export function deriveDealRailMicroHints(
   }
   if (!data.leadId && data.deal.status === "OPEN") {
     hints.push(
-      "Немає привʼязаного ліда — історія до угоди може бути неповна.",
+      "Немає привʼязаного ліда — історія до замовлення може бути неповна.",
     );
   }
   return hints.slice(0, 4);
 }
 
-/** Легка евристика для рядка списку угод (без завантаження задач по кожній угоді). */
+/** Легка евристика для рядка списку замовлень (без завантаження задач по кожній замовленні). */
 export function deriveDealListWarningBadge(input: {
   status: string;
   nextStepLabel: string | null;

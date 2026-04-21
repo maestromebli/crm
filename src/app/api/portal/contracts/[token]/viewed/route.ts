@@ -7,7 +7,7 @@ type Ctx = { params: Promise<{ token: string }> };
 export async function POST(_req: Request, ctx: Ctx) {
   const { token } = await ctx.params;
   const tokenHash = hashShareToken(token);
-  const share = await (prisma as any).contractShareLink.findUnique({
+  const share = await (prisma as any).dealContractShareLink.findUnique({
     where: { tokenHash },
     include: { contract: true },
   });
@@ -15,7 +15,7 @@ export async function POST(_req: Request, ctx: Ctx) {
   if (share.status !== "ACTIVE") return NextResponse.json({ error: "Посилання неактивне" }, { status: 410 });
 
   await prisma.$transaction([
-    (prisma as any).contractShareLink.update({
+    (prisma as any).dealContractShareLink.update({
       where: { id: share.id },
       data: {
         viewCount: { increment: 1 },

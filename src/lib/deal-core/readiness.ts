@@ -24,7 +24,7 @@ function technicalChecklistComplete(
   meta: DealWorkspaceMeta,
 ): { done: boolean; missingLabels: string[] } {
   const t = meta.technicalChecklist;
-  /** Доки менеджер не відкрив структурований чеклист — не блокуємо legacy-угоди. */
+  /** Доки менеджер не відкрив структурований чеклист — не блокуємо legacy-замовлення. */
   if (t === undefined) {
     return { done: true, missingLabels: [] };
   }

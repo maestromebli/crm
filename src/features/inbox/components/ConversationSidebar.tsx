@@ -20,7 +20,7 @@ export function ConversationSidebar({
         </p>
         <p className="text-xs">
           Оберіть діалог зліва, щоб побачити інформацію про клієнта,
-          повʼязані ліди, угоди та наступні кроки.
+          повʼязані ліди, замовлення та наступні кроки.
         </p>
       </aside>
     );
@@ -68,7 +68,7 @@ export function ConversationSidebar({
           </button>
         ) : (
           <p className="text-[11px] text-slate-500">
-            Діалог ще не привʼязаний до ліда або угоди.
+            Діалог ще не привʼязаний до ліда або замовлення.
           </p>
         )}
       </div>
@@ -88,7 +88,7 @@ export function ConversationSidebar({
             type="button"
             className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-[11px] text-slate-700 hover:bg-slate-100"
           >
-            Привʼязати угоду
+            Привʼязати замовлення
           </button>
           <button
             type="button"

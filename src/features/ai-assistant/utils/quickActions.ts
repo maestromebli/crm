@@ -20,7 +20,7 @@ export function buildQuickActions(
     }),
     nav({
       id: "pipeline_deals",
-      label: "Воронка угод",
+      label: "Воронка замовлень",
       href: "/deals/pipeline",
     }),
     nav({
@@ -54,14 +54,14 @@ export function buildQuickActions(
     base.unshift(
       nav({
         id: "deal_workspace",
-        label: "Робоче місце угоди",
+        label: "Робоче місце замовлення",
         href: `/deals/${ctx.dealId}/workspace`,
       }),
     );
     base.unshift(
       nav({
         id: "deal_tasks_tab",
-        label: "Задачі угоди",
+        label: "Задачі замовлення",
         href: `/deals/${ctx.dealId}/workspace?tab=tasks`,
       }),
     );

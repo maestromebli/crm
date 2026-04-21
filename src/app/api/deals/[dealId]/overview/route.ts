@@ -20,7 +20,7 @@ export async function GET(_req: Request, ctx: Ctx) {
     select: { ownerId: true },
   });
   if (!deal) {
-    return NextResponse.json({ error: "Угоду не знайдено" }, { status: 404 });
+    return NextResponse.json({ error: "Замовлення не знайдено" }, { status: 404 });
   }
   const denied = await forbidUnlessDealAccess(user, P.DEALS_VIEW, deal);
   if (denied) return denied;
@@ -30,7 +30,7 @@ export async function GET(_req: Request, ctx: Ctx) {
     mapEffectiveRoleToDealHubRole(user.dbRole),
   );
   if (!data) {
-    return NextResponse.json({ error: "Угоду не знайдено" }, { status: 404 });
+    return NextResponse.json({ error: "Замовлення не знайдено" }, { status: 404 });
   }
   return NextResponse.json({ ok: true, data });
 }

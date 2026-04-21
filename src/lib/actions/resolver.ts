@@ -114,14 +114,14 @@ export function resolveDealActionPlan(data: DealWorkspacePayload): ActionPlan {
       label: "Виграно",
       kind: "command",
       disabled: !isOpenDeal,
-      reason: !isOpenDeal ? "Угода вже завершена" : null,
+      reason: !isOpenDeal ? "Замовлення вже завершена" : null,
     },
     {
       id: "mark_lost",
       label: "Втрачено",
       kind: "command",
       disabled: !isOpenDeal,
-      reason: !isOpenDeal ? "Угода вже завершена" : null,
+      reason: !isOpenDeal ? "Замовлення вже завершена" : null,
     },
   ];
 

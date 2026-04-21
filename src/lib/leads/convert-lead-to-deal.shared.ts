@@ -1,5 +1,5 @@
 /**
- * Типи та дефолти конверсії лід → угода (без імпорту Prisma/pg — безпечно для client components).
+ * Типи та дефолти конверсії лід → замовлення (без імпорту Prisma/pg — безпечно для client components).
  */
 
 export type LeadFileTransferGroups = {

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { SETTINGS_ITEMS } from "../../config/settings";
 import { cn } from "../../lib/utils";
 
@@ -11,7 +12,17 @@ type SettingsSectionListProps = {
 export function SettingsSectionList({
   currentPath,
 }: SettingsSectionListProps) {
-  const sections = SETTINGS_ITEMS.reduce<
+  const { data } = useSession();
+  const role = data?.user?.realRole ?? data?.user?.role;
+  const isSuperAdmin = role === "SUPER_ADMIN";
+  const isAdmin = isSuperAdmin || role === "ADMIN" || role === "DIRECTOR";
+
+  const visibleItems = SETTINGS_ITEMS.filter((item) => {
+    if (item.access === "super-admin") return isSuperAdmin;
+    return isAdmin;
+  });
+
+  const sections = visibleItems.reduce<
     Record<string, typeof SETTINGS_ITEMS>
   >((acc, item) => {
     acc[item.section] = acc[item.section] || [];

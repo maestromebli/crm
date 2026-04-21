@@ -35,13 +35,13 @@ export default async function ProductionCompletedPage() {
       <header>
         <h1 className="text-xl font-semibold text-[var(--enver-text)]">Завершені</h1>
         <p className="mt-1 text-sm text-slate-600">
-          Успішно закриті угоди, по яких виробництво було запущено.
+          Успішно закриті замовлення, по яких виробництво було запущено.
         </p>
       </header>
 
       <ProductionSubpageTable
         rows={tableRows}
-        emptyText="Немає завершених угод з виробництва."
+        emptyText="Немає завершених замовлень з виробництва."
       />
     </main>
   );

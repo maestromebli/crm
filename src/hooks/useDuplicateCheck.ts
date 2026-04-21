@@ -21,7 +21,7 @@ type UseDuplicateCheckOptions = {
 };
 
 /**
- * Live-перевірка збігів за телефоном у лідах / контактах / угодах.
+ * Live-перевірка збігів за телефоном у лідах / контактах / замовленнях.
  * Ендпоінт: `/api/leads/check-phone?phone=…`
  */
 export function useDuplicateCheck(

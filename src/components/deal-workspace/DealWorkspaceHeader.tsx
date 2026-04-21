@@ -238,7 +238,7 @@ export function DealWorkspaceHeader({
         <div className="min-w-0 space-y-1">
           <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
             <Link href="/deals" className="hover:text-slate-800">
-              Угоди
+              Замовлення
             </Link>
             <span className="text-slate-300">/</span>
             <span className="font-medium text-slate-700">Робоче місце</span>
@@ -389,7 +389,7 @@ export function DealWorkspaceHeader({
 
       <p
         className={`mt-2 text-[11px] font-medium ${payVariantClass}`}
-        title="Підсумок по віхах у метаданих угоди"
+        title="Підсумок по віхах у метаданих замовлення"
       >
         {paymentStrip.label}
       </p>
@@ -397,7 +397,7 @@ export function DealWorkspaceHeader({
       {stepSeverity === "danger" ? (
         <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-900">
           <span className="font-semibold">Немає наступного кроку або дати.</span>{" "}
-          Вкажіть конкретну дію та коли з клієнтом звʼязуватись — інакше угода
+          Вкажіть конкретну дію та коли з клієнтом звʼязуватись — інакше замовлення
           зависне в «думає».
         </div>
       ) : stepSeverity === "warning" ? (
@@ -446,7 +446,7 @@ export function DealWorkspaceHeader({
           ) : null}
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block text-[11px]">
-              <span className="text-slate-500">Назва угоди</span>
+              <span className="text-slate-500">Назва замовлення</span>
               <input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
@@ -512,7 +512,7 @@ export function DealWorkspaceHeader({
               />
             </label>
             <label className="block text-[11px]">
-              <span className="text-slate-500">Стан здоров’я угоди</span>
+              <span className="text-slate-500">Стан здоров’я замовлення</span>
               <select
                 value={healthSel}
                 onChange={(e) =>
@@ -599,7 +599,7 @@ export function DealWorkspaceHeader({
               saving && "opacity-60",
             )}
           >
-            {saving ? "Збереження…" : "Зберегти угоду та бейджі"}
+            {saving ? "Збереження…" : "Зберегти замовлення та бейджі"}
           </button>
         </div>
       ) : null}

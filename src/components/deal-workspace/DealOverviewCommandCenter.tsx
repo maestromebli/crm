@@ -30,7 +30,7 @@ export function DealOverviewCommandCenter({ data, onTab }: Props) {
             Конверсія з ліда
           </p>
           <p className="mt-1.5 leading-relaxed text-sky-900">
-            Подальша смета, КП та договір ведуться в цій угоді (вкладки праворуч:
+            Подальша смета, КП та договір ведуться у цьому замовленні (вкладки праворуч:
             «Смета», «КП» у блоці продажу, «Договір»). Сторінки ліда збережені для
             історії та файлів.
           </p>
@@ -52,7 +52,7 @@ export function DealOverviewCommandCenter({ data, onTab }: Props) {
               className="rounded-lg border border-sky-300 bg-white px-2.5 py-1 text-[11px] font-medium text-sky-900 hover:bg-sky-50"
               onClick={() => onTab("estimate")}
             >
-              Смета угоди
+              Смета замовлення
             </button>
             <button
               type="button"
@@ -99,7 +99,7 @@ export function DealOverviewCommandCenter({ data, onTab }: Props) {
               {data.owner.name ?? data.owner.email}
             </li>
             <li>
-              <span className="text-slate-500">Сума угоди:</span>{" "}
+              <span className="text-slate-500">Сума замовлення:</span>{" "}
               {data.deal.value != null
                 ? `${data.deal.value.toLocaleString("uk-UA")} ${data.deal.currency ?? ""}`
                 : "—"}

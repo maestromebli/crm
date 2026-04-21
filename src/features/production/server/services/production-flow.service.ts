@@ -1,6 +1,7 @@
 import { Prisma, type ProductionFlow } from "@prisma/client";
 import { randomBytes } from "node:crypto";
 import { prisma } from "@/lib/prisma";
+import { allocateDealNumber, readDealNumberFromMeta } from "@/lib/deals/deal-number";
 import { parseHandoffManifest } from "@/lib/deals/document-templates";
 import { computeReadinessPercent, computeRiskScore } from "./production-metrics.service";
 import { PRODUCTION_STEP_SEQUENCE } from "./production-step.service";
@@ -107,10 +108,10 @@ export async function recomputeFlowMetrics(flowId: string) {
   });
 }
 
-const HANDOFF_IMPORT_PACKAGE_NAME = "Передача з угоди";
+const HANDOFF_IMPORT_PACKAGE_NAME = "Передача з замовлення";
 
 /**
- * Копіює обрані у пакеті передачі файли угоди в перший пакет виробничого потоку.
+ * Копіює обрані у пакеті передачі файли замовлення в перший пакет виробничого потоку.
  * Не змінює кроки пайплайну (на відміну від registerFilePackage).
  * Ідемпотентно: якщо пакет з такою назвою вже є — нічого не робить.
  */
@@ -173,7 +174,7 @@ export async function importDealHandoffFilesToProductionFlowIfMissing(input: {
       packageName: HANDOFF_IMPORT_PACKAGE_NAME,
       versionLabel,
       packageTypeTags: ["HANDOFF", "DEAL_IMPORT"],
-      note: "Автоматичний імпорт файлів, обраних у пакеті передачі угоди.",
+      note: "Автоматичний імпорт файлів, обраних у пакеті передачі замовлення.",
       uploadedByName: input.actorName,
       files: {
         create: unique.map((a) => ({
@@ -193,7 +194,7 @@ export async function importDealHandoffFilesToProductionFlowIfMissing(input: {
   await createEvent({
     flowId: input.flowId,
     type: "HANDOFF_FILES_IMPORTED",
-    title: "Файли з угоди додано до потоку",
+    title: "Файли з замовлення додано до потоку",
     description: `${unique.length} файл(ів) з пакета передачі.`,
     actorName: input.actorName,
   });
@@ -211,11 +212,12 @@ export async function createProductionFlowFromDealHandoff(input: {
       id: true,
       title: true,
       expectedCloseDate: true,
+      workspaceMeta: true,
       owner: { select: { name: true, email: true } },
       client: { select: { name: true } },
     },
   });
-  if (!deal) throw new Error("Угоду не знайдено");
+  if (!deal) throw new Error("Замовлення не знайдено");
 
   const existing = await prisma.productionFlow.findUnique({ where: { dealId: input.dealId } });
   if (existing) {
@@ -232,35 +234,54 @@ export async function createProductionFlowFromDealHandoff(input: {
     };
   }
 
-  const count = await prisma.productionFlow.count();
-  const number = `PR-${String(count + 1).padStart(3, "0")}`;
-
-  const flow = await prisma.productionFlow.create({
-    data: {
-      dealId: input.dealId,
-      number,
-      title: deal.title,
-      clientName: deal.client.name,
-      productSummary: deal.title,
-      status: "NEW",
-      currentStepKey: "ACCEPTED_BY_CHIEF",
-      dueDate: deal.expectedCloseDate,
-      chiefUserId: input.defaultChiefUserId ?? null,
-      steps: {
-        create: PRODUCTION_STEP_SEQUENCE.map((key, index) => ({
-          key,
-          sortOrder: index,
-          state: index === 0 ? "AVAILABLE" : "LOCKED",
-        })),
-      },
-    },
-  });
+  let preferredNumber = readDealNumberFromMeta(deal.workspaceMeta);
+  let flow: ProductionFlow | null = null;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const number = preferredNumber ?? (await allocateDealNumber(prisma));
+    try {
+      flow = await prisma.productionFlow.create({
+        data: {
+          dealId: input.dealId,
+          number,
+          title: deal.title,
+          clientName: deal.client.name,
+          productSummary: deal.title,
+          status: "NEW",
+          currentStepKey: "ACCEPTED_BY_CHIEF",
+          dueDate: deal.expectedCloseDate,
+          chiefUserId: input.defaultChiefUserId ?? null,
+          steps: {
+            create: PRODUCTION_STEP_SEQUENCE.map((key, index) => ({
+              key,
+              sortOrder: index,
+              state: index === 0 ? "AVAILABLE" : "LOCKED",
+            })),
+          },
+        },
+      });
+      break;
+    } catch (error) {
+      const isUniqueNumberConflict =
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002" &&
+        ((Array.isArray(error.meta?.target) &&
+          error.meta.target.includes("number")) ||
+          error.meta?.target === "number");
+      if (!isUniqueNumberConflict || attempt === 4) {
+        throw error;
+      }
+      preferredNumber = null;
+    }
+  }
+  if (!flow) {
+    throw new Error("Не вдалося згенерувати унікальний номер замовлення");
+  }
 
   await createEvent({
     flowId: flow.id,
     type: "FLOW_CREATED",
-    title: "Потік створено з передачі угоди",
-    description: `Потік ${number} готовий до прийняття в роботу.`,
+    title: "Потік створено з передачі замовлення",
+    description: `Потік ${flow.number} готовий до прийняття в роботу.`,
     actorName: input.actorName,
   });
   const imported = await importDealHandoffFilesToProductionFlowIfMissing({

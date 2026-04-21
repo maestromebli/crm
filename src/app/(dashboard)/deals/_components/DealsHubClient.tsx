@@ -152,7 +152,7 @@ function buildCsv(rows: DealHubRow[]): string {
   const headers = [
     "Воронка",
     "Клієнт",
-    "Угода",
+    "Замовлення",
     "Стадія",
     "Відповідальний",
     "Сума",
@@ -440,7 +440,7 @@ export function DealsHubClient({
       if (deal.status !== "OPEN") {
         setDndBanner({
           kind: "err",
-          text: "Закриті угоди не переносять на дошці. Відкрийте картку угоди для змін.",
+          text: "Закриті замовлення не переносять на дошці. Відкрийте картку замовлення для змін.",
         });
         return;
       }
@@ -523,10 +523,10 @@ export function DealsHubClient({
                   type="button"
                   onClick={() => setLayout("table")}
                   className={cn(
-                    "inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold",
+                    "enver-cta enver-cta-xs",
                     layout === "table"
-                      ? "bg-[var(--enver-accent)] text-white"
-                      : "text-[var(--enver-text-muted)] hover:bg-[var(--enver-hover)]",
+                      ? "enver-cta-primary"
+                      : "enver-cta-ghost",
                   )}
                 >
                   <Table2 className="h-3.5 w-3.5" aria-hidden />
@@ -534,7 +534,7 @@ export function DealsHubClient({
                 </button>
               </TooltipTrigger>
               <TooltipContent side="bottom" className="max-w-[16rem]">
-                Список угод з колонками — сортування та експорт
+                Список замовлень з колонками — сортування та експорт
               </TooltipContent>
             </Tooltip>
             <Tooltip>
@@ -543,10 +543,10 @@ export function DealsHubClient({
                   type="button"
                   onClick={() => setLayout("board")}
                   className={cn(
-                    "inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold",
+                    "enver-cta enver-cta-xs",
                     layout === "board"
-                      ? "bg-[var(--enver-accent)] text-white"
-                      : "text-[var(--enver-text-muted)] hover:bg-[var(--enver-hover)]",
+                      ? "enver-cta-primary"
+                      : "enver-cta-ghost",
                   )}
                 >
                   <LayoutGrid className="h-3.5 w-3.5" aria-hidden />
@@ -571,7 +571,7 @@ export function DealsHubClient({
                       d === "compact" ? "comfortable" : "compact",
                     )
                   }
-                  className="inline-flex items-center gap-1 rounded-lg border border-[var(--enver-border)] bg-[var(--enver-surface)] px-2 py-1 text-[10px] font-semibold text-[var(--enver-text-muted)] hover:bg-[var(--enver-hover)]"
+                  className="enver-cta enver-cta-xs enver-cta-secondary"
                 >
                   <Rows3 className="h-3 w-3" aria-hidden />
                   {density === "compact" ? "Компактно" : "Зручно"}
@@ -585,10 +585,10 @@ export function DealsHubClient({
                   type="button"
                   onClick={() => setShowInsights((s) => !s)}
                   className={cn(
-                    "inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[10px] font-semibold transition",
+                    "enver-cta enver-cta-xs",
                     showInsights
-                      ? "border-[var(--enver-accent)] bg-[var(--enver-accent-soft)] text-[var(--enver-accent-hover)]"
-                      : "border-[var(--enver-border)] bg-[var(--enver-surface)] text-[var(--enver-text-muted)] hover:bg-[var(--enver-hover)]",
+                      ? "enver-cta-primary"
+                      : "enver-cta-secondary",
                   )}
                 >
                   <Sparkles className="h-3 w-3" aria-hidden />
@@ -611,10 +611,10 @@ export function DealsHubClient({
                   type="button"
                   onClick={() => setSavedView(v.id)}
                   className={cn(
-                    "whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-semibold",
+                    "enver-cta enver-cta-xs enver-cta-pill whitespace-nowrap",
                     savedView === v.id
-                      ? "border-[var(--enver-accent)] bg-[var(--enver-accent)] text-white"
-                      : "border-[var(--enver-border)] bg-[var(--enver-surface)] text-[var(--enver-text-muted)] hover:bg-[var(--enver-hover)]",
+                      ? "enver-cta-primary"
+                      : "enver-cta-secondary",
                   )}
                 >
                   {v.label}
@@ -645,7 +645,7 @@ export function DealsHubClient({
               type="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Пошук: клієнт, угода, стадія, воронка, менеджер…"
+              placeholder="Пошук: клієнт, замовлення, стадія, воронка, менеджер…"
               className="w-full rounded-xl border border-[var(--enver-border)] bg-[var(--enver-input-bg)] py-2 pl-8 pr-3 text-xs text-[var(--enver-text)] outline-none placeholder:text-[var(--enver-muted)] focus:border-[var(--enver-accent)] focus:ring-2 focus:ring-[var(--enver-accent-ring)]"
               aria-label="Пошук у списку"
             />
@@ -756,7 +756,7 @@ export function DealsHubClient({
                   {showPipelineColumn ? (
                     <th className={cn("px-3", headY)}>Воронка</th>
                   ) : null}
-                  <th className={cn("px-3", headY)}>Клієнт / угода</th>
+                  <th className={cn("px-3", headY)}>Клієнт / замовлення</th>
                   <th className={cn("px-3", headY)}>Стадія</th>
                   <th className={cn("px-3", headY)}>Відповідальний</th>
                   <th className={cn("px-3", headY)}>Сума</th>
@@ -857,7 +857,7 @@ export function DealsHubClient({
                       <div className="flex flex-wrap justify-end gap-1">
                         <Link
                           href={`/deals/${r.id}/workspace`}
-                          className="rounded-full border border-[var(--enver-accent)]/30 bg-[var(--enver-accent-soft)] px-2.5 py-1 text-[10px] font-semibold text-[var(--enver-accent-hover)] hover:bg-[var(--enver-hover)]"
+                          className="enver-cta enver-cta-xs enver-cta-primary enver-cta-pill"
                         >
                           Відкрити
                         </Link>
@@ -904,7 +904,7 @@ export function DealsHubClient({
           <div className="flex gap-3 overflow-x-auto pb-2 [scrollbar-width:thin]">
             {boardGroups.length === 0 ? (
               <div className="min-h-[200px] w-full py-4">
-                <KanbanEmptyColumn message="Немає колонок воронки. Перевірте пайплайн угод у налаштуваннях." />
+                <KanbanEmptyColumn message="Немає колонок воронки. Перевірте пайплайн замовлень у налаштуваннях." />
               </div>
             ) : (
               boardGroups.map(
@@ -962,7 +962,7 @@ export function DealsHubClient({
                       </div>
                       <span
                         className="shrink-0 rounded-full border border-[var(--enver-border)] bg-[var(--enver-hover)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--enver-text-muted)]"
-                        aria-label={`Кількість угод: ${list.length}`}
+                        aria-label={`Кількість замовлень: ${list.length}`}
                       >
                         {list.length}
                       </span>
@@ -996,7 +996,7 @@ export function DealsHubClient({
                         <li>
                           <KanbanEmptyColumn
                             className="min-h-[100px] border-dashed py-4"
-                            message="Немає угод у стадії"
+                            message="Немає замовлень у стадії"
                           />
                         </li>
                       ) : null}
@@ -1018,7 +1018,7 @@ export function DealsHubClient({
                                 title={
                                   canDrag
                                     ? "Перетягнути в іншу колонку"
-                                    : "Лише відкриті угоди можна перетягувати"
+                                    : "Лише відкриті замовлення можна перетягувати"
                                 }
                                 onDragStart={(e) => {
                                   if (!canDrag) {
@@ -1037,7 +1037,7 @@ export function DealsHubClient({
                                 )}
                                 aria-label={
                                   canDrag
-                                    ? "Перетягнути угоду в іншу колонку"
+                                    ? "Перетягнути замовлення в іншу колонку"
                                     : undefined
                                 }
                               >

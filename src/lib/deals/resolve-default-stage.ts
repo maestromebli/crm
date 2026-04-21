@@ -1,6 +1,6 @@
 import { prisma } from "../prisma";
 
-/** Воронка угод за замовчуванням і перша нефінальна стадія (або перша за sortOrder). */
+/** Воронка замовлень за замовчуванням і перша нефінальна стадія (або перша за sortOrder). */
 export async function resolveDefaultDealStage(): Promise<{
   pipelineId: string;
   stageId: string;

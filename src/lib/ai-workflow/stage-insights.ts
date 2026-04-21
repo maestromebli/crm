@@ -30,7 +30,7 @@ export function buildDealStageInsight(input: Input): DealStageInsight {
   if (input.stage === "qualification") {
     const done = Boolean(input.meta.qualificationComplete);
     out.summary = done
-      ? "Кваліфікація завершена, можна рухати угоду далі."
+      ? "Кваліфікація завершена, можна рухати замовлення далі."
       : "Кваліфікація не завершена і блокує подальші кроки.";
     out.confidence = done ? 0.87 : 0.93;
     out.nextAction = done
@@ -124,8 +124,8 @@ export function buildDealStageInsight(input: Input): DealStageInsight {
     out.summary = launched
       ? "Виробництво запущено."
       : input.readinessAllMet
-        ? "Угода готова до запуску у виробництво."
-        : "Угода ще не готова до запуску у виробництво.";
+        ? "Замовлення готова до запуску у виробництво."
+        : "Замовлення ще не готова до запуску у виробництво.";
     out.confidence = launched ? 0.95 : 0.9;
     out.nextAction = launched
       ? "Контролювати виконання у виробничій черзі."

@@ -43,7 +43,7 @@ export function FinanceDirectorIntakePanel({ projects }: Props) {
         ? "Заявку на бюджет закупівель надіслано на погодження (локальне демо)."
         : tab === "payroll"
           ? "Запит на виплату / премію передано в фінанси (локальне демо)."
-          : "Запит на зміну умов угоди зареєстровано (локальне демо).",
+          : "Запит на зміну умов замовлення зареєстровано (локальне демо).",
     );
     setAmount("");
     setJustification("");
@@ -52,7 +52,7 @@ export function FinanceDirectorIntakePanel({ projects }: Props) {
   const tabs: { id: Tab; label: string; hint: string }[] = [
     { id: "budget", label: "Бюджет закупівель", hint: "Ліміт по обʼєкту або додаткова партія матеріалів" },
     { id: "payroll", label: "Виплата / премія", hint: "ЗП, бонус бригаді, терміновий аванс" },
-    { id: "contract", label: "Умови угоди", hint: "Зміна строків, обсягу, графіку оплат" },
+    { id: "contract", label: "Умови замовлення", hint: "Зміна строків, обсягу, графіку оплат" },
   ];
 
   const inputClass =
@@ -65,7 +65,7 @@ export function FinanceDirectorIntakePanel({ projects }: Props) {
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Керівники напрямів</p>
           <h3 className="text-base font-semibold text-slate-900">Подача заявок у фінанси</h3>
           <p className="mt-1 max-w-[65ch] text-sm leading-relaxed text-slate-600">
-            Бюджет закупівель, виплати, зміни до угоди. У демо заявки зберігаються локально в браузері.
+            Бюджет закупівель, виплати, зміни до замовлення. У демо заявки зберігаються локально в браузері.
           </p>
         </div>
       </div>
@@ -108,7 +108,7 @@ export function FinanceDirectorIntakePanel({ projects }: Props) {
           </select>
         </label>
         <label className="text-sm font-medium text-slate-800">
-          Угода (проєкт)
+          Замовлення (проєкт)
           <select
             className={inputClass}
             value={projectId}

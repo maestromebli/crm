@@ -40,11 +40,11 @@ export function DealContractPanel() {
       <div className="space-y-2 text-sm">
         <p className="text-slate-600">Поточний статус: {status}</p>
         {contractId ? (
-          <Link href={`/manager/contracts/${contractId}`} className="inline-flex rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white">
-            Відкрити договір менеджера
+          <Link href={`/deals/${dealId}/workspace?tab=contract`} className="inline-flex rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white">
+            Відкрити модуль договорів
           </Link>
         ) : (
-          <p className="text-xs text-slate-500">Створіть договір через API `POST /api/contracts/create-from-quotation`.</p>
+          <p className="text-xs text-slate-500">Створіть договір через API `POST /api/contracts`.</p>
         )}
       </div>
     </DealCard>

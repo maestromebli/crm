@@ -9,6 +9,7 @@ import { evaluateReadiness, allReadinessMet } from "./readiness";
 import type { DealWorkspaceMeta, DealWorkspacePayload } from "../../lib/deal-core/workspace-types";
 import { parseDealCommercialSnapshot } from "../../lib/deals/commercial-snapshot";
 import { parseDealControlMeasurement } from "../../lib/deals/control-measurement";
+import { readDealNumberFromMeta } from "../../lib/deals/deal-number";
 import { parseHandoffManifest } from "../../lib/deals/document-templates";
 import {
   dealConstructorRoomApiSelect,
@@ -17,7 +18,7 @@ import {
 } from "../../lib/constructor-room/workspace-room-map";
 import { deriveDealListWarningBadge } from "./deal-workspace-warnings";
 
-/** Фільтр списку угод (бокове меню / статичні маршрути). */
+/** Фільтр списку замовлень (бокове меню / статичні маршрути). */
 export type DealListViewId =
   | "all"
   | "pipeline"
@@ -205,13 +206,13 @@ export async function listDealsForTable(
       rows: [],
       error: userFacingPrismaMessage(
         e,
-        "Не вдалося завантажити угоди. Перевірте БД.",
+        "Не вдалося завантажити замовлення. Перевірте БД.",
       ),
     };
   }
 }
 
-/** Стадії воронки DEAL для канбану — усі колонки, навіть без угод. */
+/** Стадії воронки DEAL для канбану — усі колонки, навіть без замовлень. */
 export type DealBoardStage = {
   id: string;
   name: string;
@@ -559,6 +560,7 @@ export async function getDealWorkspacePayload(
     const payload: DealWorkspacePayload = {
       deal: {
         id: deal.id,
+        number: readDealNumberFromMeta(meta) ?? flow?.number ?? null,
         title: deal.title,
         description: deal.description,
         status: deal.status,

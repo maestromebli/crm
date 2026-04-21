@@ -9,7 +9,7 @@ import { computeDealFinanceRollup } from "../../../../../../lib/finance/deal-fin
 
 type Ctx = { params: Promise<{ dealId: string }> };
 
-/** Агреговані показники по угоді (виручка з КП, витрати з транзакцій, оплати клієнта). */
+/** Агреговані показники по замовленні (виручка з КП, витрати з транзакцій, оплати клієнта). */
 export async function GET(_req: Request, ctx: Ctx) {
   if (!process.env.DATABASE_URL?.trim()) {
     return NextResponse.json({ error: "DATABASE_URL не задано" }, { status: 503 });
@@ -23,7 +23,7 @@ export async function GET(_req: Request, ctx: Ctx) {
     select: { ownerId: true },
   });
   if (!deal) {
-    return NextResponse.json({ error: "Угоду не знайдено" }, { status: 404 });
+    return NextResponse.json({ error: "Замовлення не знайдено" }, { status: 404 });
   }
   const denied = await forbidUnlessDealAccess(user, P.DEALS_VIEW, deal);
   if (denied) return denied;

@@ -12,7 +12,7 @@ import {
   deriveNextBestAction,
 } from "../../features/deal-workspace/insights";
 
-/** Зведений хук для клієнтських панелей робочого місця угоди. */
+/** Зведений хук для клієнтських панелей робочого місця замовлення. */
 export function useDealWorkspace(data: DealWorkspacePayload) {
   return useMemo(
     () => ({

@@ -64,7 +64,7 @@ export default async function SettingsGitLabPage() {
 
       <SettingsCard
         title="Подальший розвиток"
-        description="Після успішної перевірки можна додати вебхуки, створення задач з угод, статуси пайплайнів по проєкту."
+        description="Після успішної перевірки можна додати вебхуки, створення задач з замовлень, статуси пайплайнів по проєкту."
       >
         <p className="text-[11px] text-slate-600">
           Ендпоінт для тесту: <code className="rounded bg-slate-100 px-1">GET /api/integrations/gitlab</code>{" "}

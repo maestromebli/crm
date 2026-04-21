@@ -64,7 +64,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
       },
     });
     if (!deal) {
-      return NextResponse.json({ error: "Угоду не знайдено" }, { status: 404 });
+      return NextResponse.json({ error: "Замовлення не знайдено" }, { status: 404 });
     }
 
     const denied = await forbidUnlessDealAccess(user, P.DEALS_STAGE_CHANGE, {
@@ -137,7 +137,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
   } catch (e) {
     logError({
       module: "api.deals.stage",
-      message: "Не вдалося оновити етап угоди",
+      message: "Не вдалося оновити етап замовлення",
       requestId: requestCtx.requestId,
       correlationId: requestCtx.correlationId,
       details: { dealId, error: e instanceof Error ? e.message : String(e) },

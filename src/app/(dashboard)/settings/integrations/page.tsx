@@ -2,12 +2,15 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { SettingsShell } from "../../../../components/settings/SettingsShell";
 import { SettingsCard } from "../../../../components/settings/SettingsCard";
+import { P, requirePermissionForPage } from "../../../../lib/authz/page-auth";
 
 export const metadata: Metadata = {
   title: "Інтеграції · ENVER CRM",
 };
 
-export default function SettingsIntegrationsPage() {
+export default async function SettingsIntegrationsPage() {
+  await requirePermissionForPage(P.ROLES_MANAGE);
+
   return (
     <SettingsShell
       title="Інтеграції"

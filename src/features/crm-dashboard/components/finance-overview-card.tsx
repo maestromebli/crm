@@ -82,7 +82,7 @@ export function FinanceOverviewCard({
       </div>
       <div className="mt-4">
         <p className="text-[11px] font-medium uppercase text-[var(--enver-muted)]">
-          Маржа по угодах
+          Маржа по замовленнях
         </p>
         <ul className="mt-2 space-y-1">
           {data.marginByDeal.map((d) => (

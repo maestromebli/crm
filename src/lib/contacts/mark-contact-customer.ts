@@ -2,7 +2,7 @@ import { prisma } from "../prisma";
 import { updateContactLifecycleToCustomerRaw } from "./contact-lifecycle-raw";
 
 /**
- * Після повного підписання договору — контакт вважається клієнтом (затверджена угода).
+ * Після повного підписання договору — контакт вважається клієнтом (затверджена замовлення).
  * Повертає `primaryContactId` для revalidate, якщо він є.
  */
 export async function markPrimaryContactCustomerOnContractFullySigned(

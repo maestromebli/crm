@@ -37,7 +37,7 @@ export async function GET(req: Request, ctx: Ctx) {
     select: { ownerId: true },
   });
   if (!deal) {
-    return NextResponse.json({ error: "Угоду не знайдено" }, { status: 404 });
+    return NextResponse.json({ error: "Замовлення не знайдено" }, { status: 404 });
   }
 
   const denied = await forbidUnlessDealAccess(user, P.ESTIMATES_VIEW, deal);
@@ -90,7 +90,7 @@ export async function GET(req: Request, ctx: Ctx) {
 
   if (!fromEst || !toEst) {
     return NextResponse.json(
-      { error: "Одну з версій смети не знайдено для цієї угоди" },
+      { error: "Одну з версій смети не знайдено для цієї замовлення" },
       { status: 404 },
     );
   }

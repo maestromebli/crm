@@ -250,7 +250,7 @@ export function ProductionKanbanClient() {
 
       <p className="rounded-lg border border-dashed border-[var(--enver-border)] bg-[var(--enver-surface)]/50 px-3 py-2 text-[11px] text-[var(--enver-text-muted)]">
         Перетягніть картку між колонками. Скасовані замовлення приховані з дошки — керуйте ними з
-        картки угоди.
+        картки замовлення.
       </p>
     </div>
   );

@@ -74,11 +74,11 @@ function hintForDirector(ctx: ResolvedPageContext): ContextHint {
   }
   if (ctx.kind === "deal_detail" || ctx.kind === "deal_workspace") {
     return {
-      title: "Угода",
+      title: "Замовлення",
       summary:
         "Перевірте узгодженість етапу, готовність до виробництва та фінансові умови перед наступним кроком.",
       suggestedNextStep:
-        "Оцініть ризики прострочки та забезпеченість документами в робочому місці угоди.",
+        "Оцініть ризики прострочки та забезпеченість документами в робочому місці замовлення.",
       hasSuggestion: true,
       tone: "risk",
     };
@@ -126,7 +126,7 @@ function hintForSales(ctx: ResolvedPageContext): ContextHint {
   }
   if (ctx.kind === "deal_detail" || ctx.kind === "deal_workspace") {
     return {
-      title: "Угода",
+      title: "Замовлення",
       summary:
         "Тримайте в полі зору КП, договір та готовність до виробництва — клієнт чекає чіткого наступного кроку.",
       suggestedNextStep:
@@ -155,7 +155,7 @@ function genericHint(ctx: ResolvedPageContext): ContextHint {
         title: "Дашборд",
         summary: "Короткий зріз пріоритетів дня та зон ризику по вашій зоні відповідальності.",
         suggestedNextStep:
-          "Відкрийте «Моя робота» або перейдіть до лідів/угод з найближчими дедлайнами.",
+          "Відкрийте «Моя робота» або перейдіть до лідів/замовлень з найближчими дедлайнами.",
         hasSuggestion: false,
         tone: "neutral",
       };
@@ -171,7 +171,7 @@ function genericHint(ctx: ResolvedPageContext): ContextHint {
     case "deal_detail":
     case "deal_workspace":
       return {
-        title: "Угода",
+        title: "Замовлення",
         summary:
           "Робоче місце збирає документи, готовність і виробництво — менше розривів між відділами.",
         suggestedNextStep:

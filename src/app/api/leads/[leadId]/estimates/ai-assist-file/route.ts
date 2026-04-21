@@ -48,7 +48,7 @@ export async function POST(req: Request, ctx: Ctx) {
     return NextResponse.json({ error: "Лід не знайдено" }, { status: 404 });
   }
   if (lead.dealId) {
-    return NextResponse.json({ error: "Використовуйте смету в угоді" }, { status: 409 });
+    return NextResponse.json({ error: "Використовуйте смету в замовленні" }, { status: 409 });
   }
 
   const denied = await forbidUnlessLeadAccess(user, P.LEADS_UPDATE, lead);

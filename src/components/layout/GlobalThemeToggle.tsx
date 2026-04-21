@@ -17,35 +17,27 @@ function applyThemeMode(mode: ThemeMode) {
 }
 
 export function GlobalThemeToggle() {
-  const [theme, setTheme] = useState<ThemeMode>("light");
+  const resolveInitialTheme = (): ThemeMode => {
+    if (typeof document === "undefined") return "light";
+    const htmlTheme = document.documentElement.getAttribute("data-theme");
+    return htmlTheme === "dark" || htmlTheme === "light" ? htmlTheme : "light";
+  };
+
+  const [theme, setTheme] = useState<ThemeMode>(() => {
+    return resolveInitialTheme();
+  });
 
   useEffect(() => {
+    applyThemeMode(theme);
     try {
-      const saved = window.localStorage.getItem(THEME_STORAGE_KEY);
-      const resolved: ThemeMode =
-        saved === "light" || saved === "dark"
-          ? saved
-          : "light";
-      setTheme(resolved);
-      applyThemeMode(resolved);
+      window.localStorage.setItem(THEME_STORAGE_KEY, theme);
     } catch {
-      const fallback: ThemeMode = "light";
-      setTheme(fallback);
-      applyThemeMode(fallback);
+      // no-op when storage is unavailable
     }
-  }, []);
+  }, [theme]);
 
   const toggleTheme = () => {
-    setTheme((prev) => {
-      const next: ThemeMode = prev === "dark" ? "light" : "dark";
-      applyThemeMode(next);
-      try {
-        window.localStorage.setItem(THEME_STORAGE_KEY, next);
-      } catch {
-        // no-op when storage is unavailable
-      }
-      return next;
-    });
+    setTheme((prev) => (prev === "dark" ? "light" : "dark"));
   };
 
   const title =

@@ -13,6 +13,10 @@ import {
   buildContinuousLearningBlock,
   recordContinuousLearningEvent,
 } from "../../../../lib/ai/continuous-learning";
+import { logAiEvent } from "../../../../lib/ai/log-ai-event";
+import { requireAiRateLimit } from "../../../../lib/ai/route-guard";
+import { openAiChatCompletionText } from "../../../../features/ai/core/openai-client";
+import { evaluateAiTextQuality } from "../../../../lib/ai/evals/quality";
 
 export const runtime = "nodejs";
 
@@ -50,6 +54,13 @@ export async function POST(request: Request) {
   }
 
   const { type, context, period } = parsed.data;
+  const limited = await requireAiRateLimit({
+    userId: user.id,
+    action: "ai_summary",
+    maxRequests: 20,
+    windowMinutes: 10,
+  });
+  if (limited) return limited;
 
   if (type === "executive_dashboard") {
     const canAi =
@@ -153,7 +164,6 @@ async function runOpenAi(
   learningContext?: string,
 ) {
   const apiKey = process.env.AI_API_KEY;
-  const baseUrl = process.env.AI_BASE_URL ?? "https://api.openai.com/v1";
   const model = process.env.AI_MODEL ?? "gpt-4.1-mini";
 
   if (!apiKey) {
@@ -181,45 +191,45 @@ Context:
 ${learningContext ?? contextBlock}`;
 
   try {
-    const response = await fetch(`${baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          {
-            role: "system",
-            content:
-              "Ти помічник ENVER CRM. Пиши українською, стисло, без привітання.",
-          },
-          { role: "user", content: prompt },
-        ],
-        temperature: 0.4,
-        max_tokens: 220,
-      }),
+    const result = await openAiChatCompletionText({
+      messages: [
+        {
+          role: "system",
+          content:
+            "Ти помічник ENVER CRM. Пиши українською, стисло, без привітання.",
+        },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.4,
+      maxTokens: 220,
     });
 
-    if (!response.ok) {
-      const text = await response.text();
+    if (result.ok === false) {
+      await logAiEvent({
+        userId,
+        action: "ai_summary",
+        model,
+        ok: false,
+        errorMessage: result.error,
+        metadata: { type, usedLearningMemory: Boolean(learningContext) },
+      });
       return NextResponse.json(
         {
-          error: `Помилка AI (${response.status})`,
-          text: text.slice(0, 500),
+          error: `Помилка AI (${result.httpStatus ?? 502})`,
+          text: result.error.slice(0, 500),
         },
         { status: 502 },
       );
     }
 
-    const data = (await response.json()) as {
-      choices?: { message?: { content?: string } }[];
-    };
-
-    const content =
-      data.choices?.[0]?.message?.content ??
-      "AI не надіслав контент. Перевірте модель та ключ.";
+    const content = result.content || "AI не надіслав контент. Перевірте модель та ключ.";
+    const quality = evaluateAiTextQuality({
+      text: content,
+      maxSentences: type === "executive_dashboard" ? 5 : 3,
+      minChars: 18,
+      requireUkrainian: true,
+      allowMarkdown: false,
+    });
 
     await recordContinuousLearningEvent({
       userId,
@@ -228,11 +238,51 @@ ${learningContext ?? contextBlock}`;
       entityType: "DASHBOARD",
       entityId: userId,
       ok: true,
-      metadata: { type, usedLearningMemory: Boolean(learningContext) },
+      metadata: {
+        type,
+        usedLearningMemory: Boolean(learningContext),
+        promptTokens: result.usage?.promptTokens ?? 0,
+        completionTokens: result.usage?.completionTokens ?? 0,
+        totalTokens: result.usage?.totalTokens ?? 0,
+        tokensApprox: result.tokensApprox,
+        costUsdApprox: result.costUsdApprox,
+        qualityScore: quality.score,
+        qualityViolations: quality.violations,
+      },
     });
 
-    return NextResponse.json({ text: content });
+    await logAiEvent({
+      userId,
+      action: "ai_summary",
+      model: result.model,
+      ok: true,
+      tokensApprox:
+        result.usage?.totalTokens && result.usage.totalTokens > 0
+          ? result.usage.totalTokens
+          : result.tokensApprox,
+      metadata: {
+        type,
+        usedLearningMemory: Boolean(learningContext),
+        promptTokens: result.usage?.promptTokens ?? 0,
+        completionTokens: result.usage?.completionTokens ?? 0,
+        totalTokens: result.usage?.totalTokens ?? 0,
+        tokensApprox: result.tokensApprox,
+        costUsdApprox: result.costUsdApprox,
+        qualityScore: quality.score,
+        qualityViolations: quality.violations,
+      },
+    });
+
+    return NextResponse.json({ text: content, quality });
   } catch (error) {
+    await logAiEvent({
+      userId,
+      action: "ai_summary",
+      model,
+      ok: false,
+      errorMessage: (error as Error).message,
+      metadata: { type, usedLearningMemory: Boolean(learningContext) },
+    });
     await recordContinuousLearningEvent({
       userId,
       action: "ai_summary",

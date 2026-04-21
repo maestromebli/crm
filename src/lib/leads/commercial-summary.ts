@@ -70,7 +70,7 @@ export function deriveCommercialNextActions(
     actions.push({
       key: "create_proposal",
       label: "Створити КП з поточної смети",
-      reason: "Закрити угоду легше з офером на основі цифр.",
+      reason: "Закрити замовлення легше з офером на основі цифр.",
     });
   }
 

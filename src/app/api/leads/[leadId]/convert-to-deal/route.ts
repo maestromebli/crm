@@ -141,7 +141,7 @@ export async function POST(req: Request, ctx: Ctx) {
   if (!stage) {
     return jsonError(
       requestId,
-      "Немає воронки для угод. Виконайте `pnpm db:seed` або створіть Pipeline з entityType DEAL.",
+      "Немає воронки для замовлень. Виконайте `pnpm db:seed` або створіть Pipeline з entityType DEAL.",
       409,
     );
   }
@@ -262,7 +262,7 @@ export async function POST(req: Request, ctx: Ctx) {
   } catch (e) {
     logError({
       module: "api.leads.convert-to-deal",
-      message: "Не вдалося конвертувати лід в угоду",
+      message: "Не вдалося конвертувати лід в замовлення",
       requestId: requestCtx.requestId,
       correlationId: requestCtx.correlationId,
       details: {
@@ -270,6 +270,6 @@ export async function POST(req: Request, ctx: Ctx) {
         error: e instanceof Error ? e.message : String(e),
       },
     });
-    return jsonError(requestId, "Не вдалося створити угоду", 500);
+    return jsonError(requestId, "Не вдалося створити замовлення", 500);
   }
 }

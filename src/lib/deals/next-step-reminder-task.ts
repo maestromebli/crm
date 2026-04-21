@@ -3,7 +3,7 @@ import type { DealWorkspaceMeta } from "@/lib/deal-core/workspace-types";
 import { deriveNextStepSeverity } from "@/lib/deal-core/insights";
 import { prisma } from "../prisma";
 
-/** Одна службова задача на угоду — без міграцій схеми. */
+/** Одна службова задача на замовлення — без міграцій схеми. */
 export const NEXT_STEP_REMINDER_TASK_TITLE =
   "[NEXTSTEP] Задайте наступний крок і дату контакту";
 
@@ -29,7 +29,7 @@ async function completeOpenReminders(dealId: string): Promise<void> {
 
 /**
  * Після зміни workspaceMeta: якщо «немає кроку/дати» — одна відкрита нагадувальна задача
- * власнику угоди; якщо все ок — закрити таку задачу.
+ * власнику замовлення; якщо все ок — закрити таку задачу.
  */
 export async function syncNextStepReminderTask(params: {
   dealId: string;
@@ -73,7 +73,7 @@ export async function syncNextStepReminderTask(params: {
       description:
         severity === "warning"
           ? "CRM: час наступної дії минув — оновіть дату або зафіксуйте контакт."
-          : "CRM: у шапці угоди не заповнено наступний крок або дату контакту.",
+          : "CRM: у шапці замовлення не заповнено наступний крок або дату контакту.",
       entityType: "DEAL",
       entityId: dealId,
       taskType: "FOLLOW_UP",

@@ -599,7 +599,7 @@ const uid = () => `t_${Math.random().toString(36).slice(2, 11)}`;
 export type LeadPricingWorkspaceClientProps = {
   leadId: string;
   leadTitle: string;
-  /** Лід уже конвертований — смета в угоді. */
+  /** Лід уже конвертований — смета в замовленні. */
   leadConverted: boolean;
   initialEstimates: LeadEstimateSummary[];
   initialProposals: LeadProposalSummary[];
@@ -612,7 +612,7 @@ export type LeadPricingWorkspaceClientProps = {
   scrollToSection?: "estimate" | "kp";
   /** Зображення з файлів ліда — автопідстановка URL у КП. */
   leadImageUrlsForKp?: string[];
-  /** Id угоди після конверсії (посилання з заблокованого розділу). */
+  /** Id замовлення після конверсії (посилання з заблокованого розділу). */
   leadDealId?: string | null;
 };
 
@@ -1966,10 +1966,10 @@ export function LeadPricingWorkspaceClient({
     return (
       <div className="rounded-xl border border-slate-200 bg-[var(--enver-card)] px-4 py-3 text-sm text-slate-700 shadow-sm">
         <p className="font-medium text-[var(--enver-text)]">
-          Лід конвертовано в угоду
+          Лід конвертовано у замовлення
         </p>
         <p className="mt-1 text-xs leading-relaxed text-slate-600">
-          Актуальну смету, КП і договір ведіть у робочому місці угоди — там же
+          Актуальну смету, КП і договір ведіть у робочому місці замовлення — там же
           підпис і передача у виробництво.
         </p>
         {leadDealId ? (
@@ -1977,7 +1977,7 @@ export function LeadPricingWorkspaceClient({
             href={`/deals/${leadDealId}/workspace`}
             className="mt-2 inline-flex text-sm font-medium text-sky-700 underline hover:text-sky-900"
           >
-            Відкрити угоду
+            Відкрити замовлення
           </Link>
         ) : null}
       </div>

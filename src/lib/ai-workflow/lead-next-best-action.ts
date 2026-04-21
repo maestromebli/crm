@@ -59,11 +59,11 @@ export function deriveLeadNextBestAction(
   }
   if (isWon || lead.dealId) {
     return {
-      title: "Відкрийте угоду",
-      reason: "Лід закрито позитивно або вже є угода.",
+      title: "Відкрийте замовлення",
+      reason: "Лід закрито позитивно або вже є замовлення.",
       priority: "LOW",
       target: "convert",
-      ctaLabel: "Угода",
+      ctaLabel: "Замовлення",
     };
   }
 
@@ -156,7 +156,7 @@ export function deriveLeadNextBestAction(
 
   if (prop?.status === "APPROVED" && !lead.dealId) {
     return {
-      title: "Конвертуйте в угоду",
+      title: "Конвертуйте в замовлення",
       reason: "КП погоджено — наступний крок продажу.",
       priority: "HIGH",
       target: "convert",

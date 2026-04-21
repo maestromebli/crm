@@ -115,7 +115,7 @@ const stageLabels: Record<Stage, string> = {
   Contacted: "Контакт встановлено",
   "Measurement Scheduled": "Заплановано замір",
   "Proposal Sent": "КП надіслано",
-  Won: "Угоду виграно",
+  Won: "Замовлення виграно",
 };
 
 const urgencyLabels: Record<Urgency, string> = {
@@ -336,7 +336,7 @@ function LeadCard({
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="flex items-center gap-2">
-              <h4 className="text-sm font-semibold text-white">{lead.name}</h4>
+              <p className="text-sm font-semibold text-white">{lead.name}</p>
               {lead.hot ? (
                 <motion.span
                   animate={reduceMotion ? undefined : { scale: [1, 1.18, 1], opacity: [0.8, 1, 0.8] }}
@@ -479,7 +479,7 @@ function DetailPanel({
       ? "Комерційну пропозицію надіслано клієнту"
       : "Комерційну пропозицію ще не надіслано",
     lead.stage === "Won"
-      ? "Угоду підтверджено і передано у виробництво"
+      ? "Замовлення підтверджено і передано у виробництво"
       : "Відкрита можливість",
   ];
 
@@ -737,7 +737,7 @@ export function LeadHubNotesCard({ leadId, canUpdateLead }: Props) {
     });
     return {
       id: raw.id,
-      name: raw.contact?.fullName || raw.contactName || raw.title,
+      name: raw.title || raw.contact?.fullName || raw.contactName || "Лід",
       phone: raw.contact?.phone || raw.phone || "—",
       source: raw.source,
       budget: raw.estimates[0]?.totalPrice ?? 0,
@@ -768,6 +768,10 @@ export function LeadHubNotesCard({ leadId, canUpdateLead }: Props) {
       const railJson = (await railRes.json()) as { items?: HubRailItem[]; error?: string };
       if (!railRes.ok) throw new Error(railJson.error ?? "Не вдалося завантажити список лідів");
       const allIds = (railJson.items ?? []).map((item) => item.id);
+      // Гарантуємо присутність поточного ліда в картках нотаток навіть до оновлення загальної rail-вибірки.
+      if (leadId && !allIds.includes(leadId)) {
+        allIds.unshift(leadId);
+      }
       const { ids, skipped } = trimHubRailIds(allIds, MAX_HUB_RAIL_ITEMS);
       const nowMs = Date.now();
       const detailResults = await mapWithConcurrency(ids, DETAIL_FETCH_CONCURRENCY, async (id) => {
@@ -888,7 +892,7 @@ export function LeadHubNotesCard({ leadId, canUpdateLead }: Props) {
           if (nextStage === "Won" && lead.stage !== "Won") {
             setWonPulse(true);
             window.setTimeout(() => setWonPulse(false), 1600);
-            pushNotification("Угоду виграно", `${lead.name}: лід переведено в статус «Угоду виграно».`);
+            pushNotification("Замовлення виграно", `${lead.name}: лід переведено в статус «Замовлення виграно».`);
           } else {
             pushNotification("Статус оновлено", `${lead.name}: новий етап — ${stageLabels[nextStage]}.`);
           }
@@ -968,7 +972,7 @@ export function LeadHubNotesCard({ leadId, canUpdateLead }: Props) {
       delay: 0.15,
     },
     {
-      title: "Виграні угоди",
+      title: "Виграні замовлення",
       value: leads.filter((l) => l.stage === "Won").length,
       icon: BadgeCheck,
       sub: "Закриті можливості",

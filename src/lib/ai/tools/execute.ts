@@ -14,6 +14,7 @@ import {
 } from "../../authz/data-scope";
 import { taskListWhereForUser } from "../../tasks/prisma-scope";
 import { buildNavSnapshotForAi } from "./nav-for-user";
+import { redactContextForAi } from "../context-denylist";
 
 const CUID_LIKE = /^[a-z0-9]{20,40}$/i;
 
@@ -58,25 +59,27 @@ export async function executeAiTool(
   }
 
   try {
+    const toToolJson = (value: unknown) =>
+      JSON.stringify(redactContextForAi(value));
     switch (name) {
       case "crm_list_leads":
-        return JSON.stringify(await toolListLeads(user, args));
+        return toToolJson(await toolListLeads(user, args));
       case "crm_list_deals":
-        return JSON.stringify(await toolListDeals(user, args));
+        return toToolJson(await toolListDeals(user, args));
       case "crm_list_open_tasks":
-        return JSON.stringify(await toolListOpenTasks(user, args));
+        return toToolJson(await toolListOpenTasks(user, args));
       case "crm_get_lead":
-        return JSON.stringify(await toolGetLead(user, args));
+        return toToolJson(await toolGetLead(user, args));
       case "crm_get_deal":
-        return JSON.stringify(await toolGetDeal(user, args));
+        return toToolJson(await toolGetDeal(user, args));
       case "crm_quick_overview":
-        return JSON.stringify(await toolQuickOverview(user));
+        return toToolJson(await toolQuickOverview(user));
       case "crm_nav_menu":
-        return JSON.stringify(toolNavMenu(user));
+        return toToolJson(toolNavMenu(user));
       case "crm_calendar_upcoming":
-        return JSON.stringify(await toolCalendarUpcoming(user, args));
+        return toToolJson(await toolCalendarUpcoming(user, args));
       case "crm_search_contacts":
-        return JSON.stringify(await toolSearchContacts(user, args));
+        return toToolJson(await toolSearchContacts(user, args));
       default:
         return JSON.stringify({ error: `Невідомий tool: ${name}` });
     }
@@ -335,10 +338,10 @@ async function toolGetDeal(
   });
 
   if (!deal) {
-    return { error: "Угоду не знайдено" };
+    return { error: "Замовлення не знайдено" };
   }
   if (!canAccessOwner(ctx, deal.ownerId)) {
-    return { error: "Недостатньо прав або угода поза вашою видимістю" };
+    return { error: "Недостатньо прав або замовлення поза вашою видимістю" };
   }
 
   return {

@@ -25,7 +25,7 @@ import {
 } from "../../../../features/procurement/lib/quick-actions";
 
 type Props = {
-  searchParams?: Promise<{ role?: string; view?: string; newRequest?: string; dealId?: string }>;
+  searchParams?: Promise<{ role?: string; view?: string; newRequest?: string; dealId?: string; tab?: string }>;
 };
 
 export default async function ProcurementOverviewPage({ searchParams }: Props) {
@@ -44,11 +44,11 @@ export default async function ProcurementOverviewPage({ searchParams }: Props) {
             <div className="inline-flex rounded-lg border border-[var(--enver-border)] bg-[var(--enver-bg)] p-1">
               <Link
                 href="/crm/procurement"
-                className="rounded-md px-3 py-1.5 text-xs font-medium text-[var(--enver-muted)] hover:bg-[var(--enver-hover)]"
+                className="enver-cta enver-cta-sm enver-cta-ghost"
               >
                 Аналітичний огляд
               </Link>
-              <span className="rounded-md bg-[var(--enver-accent-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--enver-accent-hover)]">
+              <span className="enver-cta enver-cta-sm enver-cta-primary">
                 Оперативний хаб
               </span>
             </div>
@@ -64,6 +64,8 @@ export default async function ProcurementOverviewPage({ searchParams }: Props) {
   }
 
   const data = await getProcurementOverviewData();
+  const overviewTab = params?.tab === "analytics" ? "analytics" : params?.tab === "tables" ? "tables" : "monitor";
+  const roleQuery = params?.role ? `&role=${encodeURIComponent(params.role)}` : "";
   const projectNameById = data.projectNameById;
   const supplierNameById = data.supplierNameById;
   const categoryNameById = Object.fromEntries(data.categories.map((c) => [c.id, c.name]));
@@ -81,12 +83,12 @@ export default async function ProcurementOverviewPage({ searchParams }: Props) {
         actionsSlot={
           <div className="flex flex-wrap items-center gap-2">
             <div className="inline-flex rounded-lg border border-[var(--enver-border)] bg-[var(--enver-bg)] p-1">
-              <span className="rounded-md bg-[var(--enver-accent-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--enver-accent-hover)]">
+              <span className="enver-cta enver-cta-sm enver-cta-primary">
                 Аналітичний огляд
               </span>
               <Link
                 href={buildProcurementHubHref()}
-                className="rounded-md px-3 py-1.5 text-xs font-medium text-[var(--enver-muted)] hover:bg-[var(--enver-hover)]"
+                className="enver-cta enver-cta-sm enver-cta-ghost"
               >
                 Оперативний хаб
               </Link>
@@ -112,7 +114,7 @@ export default async function ProcurementOverviewPage({ searchParams }: Props) {
       />
       {data.dataSource === "demo" ? (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
-          Показано демо-дані. Підключіть БД і заповніть угоди / закупівлі — тут з’являться реальні цифри.
+          Показано демо-дані. Підключіть БД і заповніть замовлення / закупівлі — тут з’являться реальні цифри.
         </p>
       ) : null}
       <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600">
@@ -134,6 +136,42 @@ export default async function ProcurementOverviewPage({ searchParams }: Props) {
           initialDealId={params?.dealId}
         />
       ) : null}
+      <div className="rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href={`/crm/procurement?tab=monitor${roleQuery}`}
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+              overviewTab === "monitor"
+                ? "bg-slate-900 text-white shadow-sm"
+                : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+            }`}
+          >
+            Моніторинг
+          </Link>
+          <Link
+            href={`/crm/procurement?tab=tables${roleQuery}`}
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+              overviewTab === "tables"
+                ? "bg-slate-900 text-white shadow-sm"
+                : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+            }`}
+          >
+            Операційні таблиці
+          </Link>
+          <Link
+            href={`/crm/procurement?tab=analytics${roleQuery}`}
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+              overviewTab === "analytics"
+                ? "bg-slate-900 text-white shadow-sm"
+                : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+            }`}
+          >
+            Ризики та аналітика
+          </Link>
+        </div>
+      </div>
+      {overviewTab === "monitor" ? (
+        <>
       <ProcurementKpiCards kpi={data.kpi} />
       <SectionCard
         title="Моніторинг замовлених позицій"
@@ -198,8 +236,12 @@ export default async function ProcurementOverviewPage({ searchParams }: Props) {
           </div>
         </div>
       </SectionCard>
+        </>
+      ) : null}
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-4">
+          {overviewTab === "tables" ? (
+            <>
           <SectionCard title="Заявки" subtitle="Поточний стан і бюджет">
             {canAccess(role, "PROCUREMENT_FULL") || canAccess(role, "PROCUREMENT_SUMMARY") ? (
               <ProcurementRequestsTable rows={data.requests} projectNameById={projectNameById} />
@@ -232,6 +274,10 @@ export default async function ProcurementOverviewPage({ searchParams }: Props) {
               projectNameById={projectNameById}
             />
           </SectionCard>
+            </>
+          ) : null}
+          {overviewTab === "analytics" ? (
+            <>
           <SectionCard title="Профіль постачальників" subtitle="Фокус витрат і незакриті замовлення по постачальниках">
             <div className="overflow-x-auto">
               <table className="min-w-full text-left text-sm">
@@ -342,10 +388,14 @@ export default async function ProcurementOverviewPage({ searchParams }: Props) {
               </table>
             </div>
           </SectionCard>
+            </>
+          ) : null}
         </div>
-        <StickySidePanel>
-          <ProcurementRiskPanel risks={data.riskAlerts} />
-        </StickySidePanel>
+        {overviewTab !== "monitor" ? (
+          <StickySidePanel>
+            <ProcurementRiskPanel risks={data.riskAlerts} />
+          </StickySidePanel>
+        ) : null}
       </div>
     </main>
   );

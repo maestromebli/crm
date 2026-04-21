@@ -18,7 +18,7 @@ export type ObjectFinanceLedgerRow = {
   procurementPlanned: number;
   procurementAccrual: number;
   payrollAccrued: number;
-  /** Відкриті PO по проєкту (у демо 1 обʼєкт = 1 адреса на проєкт — сума на рівні угоди). */
+  /** Відкриті PO по проєкту (у демо 1 обʼєкт = 1 адреса на проєкт — сума на рівні замовлення). */
   openPurchaseOrders: number;
 };
 
@@ -29,7 +29,7 @@ function sumTx(
   return txs.filter(pred).reduce((a, t) => a + t.amount, 0);
 }
 
-/** Реєстр показників по кожному обʼєкту (адреса) + звʼязок з угодою (проєкт) і закупівлею. */
+/** Реєстр показників по кожному обʼєкту (адреса) + звʼязок з замовленням (проєкт) і закупівлею. */
 export function buildObjectFinanceLedger(
   projects: Project[],
   objects: ProjectObject[],
@@ -111,7 +111,7 @@ export function consolidateObjectLedger(rows: ObjectFinanceLedgerRow[]): ObjectF
     objectId: "__all__",
     projectId: "__portfolio__",
     projectCode: "Σ",
-    projectTitle: "Усі угоди та обʼєкти",
+    projectTitle: "Усі замовлення та обʼєкти",
     objectTitle: "Консолідовано",
     objectAddress: "—",
     ...z,

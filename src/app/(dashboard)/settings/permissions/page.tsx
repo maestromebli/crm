@@ -3,6 +3,7 @@ import type { Role } from "@prisma/client";
 import Link from "next/link";
 import { CRM_ROLES_PRIMARY, ROLE_LABELS } from "../../../../config/user-roles";
 import { ROLE_POLICY_SUMMARY_UK } from "../../../../lib/authz/role-access-policy";
+import { P, requirePermissionForPage } from "../../../../lib/authz/page-auth";
 import { SettingsShell } from "../../../../components/settings/SettingsShell";
 import { SettingsCard } from "../../../../components/settings/SettingsCard";
 
@@ -18,7 +19,9 @@ export const metadata: Metadata = {
   title: "Права доступу · ENVER CRM",
 };
 
-export default function SettingsPermissionsPage() {
+export default async function SettingsPermissionsPage() {
+  await requirePermissionForPage(P.ROLES_MANAGE);
+
   return (
     <SettingsShell
       title="Права доступу"

@@ -12,7 +12,7 @@ export const runtime = "nodejs";
 type Ctx = { params: Promise<{ dealId: string }> };
 
 /**
- * Проєкти без угоди — для прив’язки до поточної угоди з робочого місця.
+ * Проєкти без замовлення — для прив’язки до поточної замовлення з робочого місця.
  */
 export async function GET(_req: Request, ctx: Ctx) {
   const dbNotReady = requireDatabaseUrl();
@@ -29,7 +29,7 @@ export async function GET(_req: Request, ctx: Ctx) {
       select: { ownerId: true },
     });
     if (!deal) {
-      return NextResponse.json({ error: "Угоду не знайдено" }, { status: 404 });
+      return NextResponse.json({ error: "Замовлення не знайдено" }, { status: 404 });
     }
 
     const denied = await forbidUnlessDealAccess(user, P.DEALS_VIEW, deal);

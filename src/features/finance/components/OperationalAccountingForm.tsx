@@ -141,7 +141,7 @@ export function OperationalAccountingForm({
       {!canSubmit ? (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
           У вашій ролі недоступне створення проводок. Зверніться до адміністратора
-          (потрібні права на оплату / угоди).
+          (потрібні права на оплату / замовлення).
         </p>
       ) : null}
 

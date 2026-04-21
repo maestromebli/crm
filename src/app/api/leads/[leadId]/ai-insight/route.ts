@@ -12,6 +12,10 @@ import {
   recordContinuousLearningEvent,
 } from "../../../../../lib/ai/continuous-learning";
 import { prisma } from "../../../../../lib/prisma";
+import { requireAiRateLimit } from "../../../../../lib/ai/route-guard";
+import { logAiEvent } from "../../../../../lib/ai/log-ai-event";
+import { openAiChatCompletionText } from "../../../../../features/ai/core/openai-client";
+import { evaluateAiTextQuality } from "../../../../../lib/ai/evals/quality";
 
 type Ctx = { params: Promise<{ leadId: string }> };
 
@@ -49,6 +53,13 @@ async function postLeadAiInsight(req: Request, ctx: Ctx) {
 
   const user = await requireSessionUser();
   if (user instanceof NextResponse) return user;
+  const limited = await requireAiRateLimit({
+    userId: user.id,
+    action: "lead_ai_insight",
+    maxRequests: 20,
+    windowMinutes: 10,
+  });
+  if (limited) return limited;
 
   const { leadId } = await ctx.params;
 
@@ -132,7 +143,6 @@ async function postLeadAiInsight(req: Request, ctx: Ctx) {
   const stageIdSet = new Set(stageOpts.map((s) => s.id));
 
   const apiKey = process.env.AI_API_KEY?.trim();
-  const baseUrl = process.env.AI_BASE_URL ?? "https://api.openai.com/v1";
   const model = process.env.AI_MODEL ?? "gpt-4.1-mini";
 
   const dealHint = leadRow.deals[0];
@@ -140,20 +150,12 @@ async function postLeadAiInsight(req: Request, ctx: Ctx) {
     `Назва: ${leadRow.title}`,
     `Воронка: ${leadRow.pipeline.name}, поточна стадія: ${leadRow.stage.name} (id=${leadRow.stageId})`,
     `Джерело: ${leadRow.source}, пріоритет: ${leadRow.priority}`,
-    `Відповідальний: ${leadRow.owner.name ?? leadRow.owner.email}`,
-    `Контакт: ${leadRow.contactName ?? "—"} / ${leadRow.phone ?? "—"} / ${leadRow.email ?? "—"}`,
+    `Відповідальний: ${leadRow.owner.name ?? "assigned_manager"}`,
+    "Контактні реквізити клієнта: [приховано для AI-контексту]",
   ];
-  if (leadRow.contact) {
-    contextLines.push(
-      `Картка контакту: ${leadRow.contact.fullName}, ${leadRow.contact.phone ?? ""}, ${leadRow.contact.email ?? ""}`,
-    );
-  }
-  if (leadRow.note?.trim()) {
-    contextLines.push(`Нотатка: ${leadRow.note.trim()}`);
-  }
   if (dealHint) {
     contextLines.push(
-      `Відкрита угода: ${dealHint.title} · ${dealHint.stage.name}`,
+      `Відкрита замовлення: ${dealHint.title} · ${dealHint.stage.name}`,
     );
   }
   contextLines.push(
@@ -249,65 +251,58 @@ ${stagesJson}
     reason?: string;
     confidence?: string;
   };
+  let aiUsage:
+    | { promptTokens: number; completionTokens: number; totalTokens: number }
+    | null = null;
+  let aiTokensApprox = 0;
+  let aiCostUsdApprox: number | null = null;
+  let aiModelUsed = model;
 
   try {
-    const response = await fetch(`${baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          {
-            role: "system",
-            content:
-              "Ти повертаєш лише JSON без пояснень. Ключі англійською як у інструкції, текстові значення українською.",
-          },
-          { role: "user", content: promptWithMemory },
-        ],
-        temperature: 0.25,
-        max_tokens: 900,
-      }),
+    const response = await openAiChatCompletionText({
+      messages: [
+        {
+          role: "system",
+          content:
+            "Ти повертаєш лише JSON без пояснень. Ключі англійською як у інструкції, текстові значення українською.",
+        },
+        { role: "user", content: promptWithMemory },
+      ],
+      temperature: 0.25,
+      maxTokens: 900,
     });
 
-    if (!response.ok) {
-      const errText = await response.text();
+    if (response.ok === false) {
+      await logAiEvent({
+        userId: user.id,
+        action: "lead_ai_insight",
+        model,
+        ok: false,
+        errorMessage: response.error,
+        entityType: "LEAD",
+        entityId: leadId,
+      });
       return NextResponse.json(
         {
-          error: `AI HTTP ${response.status}`,
-          detail: errText.slice(0, 500),
+          error: `AI HTTP ${response.httpStatus ?? 502}`,
+          detail: response.error.slice(0, 500),
         },
         { status: 502 },
       );
     }
 
-    const rawAi = await response.text();
+    const rawAi = response.content;
+    aiUsage = response.usage;
+    aiTokensApprox = response.tokensApprox;
+    aiCostUsdApprox = response.costUsdApprox;
+    aiModelUsed = response.model;
     if (!rawAi.trim()) {
       return NextResponse.json(
         { error: "Провайдер ШІ повернув порожню відповідь" },
         { status: 502 },
       );
     }
-    let data: { choices?: { message?: { content?: string } }[] };
-    try {
-      data = JSON.parse(rawAi) as typeof data;
-    } catch {
-      return NextResponse.json(
-        { error: "Провайдер ШІ повернув некоректний JSON" },
-        { status: 502 },
-      );
-    }
-    const content = data.choices?.[0]?.message?.content?.trim() ?? "";
-    if (!content) {
-      return NextResponse.json(
-        { error: "ШІ не повернув текст" },
-        { status: 502 },
-      );
-    }
-
-    parsed = extractFirstJsonObject(content) as typeof parsed;
+    parsed = extractFirstJsonObject(rawAi) as typeof parsed;
   } catch (e) {
      
     console.error("[ai-insight] parse/call", e);
@@ -424,6 +419,36 @@ ${stagesJson}
       appliedStage,
       confidence,
       usedLearningMemory: Boolean(memory),
+      qualityScore: evaluateAiTextQuality({
+        text: summary,
+        maxSentences: 6,
+        minChars: 12,
+        requireUkrainian: true,
+        allowMarkdown: false,
+      }).score,
+    },
+  });
+  await logAiEvent({
+    userId: user.id,
+    action: "lead_ai_insight",
+    model: aiModelUsed,
+    ok: true,
+    tokensApprox:
+      aiUsage?.totalTokens && aiUsage.totalTokens > 0
+        ? aiUsage.totalTokens
+        : aiTokensApprox,
+    entityType: "LEAD",
+    entityId: leadId,
+    metadata: {
+      recommendedStageId,
+      appliedStage,
+      confidence,
+      usedLearningMemory: Boolean(memory),
+      promptTokens: aiUsage?.promptTokens ?? 0,
+      completionTokens: aiUsage?.completionTokens ?? 0,
+      totalTokens: aiUsage?.totalTokens ?? 0,
+      tokensApprox: aiTokensApprox,
+      costUsdApprox: aiCostUsdApprox,
     },
   });
 

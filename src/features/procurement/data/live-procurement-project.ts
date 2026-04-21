@@ -111,7 +111,7 @@ export type ProcurementProjectPageData = {
 };
 
 /**
- * Завантажує зріз закупівель для угоди (dealId = projectId у таблицях UI).
+ * Завантажує зріз закупівель для замовлення (dealId = projectId у таблицях UI).
  */
 export async function tryLoadProcurementProjectFromDeal(
   dealId: string,

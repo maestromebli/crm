@@ -71,7 +71,7 @@ export async function POST(req: Request, ctx: Ctx) {
       select: { id: true, ownerId: true },
     });
     if (!deal) {
-      return NextResponse.json({ error: "Угоду не знайдено" }, { status: 404 });
+      return NextResponse.json({ error: "Замовлення не знайдено" }, { status: 404 });
     }
 
     const denied = await forbidUnlessDealAccess(user, P.FILES_UPLOAD, deal);
@@ -177,7 +177,7 @@ export async function POST(req: Request, ctx: Ctx) {
   } catch (e) {
     if (e instanceof Error && e.message === "FILE_ASSET_NOT_FOUND") {
       return NextResponse.json(
-        { error: "Логічний файл не знайдено для цієї угоди" },
+        { error: "Логічний файл не знайдено для цієї замовлення" },
         { status: 400 },
       );
     }

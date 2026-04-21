@@ -43,7 +43,7 @@ export async function POST(req: Request, ctx: Ctx) {
   }
   if (lead.dealId) {
     return NextResponse.json(
-      { error: "Використовуйте смету в угоді" },
+      { error: "Використовуйте смету в замовленні" },
       { status: 409 },
     );
   }

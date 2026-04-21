@@ -25,7 +25,8 @@ async function getDealColumnNames(
 }
 
 /**
- * Після створення угоди: знімок КП + графік 70/30, якщо активне КП у статусі APPROVED.
+ * Після створення замовлення: фіксує знімок активного КП на замовленні.
+ * `estimateApproved` у чеклісті виставляється лише коли КП має статус APPROVED.
  */
 export async function applyCommercialSnapshotFromApprovedProposal(
   tx: Prisma.TransactionClient,
@@ -52,7 +53,8 @@ export async function applyCommercialSnapshotFromApprovedProposal(
     },
   });
 
-  if (!proposal || proposal.status !== "APPROVED") return;
+  if (!proposal) return;
+  const isApprovedProposal = proposal.status === "APPROVED";
 
   const frozenAt = new Date();
   const commercial = buildDealCommercialSnapshotV1({
@@ -80,7 +82,7 @@ export async function applyCommercialSnapshotFromApprovedProposal(
     ...base,
     executionChecklist: {
       ...exec,
-      estimateApproved: true,
+      estimateApproved: isApprovedProposal,
     },
     ...(payment ? { payment } : {}),
   };

@@ -11,7 +11,7 @@ const IDEAL_CONVERSION_STAGES: ReadonlySet<LeadStageKey> = new Set([
 ]);
 
 /**
- * Перевірка можливості конвертації ліда в угоду (без UI).
+ * Перевірка можливості конвертації ліда в замовлення (без UI).
  */
 export function validateLeadConversionToDeal(
   lead: LeadCoreInput,
@@ -22,7 +22,7 @@ export function validateLeadConversionToDeal(
   if (lead.dealId) {
     errors.push({
       code: "ALREADY_CONVERTED",
-      messageUa: "Лід уже пов’язаний з угодою.",
+      messageUa: "Лід уже пов’язаний з замовленням.",
     });
     return { ok: false, errors, warnings };
   }
@@ -82,7 +82,7 @@ export function validateLeadConversionToDeal(
   if (!budget.pass) {
     warnings.push({
       code: "BUDGET_MISSING",
-      messageUa: "Бюджет не зафіксовано — рекомендуємо для угоди.",
+      messageUa: "Бюджет не зафіксовано — рекомендуємо для замовлення.",
     });
   }
 

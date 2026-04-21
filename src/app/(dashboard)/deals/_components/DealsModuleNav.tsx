@@ -40,7 +40,7 @@ export function DealsModuleNav({ activeHref }: Props) {
   return (
     <nav
       className="-mx-1 flex snap-x snap-mandatory gap-1.5 overflow-x-auto pb-1 pt-0.5 [scrollbar-width:thin]"
-      aria-label="Розділи модуля угод"
+      aria-label="Розділи модуля замовлень"
     >
       {DEAL_LIST_ROUTES.map((r) => {
         const active =

@@ -34,7 +34,7 @@ export async function GET(_req: Request, ctx: Ctx) {
       select: { id: true, ownerId: true },
     });
     if (!deal) {
-      return NextResponse.json({ error: "Угоду не знайдено" }, { status: 404 });
+      return NextResponse.json({ error: "Замовлення не знайдено" }, { status: 404 });
     }
 
     const denied = await forbidUnlessDealAccess(user, P.PRODUCTION_LAUNCH, {
@@ -84,7 +84,7 @@ export async function POST(req: Request, ctx: Ctx) {
       include: { productionFlow: { select: { id: true } }, handoff: true },
     });
     if (!deal) {
-      return NextResponse.json({ error: "Угоду не знайдено" }, { status: 404 });
+      return NextResponse.json({ error: "Замовлення не знайдено" }, { status: 404 });
     }
 
     const denied = await forbidUnlessDealAccess(user, P.PRODUCTION_LAUNCH, {
@@ -105,7 +105,7 @@ export async function POST(req: Request, ctx: Ctx) {
       return NextResponse.json(
         {
           error:
-            "Спочатку передайте угоду у виробництво (вкладка «Виробництво»).",
+            "Спочатку передайте замовлення у виробництво (вкладка «Виробництво»).",
         },
         { status: 400 },
       );
@@ -182,7 +182,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
       select: { id: true, ownerId: true },
     });
     if (!deal) {
-      return NextResponse.json({ error: "Угоду не знайдено" }, { status: 404 });
+      return NextResponse.json({ error: "Замовлення не знайдено" }, { status: 404 });
     }
 
     const denied = await forbidUnlessDealAccess(user, P.PRODUCTION_LAUNCH, {

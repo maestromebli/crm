@@ -3,7 +3,7 @@ import { deriveDealWarnings } from "../../features/deal-workspace/deal-workspace
 import type { DealAiWarningItem } from "./types";
 
 /**
- * Структуровані сигнали для AI-панелі угоди (§8.2–8.3) поверх `deriveDealWarnings`.
+ * Структуровані сигнали для AI-панелі замовлення (§8.2–8.3) поверх `deriveDealWarnings`.
  */
 export function deriveDealPaymentContractAiWarnings(
   data: DealWorkspacePayload,

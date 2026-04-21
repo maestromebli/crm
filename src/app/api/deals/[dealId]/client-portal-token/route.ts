@@ -14,7 +14,7 @@ export async function POST(_req: Request, ctx: Ctx) {
     where: { id: dealId },
     select: { id: true, ownerId: true },
   });
-  if (!deal) return NextResponse.json({ error: "Угоду не знайдено" }, { status: 404 });
+  if (!deal) return NextResponse.json({ error: "Замовлення не знайдено" }, { status: 404 });
   const denied = await forbidUnlessDealAccess(user, P.DEALS_VIEW, deal);
   if (denied) return denied;
   try {

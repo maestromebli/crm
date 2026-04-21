@@ -68,7 +68,7 @@ export const DEAL_DOCUMENT_TEMPLATES: DealDocumentTemplate[] = [
     documentType: "CONTRACT",
     format: "HTML",
     description:
-      "Текст на основі зразка договору поставки: реквізити, 70/30, додаток-специфікація. Змінні підставляються з угоди.",
+      "Текст на основі зразка договору поставки: реквізити, 70/30, додаток-специфікація. Змінні підставляються з замовлення.",
     defaultHtml: CONTRACT_SUPPLY_ZRAZOK_HTML,
     defaultVariables: {
       contractNumber: "",

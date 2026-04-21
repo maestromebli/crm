@@ -218,7 +218,7 @@ export default async function HandoffPage({ params }: PageProps) {
         </h1>
         <p className="mt-1 text-sm text-slate-600">{VIEW_LABELS[view].subtitle}</p>
         <p className="mt-2 text-xs text-slate-500">
-          Показано: {filtered.length} з {rows.length} угод у зоні видимості.
+          Показано: {filtered.length} з {rows.length} замовлень у зоні видимості.
         </p>
       </section>
 
@@ -227,7 +227,7 @@ export default async function HandoffPage({ params }: PageProps) {
           <table className="min-w-full text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
               <tr>
-                <th className="px-3 py-2">Угода</th>
+                <th className="px-3 py-2">Замовлення</th>
                 <th className="px-3 py-2">Клієнт</th>
                 <th className="px-3 py-2">Власник</th>
                 <th className="px-3 py-2">Передача</th>

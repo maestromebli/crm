@@ -51,6 +51,20 @@ type Dashboard = {
       net: number;
       projectedBalance: number;
     }>;
+    objectLedger: Array<{
+      dealId: string;
+      dealTitle: string;
+      plannedInflow: number;
+      actualInflow: number;
+      actualOutflow: number;
+      openCommitment: number;
+      clientDebt: number;
+      grossMargin: number;
+      netMarginPct: number;
+      nextPaymentDate: string | null;
+      overdueDays: number;
+      status: "ON_TRACK" | "DUE_SOON" | "OVERDUE" | "BLOCKED";
+    }>;
     riskIndex: number;
     riskLabel: string;
   };
@@ -62,6 +76,8 @@ const DEFAULT_FINANCE_RISK = {
   apOutstandingWarn: 700000,
   weekNetWarn: -120000,
 };
+
+type FinanceHubTab = "overview" | "objects" | "documents" | "control";
 
 function readFinanceRiskFromStorage() {
   if (typeof window === "undefined") return DEFAULT_FINANCE_RISK;
@@ -78,6 +94,12 @@ function readFinanceRiskFromStorage() {
 export function FinanceHubClient() {
   const [data, setData] = useState<Dashboard | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<FinanceHubTab>("overview");
+  const [objectQuery, setObjectQuery] = useState("");
+  const [objectStatusFilter, setObjectStatusFilter] = useState<
+    "all" | "ON_TRACK" | "DUE_SOON" | "OVERDUE" | "BLOCKED"
+  >("all");
+  const [showDebtOnly, setShowDebtOnly] = useState(false);
   const [nowLabel, setNowLabel] = useState("—");
   const [invoiceForm, setInvoiceForm] = useState({
     entity: "",
@@ -190,6 +212,19 @@ export function FinanceHubClient() {
       worstWeekNet: data.enterprise.cashflowForecast8w.reduce((acc, row) => Math.min(acc, row.net), 0),
     };
   }, [data]);
+
+  const filteredObjectLedger = useMemo(() => {
+    if (!data) return [];
+    const query = objectQuery.trim().toLowerCase();
+    return data.enterprise.objectLedger
+      .filter((row) => (objectStatusFilter === "all" ? true : row.status === objectStatusFilter))
+      .filter((row) => (showDebtOnly ? row.clientDebt > 0 : true))
+      .filter((row) => {
+        if (!query) return true;
+        return row.dealTitle.toLowerCase().includes(query) || row.dealId.toLowerCase().includes(query);
+      })
+      .sort((a, b) => b.clientDebt - a.clientDebt);
+  }, [data, objectQuery, objectStatusFilter, showDebtOnly]);
 
   useEffect(() => {
     if (!data) return;
@@ -389,427 +424,565 @@ export function FinanceHubClient() {
         </div>
       )}
 
+      <section className="rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+        <div className="flex flex-wrap gap-2">
+          {(
+            [
+              ["overview", "Огляд і прогнози"],
+              ["objects", "Об'єкти та маржа"],
+              ["documents", "Документи та плани"],
+              ["control", "Контроль і погодження"],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setActiveTab(id)}
+              className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition ${
+                activeTab === id
+                  ? "bg-slate-900 text-white shadow-sm"
+                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </section>
+
       {data && (
         <>
-          <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <KpiCard
-              label="Баланс"
-              value={`${formatMoney(data.kpi.balance)} ₴`}
-              hint="Поточний залишок на рахунках за даними вікна"
-            />
-            <KpiCard
-              label="Надходження"
-              value={`${formatMoney(data.kpi.incomeMonth)} ₴`}
-              tone="ok"
-              hint="Сума надходжень за поточний місяць"
-            />
-            <KpiCard
-              label="Витрати"
-              value={`${formatMoney(data.kpi.expenseMonth)} ₴`}
-              tone="warn"
-              hint="Сума витрат за поточний місяць"
-            />
-            <KpiCard
-              label="Прибуток"
-              value={`${formatMoney(data.kpi.profit)} ₴`}
-              tone="info"
-              hint="Доходи мінус витрати за місяць"
-            />
-          </section>
-          <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <KpiCard label="Корпоративний ризик" value={`${data.enterprise.riskIndex}/100`} tone="warn" />
-            <KpiCard label="Мітка ризику" value={data.enterprise.riskLabel} />
-            <KpiCard
-              label="Дебіторка (залишок)"
-              value={`${formatMoney(data.enterprise.arLedger.reduce((a, r) => a + r.outstanding, 0))} ₴`}
-              tone="info"
-            />
-            <KpiCard
-              label="Кредиторка (залишок)"
-              value={`${formatMoney(data.enterprise.apLedger.reduce((a, r) => a + r.outstanding, 0))} ₴`}
-              tone="warn"
-            />
-          </section>
-          <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <h2 className="text-sm font-semibold text-slate-900">Пороги ризику (керовані)</h2>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-              <label className="text-xs text-slate-600">
-                Поріг індексу ризику
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  className="mt-1 w-full rounded border border-slate-300 px-2 py-1"
-                  value={riskConfig.riskIndexWarn}
-                  onChange={(event) =>
-                    setRiskConfig((prev) => ({ ...prev, riskIndexWarn: Number(event.target.value || 0) }))
-                  }
+          {activeTab === "overview" ? (
+            <>
+              <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <KpiCard
+                  label="Баланс"
+                  value={`${formatMoney(data.kpi.balance)} ₴`}
+                  hint="Поточний залишок на рахунках за даними вікна"
                 />
-              </label>
-              <label className="text-xs text-slate-600">
-                Поріг дебіторки
-                <input
-                  type="number"
-                  min={0}
-                  className="mt-1 w-full rounded border border-slate-300 px-2 py-1"
-                  value={riskConfig.arOutstandingWarn}
-                  onChange={(event) =>
-                    setRiskConfig((prev) => ({ ...prev, arOutstandingWarn: Number(event.target.value || 0) }))
-                  }
+                <KpiCard
+                  label="Надходження"
+                  value={`${formatMoney(data.kpi.incomeMonth)} ₴`}
+                  tone="ok"
+                  hint="Сума надходжень за поточний місяць"
                 />
-              </label>
-              <label className="text-xs text-slate-600">
-                Поріг кредиторки
-                <input
-                  type="number"
-                  min={0}
-                  className="mt-1 w-full rounded border border-slate-300 px-2 py-1"
-                  value={riskConfig.apOutstandingWarn}
-                  onChange={(event) =>
-                    setRiskConfig((prev) => ({ ...prev, apOutstandingWarn: Number(event.target.value || 0) }))
-                  }
+                <KpiCard
+                  label="Витрати"
+                  value={`${formatMoney(data.kpi.expenseMonth)} ₴`}
+                  tone="warn"
+                  hint="Сума витрат за поточний місяць"
                 />
-              </label>
-              <label className="text-xs text-slate-600">
-                Поріг найгіршого тижневого net
-                <input
-                  type="number"
-                  className="mt-1 w-full rounded border border-slate-300 px-2 py-1"
-                  value={riskConfig.weekNetWarn}
-                  onChange={(event) =>
-                    setRiskConfig((prev) => ({ ...prev, weekNetWarn: Number(event.target.value || 0) }))
-                  }
+                <KpiCard
+                  label="Прибуток"
+                  value={`${formatMoney(data.kpi.profit)} ₴`}
+                  tone="info"
+                  hint="Доходи мінус витрати за місяць"
                 />
-              </label>
-            </div>
-          </section>
+              </section>
+              <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <KpiCard label="Корпоративний ризик" value={`${data.enterprise.riskIndex}/100`} tone="warn" />
+                <KpiCard label="Мітка ризику" value={data.enterprise.riskLabel} />
+                <KpiCard
+                  label="Дебіторка (залишок)"
+                  value={`${formatMoney(data.enterprise.arLedger.reduce((a, r) => a + r.outstanding, 0))} ₴`}
+                  tone="info"
+                />
+                <KpiCard
+                  label="Кредиторка (залишок)"
+                  value={`${formatMoney(data.enterprise.apLedger.reduce((a, r) => a + r.outstanding, 0))} ₴`}
+                  tone="warn"
+                />
+              </section>
+              <section className="grid gap-4 xl:grid-cols-[1.35fr_1fr]">
+                <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm">
+                  <h2 className="text-sm font-semibold text-[var(--enver-text)]">Грошовий рух (90 днів)</h2>
+                  <div className="mt-4 flex h-40 items-end gap-px overflow-x-auto pb-1">
+                    {data.cashflow.map((row) => (
+                      <div
+                        key={row.date}
+                        className="group flex min-w-[6px] flex-1 flex-col items-center gap-1"
+                        title={`${row.date}: +${row.income.toFixed(0)} / −${row.expense.toFixed(0)}`}
+                      >
+                        <div
+                          className="w-full max-w-[14px] rounded-t bg-emerald-400/90"
+                          style={{ height: `${(row.income / maxCf) * 100}%`, minHeight: row.income > 0 ? 4 : 0 }}
+                        />
+                        <div
+                          className="w-full max-w-[14px] rounded-t bg-rose-400/90"
+                          style={{ height: `${(row.expense / maxCf) * 100}%`, minHeight: row.expense > 0 ? 4 : 0 }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-xs text-slate-500">
+                    Зелений — надходження, червоний — витрати (масштаб по максимуму вікна).
+                  </p>
 
-          <section className="grid gap-4 xl:grid-cols-[1.35fr_1fr]">
-            <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm">
-              <h2 className="text-sm font-semibold text-[var(--enver-text)]">Грошовий рух (90 днів)</h2>
-              <div className="mt-4 flex h-40 items-end gap-px overflow-x-auto pb-1">
-                {data.cashflow.map((row) => (
-                  <div
-                    key={row.date}
-                    className="group flex min-w-[6px] flex-1 flex-col items-center gap-1"
-                    title={`${row.date}: +${row.income.toFixed(0)} / −${row.expense.toFixed(0)}`}
+                  <h3 className="mt-4 text-xs font-semibold text-slate-700">Чистий потік (останні 7 днів)</h3>
+                  <div className="mt-2 flex h-24 items-end gap-2 rounded-xl bg-slate-50 p-3">
+                    {weeklyNet.map((value, index) => {
+                      const positive = value >= 0;
+                      const abs = Math.min(100, Math.max(6, Math.round(Math.abs(value) / 1000)));
+                      return (
+                        <div key={`${value}-${index}`} className="flex flex-1 flex-col items-center gap-1">
+                          <div
+                            className={`w-full rounded-t ${positive ? "bg-emerald-500" : "bg-rose-500"}`}
+                            style={{ height: `${abs}%` }}
+                            title={`D${index + 1}: ${value}`}
+                          />
+                          <span className="text-[10px] text-slate-500">D{index + 1}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="rounded-2xl border border-violet-200/80 bg-gradient-to-br from-violet-50 to-white p-4">
+                    <h2 className="text-sm font-semibold text-violet-900">ШІ: ризики та прогноз</h2>
+                    <ul className="mt-3 space-y-2 text-sm text-slate-700">
+                      <li>
+                        <span className="font-medium text-slate-900">Ризик оплат: </span>
+                        {data.ai.paymentRisk}
+                      </li>
+                      <li>
+                        <span className="font-medium text-slate-900">Прогноз: </span>
+                        {data.ai.cashflowForecast}
+                      </li>
+                    </ul>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                    <h3 className="text-xs font-semibold text-slate-700">Рекомендовані дії</h3>
+                    <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-slate-700">
+                      {data.ai.actions.map((action) => (
+                        <li key={action}>{action}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </section>
+              <section className="grid gap-4 xl:grid-cols-[1.2fr_1fr]">
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <h2 className="text-sm font-semibold text-slate-900">Прогноз грошового потоку · 8 тижнів</h2>
+                  <div className="mt-3 overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-100 text-xs text-slate-500">
+                          <th className="py-2 pr-2">Тиждень</th>
+                          <th className="py-2 pr-2">Надходження</th>
+                          <th className="py-2 pr-2">Витрати</th>
+                          <th className="py-2 pr-2">Чистий потік</th>
+                          <th className="py-2">Баланс</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data.enterprise.cashflowForecast8w.map((row) => (
+                          <tr key={row.week} className="border-b border-slate-50">
+                            <td className="py-2 pr-2 font-medium text-slate-900">{row.week}</td>
+                            <td className="py-2 pr-2">{formatMoney(row.inflow)} ₴</td>
+                            <td className="py-2 pr-2">{formatMoney(row.outflow)} ₴</td>
+                            <td className={`py-2 pr-2 ${row.net >= 0 ? "text-emerald-700" : "text-rose-700"}`}>
+                              {formatMoney(row.net)} ₴
+                            </td>
+                            <td className="py-2">{formatMoney(row.projectedBalance)} ₴</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <h2 className="text-sm font-semibold text-slate-900">Реєстр дебіторки / кредиторки</h2>
+                  <div className="mt-3 grid gap-3">
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-3">
+                      <p className="text-xs font-semibold uppercase text-emerald-700">AR</p>
+                      <ul className="mt-2 space-y-1 text-xs text-slate-700">
+                        {data.enterprise.arLedger.slice(0, 6).map((row) => (
+                          <li key={row.dealId}>
+                            {row.dealTitle}: до сплати {formatMoney(row.outstanding)} ₴
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div className="rounded-xl border border-rose-200 bg-rose-50/50 p-3">
+                      <p className="text-xs font-semibold uppercase text-rose-700">AP</p>
+                      <ul className="mt-2 space-y-1 text-xs text-slate-700">
+                        {data.enterprise.apLedger.slice(0, 6).map((row) => (
+                          <li key={row.purchaseOrderId}>
+                            {row.dealTitle}: до сплати {formatMoney(row.outstanding)} ₴
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </>
+          ) : null}
+
+          {activeTab === "objects" ? (
+            <section className="space-y-4">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    value={objectQuery}
+                    onChange={(event) => setObjectQuery(event.target.value)}
+                    placeholder="Пошук замовлення за назвою або ID…"
+                    className="min-w-[240px] flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm"
+                  />
+                  <select
+                    value={objectStatusFilter}
+                    onChange={(event) =>
+                      setObjectStatusFilter(
+                        event.target.value as "all" | "ON_TRACK" | "DUE_SOON" | "OVERDUE" | "BLOCKED",
+                      )
+                    }
+                    className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs text-slate-700"
                   >
-                    <div
-                      className="w-full max-w-[14px] rounded-t bg-emerald-400/90"
-                      style={{ height: `${(row.income / maxCf) * 100}%`, minHeight: row.income > 0 ? 4 : 0 }}
+                    <option value="all">Усі статуси</option>
+                    <option value="ON_TRACK">В графіку</option>
+                    <option value="DUE_SOON">Платіж скоро</option>
+                    <option value="OVERDUE">Прострочено</option>
+                    <option value="BLOCKED">Блокер маржі</option>
+                  </select>
+                  <label className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-2 py-2 text-xs text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={showDebtOnly}
+                      onChange={(event) => setShowDebtOnly(event.target.checked)}
                     />
-                    <div
-                      className="w-full max-w-[14px] rounded-t bg-rose-400/90"
-                      style={{ height: `${(row.expense / maxCf) * 100}%`, minHeight: row.expense > 0 ? 4 : 0 }}
+                    Лише з боргом
+                  </label>
+                </div>
+                <p className="mt-3 text-xs text-slate-500">
+                  Реєстр об'єктів: план/факт надходжень, план/факт витрат, борг клієнта та статус виконання.
+                </p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-left text-sm">
+                    <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                      <tr>
+                        <th className="px-2 py-2">Замовлення</th>
+                        <th className="px-2 py-2">План вхід</th>
+                        <th className="px-2 py-2">Факт вхід</th>
+                        <th className="px-2 py-2">Факт вихід</th>
+                        <th className="px-2 py-2">Відкриті зобов&apos;язання</th>
+                        <th className="px-2 py-2">Борг клієнта</th>
+                        <th className="px-2 py-2">Маржа</th>
+                        <th className="px-2 py-2">Наступна оплата</th>
+                        <th className="px-2 py-2">Статус</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredObjectLedger.map((row) => (
+                        <tr key={row.dealId} className="border-t border-slate-100">
+                          <td className="px-2 py-2">
+                            <p className="font-medium text-slate-900">{row.dealTitle}</p>
+                            <p className="text-[11px] text-slate-500">{row.dealId}</p>
+                          </td>
+                          <td className="px-2 py-2">{formatMoney(row.plannedInflow)} ₴</td>
+                          <td className="px-2 py-2">{formatMoney(row.actualInflow)} ₴</td>
+                          <td className="px-2 py-2">{formatMoney(row.actualOutflow)} ₴</td>
+                          <td className="px-2 py-2">{formatMoney(row.openCommitment)} ₴</td>
+                          <td className="px-2 py-2 font-medium text-amber-900">{formatMoney(row.clientDebt)} ₴</td>
+                          <td className="px-2 py-2">
+                            <span className={row.grossMargin >= 0 ? "text-emerald-700" : "text-rose-700"}>
+                              {formatMoney(row.grossMargin)} ₴
+                            </span>
+                            <p className="text-[11px] text-slate-500">{row.netMarginPct}%</p>
+                          </td>
+                          <td className="px-2 py-2">
+                            <p>{row.nextPaymentDate ? formatDate(row.nextPaymentDate) : "—"}</p>
+                            {row.overdueDays > 0 ? (
+                              <p className="text-[11px] text-rose-700">Прострочка: {row.overdueDays} дн.</p>
+                            ) : null}
+                          </td>
+                          <td className="px-2 py-2">
+                            <span className={`rounded px-2 py-0.5 text-[11px] font-semibold ${statusPillClass(row.status)}`}>
+                              {statusLabel(row.status)}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {filteredObjectLedger.length === 0 ? (
+                  <p className="mt-3 text-sm text-slate-500">За обраними фільтрами записів не знайдено.</p>
+                ) : null}
+              </div>
+            </section>
+          ) : null}
+
+          {activeTab === "documents" ? (
+            <>
+              <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <h2 className="text-sm font-semibold text-slate-900">Пороги ризику (керовані)</h2>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                  <label className="text-xs text-slate-600">
+                    Поріг індексу ризику
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      className="mt-1 w-full rounded border border-slate-300 px-2 py-1"
+                      value={riskConfig.riskIndexWarn}
+                      onChange={(event) =>
+                        setRiskConfig((prev) => ({ ...prev, riskIndexWarn: Number(event.target.value || 0) }))
+                      }
+                    />
+                  </label>
+                  <label className="text-xs text-slate-600">
+                    Поріг дебіторки
+                    <input
+                      type="number"
+                      min={0}
+                      className="mt-1 w-full rounded border border-slate-300 px-2 py-1"
+                      value={riskConfig.arOutstandingWarn}
+                      onChange={(event) =>
+                        setRiskConfig((prev) => ({ ...prev, arOutstandingWarn: Number(event.target.value || 0) }))
+                      }
+                    />
+                  </label>
+                  <label className="text-xs text-slate-600">
+                    Поріг кредиторки
+                    <input
+                      type="number"
+                      min={0}
+                      className="mt-1 w-full rounded border border-slate-300 px-2 py-1"
+                      value={riskConfig.apOutstandingWarn}
+                      onChange={(event) =>
+                        setRiskConfig((prev) => ({ ...prev, apOutstandingWarn: Number(event.target.value || 0) }))
+                      }
+                    />
+                  </label>
+                  <label className="text-xs text-slate-600">
+                    Поріг найгіршого тижневого net
+                    <input
+                      type="number"
+                      className="mt-1 w-full rounded border border-slate-300 px-2 py-1"
+                      value={riskConfig.weekNetWarn}
+                      onChange={(event) =>
+                        setRiskConfig((prev) => ({ ...prev, weekNetWarn: Number(event.target.value || 0) }))
+                      }
+                    />
+                  </label>
+                </div>
+              </section>
+              <section className="grid gap-4 xl:grid-cols-2">
+                <form
+                  className="space-y-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    createInvoice();
+                  }}
+                >
+                  <h2 className="text-sm font-semibold text-slate-900">Форма рахунку / платежу</h2>
+                  <select
+                    className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+                    value={invoiceForm.type}
+                    onChange={(event) =>
+                      setInvoiceForm((prev) => ({
+                        ...prev,
+                        type: event.target.value as "INCOMING" | "OUTGOING",
+                      }))
+                    }
+                  >
+                    <option value="INCOMING">Вхідний</option>
+                    <option value="OUTGOING">Вихідний</option>
+                  </select>
+                  <input
+                    className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+                    placeholder="Контрагент"
+                    value={invoiceForm.entity}
+                    onChange={(event) => setInvoiceForm((prev) => ({ ...prev, entity: event.target.value }))}
+                  />
+                  <select
+                    className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+                    value={invoiceForm.productionOrder}
+                    onChange={(event) =>
+                      setInvoiceForm((prev) => ({ ...prev, productionOrder: event.target.value }))
+                    }
+                  >
+                    <option value="">Прив&apos;язка до замовлення (опційно)</option>
+                    {productionOrders.map((order) => (
+                      <option key={order.number} value={order.number}>
+                        {order.number} · {order.client}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="number"
+                      min={0}
+                      className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+                      placeholder="Сума"
+                      value={invoiceForm.amount}
+                      onChange={(event) =>
+                        setInvoiceForm((prev) => ({ ...prev, amount: Number(event.target.value || 0) }))
+                      }
+                    />
+                    <input
+                      type="date"
+                      className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+                      value={invoiceForm.dueDate}
+                      onChange={(event) => setInvoiceForm((prev) => ({ ...prev, dueDate: event.target.value }))}
                     />
                   </div>
-                ))}
-              </div>
-              <p className="mt-2 text-xs text-slate-500">
-                Зелений — надходження, червоний — витрати (масштаб по максимуму вікна).
-              </p>
+                  <textarea
+                    className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+                    rows={2}
+                    placeholder="Примітка"
+                    value={invoiceForm.note}
+                    onChange={(event) => setInvoiceForm((prev) => ({ ...prev, note: event.target.value }))}
+                  />
+                  <button
+                    type="submit"
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                  >
+                    Зареєструвати документ
+                  </button>
+                </form>
 
-              <h3 className="mt-4 text-xs font-semibold text-slate-700">Чистий потік (останні 7 днів)</h3>
-              <div className="mt-2 flex h-24 items-end gap-2 rounded-xl bg-slate-50 p-3">
-                {weeklyNet.map((value, index) => {
-                  const positive = value >= 0;
-                  const abs = Math.min(100, Math.max(6, Math.round(Math.abs(value) / 1000)));
-                  return (
-                    <div key={`${value}-${index}`} className="flex flex-1 flex-col items-center gap-1">
-                      <div
-                        className={`w-full rounded-t ${positive ? "bg-emerald-500" : "bg-rose-500"}`}
-                        style={{ height: `${abs}%` }}
-                        title={`D${index + 1}: ${value}`}
-                      />
-                      <span className="text-[10px] text-slate-500">D{index + 1}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="rounded-2xl border border-violet-200/80 bg-gradient-to-br from-violet-50 to-white p-4">
-                <h2 className="text-sm font-semibold text-violet-900">ШІ: ризики та прогноз</h2>
-                <ul className="mt-3 space-y-2 text-sm text-slate-700">
-                  <li>
-                    <span className="font-medium text-slate-900">Ризик оплат: </span>
-                    {data.ai.paymentRisk}
-                  </li>
-                  <li>
-                    <span className="font-medium text-slate-900">Прогноз: </span>
-                    {data.ai.cashflowForecast}
-                  </li>
-                </ul>
-              </div>
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <h3 className="text-xs font-semibold text-slate-700">Рекомендовані дії</h3>
-                <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-slate-700">
-                  {data.ai.actions.map((action) => (
-                    <li key={action}>{action}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </section>
-          <section className="grid gap-4 xl:grid-cols-[1.2fr_1fr]">
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <h2 className="text-sm font-semibold text-slate-900">Прогноз грошового потоку · 8 тижнів</h2>
-              <div className="mt-3 overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-100 text-xs text-slate-500">
-                      <th className="py-2 pr-2">Тиждень</th>
-                      <th className="py-2 pr-2">Надходження</th>
-                      <th className="py-2 pr-2">Витрати</th>
-                      <th className="py-2 pr-2">Чистий потік</th>
-                      <th className="py-2">Баланс</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.enterprise.cashflowForecast8w.map((row) => (
-                      <tr key={row.week} className="border-b border-slate-50">
-                        <td className="py-2 pr-2 font-medium text-slate-900">{row.week}</td>
-                        <td className="py-2 pr-2">{formatMoney(row.inflow)} ₴</td>
-                        <td className="py-2 pr-2">{formatMoney(row.outflow)} ₴</td>
-                        <td className={`py-2 pr-2 ${row.net >= 0 ? "text-emerald-700" : "text-rose-700"}`}>
-                          {formatMoney(row.net)} ₴
-                        </td>
-                        <td className="py-2">{formatMoney(row.projectedBalance)} ₴</td>
-                      </tr>
+                <form
+                  className="space-y-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    addPaymentPlan();
+                  }}
+                >
+                  <h2 className="text-sm font-semibold text-slate-900">План оплат по виробництву</h2>
+                  <input
+                    className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+                    placeholder="Номер замовлення (PR-...)"
+                    value={paymentPlanForm.productionOrder}
+                    onChange={(event) =>
+                      setPaymentPlanForm((prev) => ({ ...prev, productionOrder: event.target.value }))
+                    }
+                  />
+                  <select
+                    className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+                    value={paymentPlanForm.productionOrder}
+                    onChange={(event) =>
+                      setPaymentPlanForm((prev) => ({ ...prev, productionOrder: event.target.value }))
+                    }
+                  >
+                    <option value="">або виберіть з ERP</option>
+                    {productionOrders.map((order) => (
+                      <option key={order.number} value={order.number}>
+                        {order.number} · {order.product}
+                      </option>
                     ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <h2 className="text-sm font-semibold text-slate-900">Реєстр дебіторки / кредиторки</h2>
-              <div className="mt-3 grid gap-3">
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-3">
-                  <p className="text-xs font-semibold uppercase text-emerald-700">AR</p>
-                  <ul className="mt-2 space-y-1 text-xs text-slate-700">
-                    {data.enterprise.arLedger.slice(0, 6).map((row) => (
-                      <li key={row.dealId}>
-                        {row.dealTitle}: до сплати {formatMoney(row.outstanding)} ₴
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                <div className="rounded-xl border border-rose-200 bg-rose-50/50 p-3">
-                  <p className="text-xs font-semibold uppercase text-rose-700">AP</p>
-                  <ul className="mt-2 space-y-1 text-xs text-slate-700">
-                    {data.enterprise.apLedger.slice(0, 6).map((row) => (
-                      <li key={row.purchaseOrderId}>
-                        {row.dealTitle}: до сплати {formatMoney(row.outstanding)} ₴
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </section>
+                  </select>
+                  <input
+                    className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+                    placeholder="Назва траншу"
+                    value={paymentPlanForm.trancheLabel}
+                    onChange={(event) =>
+                      setPaymentPlanForm((prev) => ({ ...prev, trancheLabel: event.target.value }))
+                    }
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="number"
+                      min={0}
+                      className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+                      placeholder="Сума траншу"
+                      value={paymentPlanForm.amount}
+                      onChange={(event) =>
+                        setPaymentPlanForm((prev) => ({ ...prev, amount: Number(event.target.value || 0) }))
+                      }
+                    />
+                    <input
+                      type="date"
+                      className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+                      value={paymentPlanForm.trancheDate}
+                      onChange={(event) =>
+                        setPaymentPlanForm((prev) => ({ ...prev, trancheDate: event.target.value }))
+                      }
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                  >
+                    Додати в платіжний план
+                  </button>
+                </form>
+              </section>
+            </>
+          ) : null}
 
-          <section className="grid gap-4 xl:grid-cols-2">
-            <form
-              className="space-y-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
-              onSubmit={(event) => {
-                event.preventDefault();
-                createInvoice();
-              }}
-            >
-              <h2 className="text-sm font-semibold text-slate-900">Форма рахунку / платежу</h2>
-              <select
-                className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
-                value={invoiceForm.type}
-                onChange={(event) =>
-                  setInvoiceForm((prev) => ({
-                    ...prev,
-                    type: event.target.value as "INCOMING" | "OUTGOING",
-                  }))
-                }
-              >
-                <option value="INCOMING">Вхідний</option>
-                <option value="OUTGOING">Вихідний</option>
-              </select>
-              <input
-                className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
-                placeholder="Контрагент"
-                value={invoiceForm.entity}
-                onChange={(event) => setInvoiceForm((prev) => ({ ...prev, entity: event.target.value }))}
-              />
-              <select
-                className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
-                value={invoiceForm.productionOrder}
-                onChange={(event) =>
-                  setInvoiceForm((prev) => ({ ...prev, productionOrder: event.target.value }))
-                }
-              >
-                <option value="">Прив&apos;язка до замовлення (опційно)</option>
-                {productionOrders.map((order) => (
-                  <option key={order.number} value={order.number}>
-                    {order.number} · {order.client}
-                  </option>
-                ))}
-              </select>
-              <div className="grid grid-cols-2 gap-2">
-                <input
-                  type="number"
-                  min={0}
-                  className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
-                  placeholder="Сума"
-                  value={invoiceForm.amount}
-                  onChange={(event) =>
-                    setInvoiceForm((prev) => ({ ...prev, amount: Number(event.target.value || 0) }))
-                  }
-                />
-                <input
-                  type="date"
-                  className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
-                  value={invoiceForm.dueDate}
-                  onChange={(event) => setInvoiceForm((prev) => ({ ...prev, dueDate: event.target.value }))}
-                />
-              </div>
-              <textarea
-                className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
-                rows={2}
-                placeholder="Примітка"
-                value={invoiceForm.note}
-                onChange={(event) => setInvoiceForm((prev) => ({ ...prev, note: event.target.value }))}
-              />
-              <button
-                type="submit"
-                className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100"
-              >
-                Зареєструвати документ
-              </button>
-            </form>
-
-            <form
-              className="space-y-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
-              onSubmit={(event) => {
-                event.preventDefault();
-                addPaymentPlan();
-              }}
-            >
-              <h2 className="text-sm font-semibold text-slate-900">План оплат по виробництву</h2>
-              <input
-                className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
-                placeholder="Номер замовлення (PR-...)"
-                value={paymentPlanForm.productionOrder}
-                onChange={(event) =>
-                  setPaymentPlanForm((prev) => ({ ...prev, productionOrder: event.target.value }))
-                }
-              />
-              <select
-                className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
-                value={paymentPlanForm.productionOrder}
-                onChange={(event) =>
-                  setPaymentPlanForm((prev) => ({ ...prev, productionOrder: event.target.value }))
-                }
-              >
-                <option value="">або виберіть з ERP</option>
-                {productionOrders.map((order) => (
-                  <option key={order.number} value={order.number}>
-                    {order.number} · {order.product}
-                  </option>
-                ))}
-              </select>
-              <input
-                className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
-                placeholder="Назва траншу"
-                value={paymentPlanForm.trancheLabel}
-                onChange={(event) =>
-                  setPaymentPlanForm((prev) => ({ ...prev, trancheLabel: event.target.value }))
-                }
-              />
-              <div className="grid grid-cols-2 gap-2">
-                <input
-                  type="number"
-                  min={0}
-                  className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
-                  placeholder="Сума траншу"
-                  value={paymentPlanForm.amount}
-                  onChange={(event) =>
-                    setPaymentPlanForm((prev) => ({ ...prev, amount: Number(event.target.value || 0) }))
-                  }
-                />
-                <input
-                  type="date"
-                  className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
-                  value={paymentPlanForm.trancheDate}
-                  onChange={(event) =>
-                    setPaymentPlanForm((prev) => ({ ...prev, trancheDate: event.target.value }))
-                  }
-                />
-              </div>
-              <button
-                type="submit"
-                className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100"
-              >
-                Додати в платіжний план
-              </button>
-            </form>
-          </section>
-
-          <section className="grid gap-4 xl:grid-cols-[1.3fr_1fr]">
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <h2 className="text-sm font-semibold text-slate-900">Аудит фінансових операцій</h2>
-              <ul className="mt-3 space-y-2 text-xs">
-                {auditFeed.map((entry) => (
-                  <li key={entry} className="rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-slate-700">
-                    {entry}
-                  </li>
-                ))}
-                {auditFeed.length === 0 ? (
-                  <li className="rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-slate-500">
-                    Нові записи з&apos;являться після створення документів.
-                  </li>
-                ) : null}
-              </ul>
-            </div>
-
-            <div className="space-y-4">
+          {activeTab === "control" ? (
+            <section className="grid gap-4 xl:grid-cols-[1.3fr_1fr]">
               <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                <h2 className="text-sm font-semibold text-slate-900">Погодження фіндокументів (ERP-міст)</h2>
-                <ul className="mt-2 space-y-2 text-xs">
-                  {financeDocuments.slice(0, 6).map((doc) => (
-                    <li key={doc.id} className="rounded border border-slate-200 bg-slate-50 px-2 py-1.5">
-                      <p className="font-medium text-slate-800">
-                        {doc.kind} · {doc.direction} · {formatMoney(doc.amount)} ₴ · {doc.status}
-                      </p>
-                      <div className="mt-1 flex gap-1">
-                        {doc.status === "DRAFT" ? (
-                          <button
-                            type="button"
-                            className="rounded border border-slate-300 bg-white px-2 py-0.5 text-[11px] text-slate-700"
-                            onClick={() => approveFinanceDocument(doc.id, "CFO")}
-                          >
-                            Погодити
-                          </button>
-                        ) : null}
-                        {doc.status === "APPROVED" ? (
-                          <button
-                            type="button"
-                            className="rounded border border-slate-300 bg-white px-2 py-0.5 text-[11px] text-slate-700"
-                            onClick={() => markFinanceDocumentPaid(doc.id, "Treasury")}
-                          >
-                            Позначити оплаченим
-                          </button>
-                        ) : null}
-                      </div>
+                <h2 className="text-sm font-semibold text-slate-900">Аудит фінансових операцій</h2>
+                <ul className="mt-3 space-y-2 text-xs">
+                  {auditFeed.map((entry) => (
+                    <li key={entry} className="rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-slate-700">
+                      {entry}
                     </li>
                   ))}
-                  {financeDocuments.length === 0 ? <li className="text-slate-500">Черга апрувів порожня.</li> : null}
+                  {auditFeed.length === 0 ? (
+                    <li className="rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-slate-500">
+                      Нові записи з&apos;являться після створення документів.
+                    </li>
+                  ) : null}
                 </ul>
               </div>
-              <div className="grid gap-2">
-              <QuickLink href="/crm/production" title="Виробничий контур" subtitle="готовність замовлень і ризики строків" />
-              <QuickLink href="/warehouse" title="Склад WMS" subtitle="залишки, резерви, оцінка запасів" />
-              <QuickLink href="/crm/procurement" title="Контур закупівель" subtitle="PO, постачальники, склад" />
-              <QuickLink href="/crm/erp" title="Глобальний ERP-командний центр" subtitle="ланцюжок погоджень і наскрізна стрічка подій" />
+
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <h2 className="text-sm font-semibold text-slate-900">Погодження фіндокументів (ERP-міст)</h2>
+                  <ul className="mt-2 space-y-2 text-xs">
+                    {financeDocuments.slice(0, 6).map((doc) => (
+                      <li key={doc.id} className="rounded border border-slate-200 bg-slate-50 px-2 py-1.5">
+                        <p className="font-medium text-slate-800">
+                          {doc.kind} · {doc.direction} · {formatMoney(doc.amount)} ₴ · {doc.status}
+                        </p>
+                        <div className="mt-1 flex gap-1">
+                          {doc.status === "DRAFT" ? (
+                            <button
+                              type="button"
+                              className="rounded border border-slate-300 bg-white px-2 py-0.5 text-[11px] text-slate-700"
+                              onClick={() => approveFinanceDocument(doc.id, "CFO")}
+                            >
+                              Погодити
+                            </button>
+                          ) : null}
+                          {doc.status === "APPROVED" ? (
+                            <button
+                              type="button"
+                              className="rounded border border-slate-300 bg-white px-2 py-0.5 text-[11px] text-slate-700"
+                              onClick={() => markFinanceDocumentPaid(doc.id, "Treasury")}
+                            >
+                              Позначити оплаченим
+                            </button>
+                          ) : null}
+                        </div>
+                      </li>
+                    ))}
+                    {financeDocuments.length === 0 ? <li className="text-slate-500">Черга апрувів порожня.</li> : null}
+                  </ul>
+                </div>
+                <div className="grid gap-2">
+                  <QuickLink
+                    href="/crm/production"
+                    title="Виробничий контур"
+                    subtitle="готовність замовлень і ризики строків"
+                  />
+                  <QuickLink href="/warehouse" title="Склад WMS" subtitle="залишки, резерви, оцінка запасів" />
+                  <QuickLink href="/crm/procurement" title="Контур закупівель" subtitle="PO, постачальники, склад" />
+                  <QuickLink
+                    href="/crm/erp"
+                    title="Глобальний ERP-командний центр"
+                    subtitle="ланцюжок погоджень і наскрізна стрічка подій"
+                  />
+                </div>
               </div>
-            </div>
-          </section>
+            </section>
+          ) : null}
         </>
       )}
 
@@ -901,6 +1074,24 @@ function QuickLink({ href, title, subtitle }: { href: string; title: string; sub
       </TooltipContent>
     </Tooltip>
   );
+}
+
+function statusLabel(status: "ON_TRACK" | "DUE_SOON" | "OVERDUE" | "BLOCKED"): string {
+  if (status === "ON_TRACK") return "В графіку";
+  if (status === "DUE_SOON") return "Платіж скоро";
+  if (status === "OVERDUE") return "Прострочено";
+  return "Блокер маржі";
+}
+
+function statusPillClass(status: "ON_TRACK" | "DUE_SOON" | "OVERDUE" | "BLOCKED"): string {
+  if (status === "ON_TRACK") return "bg-emerald-100 text-emerald-800";
+  if (status === "DUE_SOON") return "bg-amber-100 text-amber-900";
+  if (status === "OVERDUE") return "bg-rose-100 text-rose-800";
+  return "bg-slate-200 text-slate-800";
+}
+
+function formatDate(value: string): string {
+  return new Date(value).toLocaleDateString("uk-UA");
 }
 
 function formatMoney(value: number): string {

@@ -98,7 +98,7 @@ function EntitySubnavDeal({ entityId }: { entityId: string }) {
     <div className="border-b border-[var(--enver-border)] bg-[var(--enver-bg)]">
       <div className="mx-auto max-w-7xl px-3 pt-1 md:px-6">
         <p className="mb-1 hidden text-[10px] font-medium uppercase tracking-wide text-[var(--enver-muted)] sm:block">
-          Розділ угоди
+          Розділ замовлення
         </p>
         <nav
           className="-mx-1 flex gap-0.5 overflow-x-auto pb-0 pt-0.5 [scrollbar-width:thin]"

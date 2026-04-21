@@ -195,7 +195,7 @@ export function TasksWorkspaceTab({ data }: { data: DealWorkspacePayload }) {
 
       <div className={wrap}>
         <h2 className="text-base font-semibold text-[var(--enver-text)]">
-          Задачі по угоді
+          Задачі по замовленню
         </h2>
         {tasksQuery.isPending ? (
           <p className="mt-2 text-sm text-slate-500">Завантаження…</p>

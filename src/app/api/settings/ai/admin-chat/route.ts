@@ -8,6 +8,10 @@ import {
   buildLearningKnowledgeBlock,
   recordContinuousLearningEvent,
 } from "../../../../../lib/ai/continuous-learning";
+import { requireAiRateLimit } from "../../../../../lib/ai/route-guard";
+import { logAiEvent } from "../../../../../lib/ai/log-ai-event";
+import { openAiChatCompletionText } from "../../../../../features/ai/core/openai-client";
+import { evaluateAiTextQuality } from "../../../../../lib/ai/evals/quality";
 
 export const runtime = "nodejs";
 
@@ -138,9 +142,15 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
+  const limited = await requireAiRateLimit({
+    userId: user.id,
+    action: "settings_admin_ai_chat",
+    maxRequests: 20,
+    windowMinutes: 10,
+  });
+  if (limited) return limited;
 
   const apiKey = process.env.AI_API_KEY;
-  const baseUrl = process.env.AI_BASE_URL ?? "https://api.openai.com/v1";
   const model = process.env.AI_MODEL ?? "gpt-4.1-mini";
 
   if (!apiKey) {
@@ -202,22 +212,26 @@ export async function POST(request: Request) {
   ];
 
   try {
-    const response = await fetch(`${baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: apiMessages,
-        temperature: 0.35,
-        max_tokens: 1800,
-      }),
+    const result = await openAiChatCompletionText({
+      messages: apiMessages as Array<{
+        role: "system" | "user" | "assistant";
+        content: unknown;
+      }>,
+      temperature: 0.35,
+      maxTokens: 1800,
     });
 
-    if (!response.ok) {
-      const detail = (await response.text()).slice(0, 600);
+    if (result.ok === false) {
+      const detail = result.error.slice(0, 600);
+      await logAiEvent({
+        userId: user.id,
+        action: "settings_admin_ai_chat",
+        model,
+        ok: false,
+        errorMessage: result.error,
+        entityType: "SYSTEM",
+        entityId: "global",
+      });
       await recordContinuousLearningEvent({
         userId: user.id,
         action: "settings_admin_ai_chat",
@@ -225,20 +239,22 @@ export async function POST(request: Request) {
         entityType: "SYSTEM",
         entityId: "global",
         ok: false,
-        metadata: { httpStatus: response.status, detail },
+        metadata: { httpStatus: result.httpStatus ?? 502, detail },
       });
       return NextResponse.json(
-        { error: `Помилка AI (${response.status})`, detail },
+        { error: `Помилка AI (${result.httpStatus ?? 502})`, detail },
         { status: 502 },
       );
     }
 
-    const data = (await response.json()) as {
-      choices?: Array<{ message?: { content?: string | null } }>;
-    };
-    const text =
-      data.choices?.[0]?.message?.content?.trim() ||
-      "AI не повернув контент. Спробуйте уточнити запит.";
+    const text = result.content.trim() || "AI не повернув контент. Спробуйте уточнити запит.";
+    const quality = evaluateAiTextQuality({
+      text,
+      maxSentences: 12,
+      minChars: 18,
+      requireUkrainian: false,
+      allowMarkdown: false,
+    });
 
     await recordContinuousLearningEvent({
       userId: user.id,
@@ -251,12 +267,52 @@ export async function POST(request: Request) {
         promptMessages: parsed.data.messages.length,
         usedLearningMemory: Boolean(memory),
         usedAdminKnowledge: Boolean(adminKnowledge),
-        model,
+        model: result.model,
+        promptTokens: result.usage?.promptTokens ?? 0,
+        completionTokens: result.usage?.completionTokens ?? 0,
+        totalTokens: result.usage?.totalTokens ?? 0,
+        tokensApprox: result.tokensApprox,
+        costUsdApprox: result.costUsdApprox,
+        qualityScore: quality.score,
+        qualityViolations: quality.violations,
+      },
+    });
+    await logAiEvent({
+      userId: user.id,
+      action: "settings_admin_ai_chat",
+      model: result.model,
+      ok: true,
+      tokensApprox:
+        result.usage?.totalTokens && result.usage.totalTokens > 0
+          ? result.usage.totalTokens
+          : result.tokensApprox,
+      entityType: "SYSTEM",
+      entityId: "global",
+      metadata: {
+        promptMessages: parsed.data.messages.length,
+        usedLearningMemory: Boolean(memory),
+        usedAdminKnowledge: Boolean(adminKnowledge),
+        promptTokens: result.usage?.promptTokens ?? 0,
+        completionTokens: result.usage?.completionTokens ?? 0,
+        totalTokens: result.usage?.totalTokens ?? 0,
+        tokensApprox: result.tokensApprox,
+        costUsdApprox: result.costUsdApprox,
+        qualityScore: quality.score,
+        qualityViolations: quality.violations,
       },
     });
 
-    return NextResponse.json({ text });
+    return NextResponse.json({ text, quality });
   } catch (error) {
+    await logAiEvent({
+      userId: user.id,
+      action: "settings_admin_ai_chat",
+      model,
+      ok: false,
+      errorMessage: (error as Error).message,
+      entityType: "SYSTEM",
+      entityId: "global",
+    });
     await recordContinuousLearningEvent({
       userId: user.id,
       action: "settings_admin_ai_chat",

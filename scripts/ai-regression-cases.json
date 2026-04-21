@@ -1,0 +1,37 @@
+[
+  {
+    "id": "summary_good_ua",
+    "text": "Продажі зростають тиждень до тижня, але є прострочені задачі по двох лідах. Сьогодні пріоритет — закрити прострочки та підтвердити наступні контакти. Після цього оновіть прогноз по угодах у стадії узгодження.",
+    "maxSentences": 3,
+    "minScore": 90,
+    "expectPass": true
+  },
+  {
+    "id": "markdown_bad",
+    "text": "# Summary\\n- Deal is blocked\\n- Need call",
+    "maxSentences": 3,
+    "minScore": 70,
+    "expectPass": false
+  },
+  {
+    "id": "wrong_language_bad",
+    "text": "The deal is delayed and needs follow-up with the client tomorrow.",
+    "maxSentences": 3,
+    "minScore": 70,
+    "expectPass": false
+  },
+  {
+    "id": "chat_quality_ua_plain",
+    "text": "По угоді є прострочений платіж і дві відкриті задачі. Спочатку підтвердьте статус оплати з клієнтом, потім закрийте задачі з дедлайном сьогодні. Після цього оновіть етап угоди і зафіксуйте наступний контакт.",
+    "maxSentences": 8,
+    "minScore": 90,
+    "expectPass": true
+  },
+  {
+    "id": "too_short_bad",
+    "text": "Ок.",
+    "maxSentences": 8,
+    "minScore": 70,
+    "expectPass": false
+  }
+]

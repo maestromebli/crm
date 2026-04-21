@@ -1,5 +1,4 @@
 import { prisma } from "@/lib/prisma";
-import { publishCrmEvent, CRM_EVENT_TYPES } from "@/lib/events/crm-events";
 import type { Prisma } from "@prisma/client";
 
 export type AiContextName =
@@ -97,11 +96,9 @@ export async function buildAiContextResult(input: {
       result.insights.push(`Production status: ${order.status}`);
       if (order.riskScore >= 60) {
         result.risks.push("Production flow marked as high risk.");
-        await publishCrmEvent({
-          type: CRM_EVENT_TYPES.PRODUCTION_DELAYED,
-          dealId: input.dealId,
-          payload: { reason: "at_risk_flag" },
-        });
+        result.recommendations.push(
+          "Production flow має високий ризик — перевірте причини затримки та план ескалації.",
+        );
       }
     }
   }

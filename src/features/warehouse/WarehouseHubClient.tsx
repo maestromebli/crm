@@ -332,7 +332,7 @@ export function WarehouseHubClient({ activeSection }: { activeSection: string })
       <div className="mx-auto w-full max-w-6xl flex-1 space-y-4">
         <nav className="text-[11px] text-[var(--enver-muted)]">
           <span className="font-medium text-[var(--enver-text)]">Склад</span>
-          <span className="mx-1.5 text-[var(--enver-border-strong)]">/</span>
+          <span className="mx-1.5 text-[var(--enver-muted)]">/</span>
           <span>{TABS.find((t) => t.id === section)?.label ?? "Огляд"}</span>
         </nav>
 
@@ -352,7 +352,7 @@ export function WarehouseHubClient({ activeSection }: { activeSection: string })
                 type="button"
                 onClick={() => void runSyncReservations()}
                 disabled={syncBusy || loading}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-900 shadow-sm hover:bg-emerald-100 disabled:opacity-60"
+                className="enver-cta enver-cta-sm enver-cta-primary disabled:opacity-60"
               >
                 {syncBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
                 {syncBusy ? "Синхронізація…" : "Синхронізувати резерви"}
@@ -361,7 +361,7 @@ export function WarehouseHubClient({ activeSection }: { activeSection: string })
                 type="button"
                 onClick={() => void load()}
                 disabled={loading || refreshing}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-60"
+                className="enver-cta enver-cta-sm enver-cta-secondary disabled:opacity-60"
               >
                 {refreshing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
                 Оновити
@@ -377,10 +377,10 @@ export function WarehouseHubClient({ activeSection }: { activeSection: string })
                   key={t.id}
                   href={t.href}
                   title={t.description}
-                  className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
+                  className={`enver-cta enver-cta-sm enver-cta-pill ${
                     active
-                      ? "bg-slate-900 text-white shadow-md shadow-slate-900/15"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      ? "enver-cta-primary"
+                      : "enver-cta-secondary"
                   }`}
                 >
                   {t.label}
@@ -638,7 +638,7 @@ export function WarehouseHubClient({ activeSection }: { activeSection: string })
                           type="button"
                           disabled={zoneSaving || !zoneName.trim() || !zoneCode.trim()}
                           onClick={() => void createZone()}
-                          className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white shadow-sm disabled:opacity-50"
+                          className="enver-cta enver-cta-md enver-cta-primary disabled:opacity-50"
                         >
                           {zoneSaving ? "Збереження…" : "Додати зону"}
                         </button>
@@ -665,7 +665,7 @@ export function WarehouseHubClient({ activeSection }: { activeSection: string })
                                   <button
                                     type="button"
                                     onClick={() => void copyBarcode(z.barcode)}
-                                    className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50"
+                                    className="enver-cta enver-cta-xs enver-cta-secondary"
                                   >
                                     <ClipboardCopy className="h-3 w-3" />
                                     {copiedBarcode === z.barcode ? "OK" : "Копіювати"}
@@ -730,10 +730,10 @@ export function WarehouseHubClient({ activeSection }: { activeSection: string })
                           key={id}
                           type="button"
                           onClick={() => setStockFilter(id)}
-                          className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium transition ${
+                          className={`enver-cta enver-cta-xs enver-cta-pill ${
                             stockFilter === id
-                              ? "bg-slate-900 text-white"
-                              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                              ? "enver-cta-primary"
+                              : "enver-cta-secondary"
                           }`}
                         >
                           {label}

@@ -90,7 +90,7 @@ function labelKind(
   const m: Record<AssistantResolvedContext["contextKind"], string> = {
     dashboard: "Дашборд",
     lead: "Лід",
-    deal: "Угода",
+    deal: "Замовлення",
     calculation: "Розрахунок",
     quote: "КП",
     contract: "Договір",

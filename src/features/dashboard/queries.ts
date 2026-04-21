@@ -545,14 +545,14 @@ export async function loadDashboardSnapshot(
           key: "submitted",
           label: "Очікують підтвердження",
           value: submittedHandoffs,
-          hint: `${dealsInHandoffStage} угод на етапі «Передача».`,
+          hint: `${dealsInHandoffStage} замовлень на етапі «Передача».`,
           tone: "neutral",
         },
         {
           key: "production",
           label: "Виробництво",
           value: inProduction,
-          hint: "Відкриті угоди на стадії виробництва.",
+          hint: "Відкриті замовлення на стадії виробництва.",
           tone: "emerald",
         },
       ];

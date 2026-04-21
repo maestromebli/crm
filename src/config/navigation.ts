@@ -108,7 +108,7 @@ export const NAV_SECTIONS: NavSection[] = [
         id: "converted",
         label: "Конвертовані",
         href: "/leads/converted",
-        description: "Ліди з привʼязаною угодою.",
+        description: "Ліди з привʼязаним замовленням.",
       },
       {
         id: "unassigned",
@@ -140,17 +140,17 @@ export const NAV_SECTIONS: NavSection[] = [
   },
   {
     id: "deals",
-    label: "Угоди",
+    label: "Замовлення",
     icon: KanbanSquare,
     href: "/deals",
     permission: P.DEALS_VIEW,
     subItems: [
       {
         id: "all",
-        label: "Усі угоди",
+        label: "Усі замовлення",
         href: "/deals",
         description:
-          "Список угод; кнопка «Робоче місце» — єдине вікно від КП до виробництва.",
+          "Список замовлень; кнопка «Робоче місце» — єдине вікно від КП до виробництва.",
       },
       { id: "pipeline", label: "Дошка воронки", href: "/deals/pipeline" },
       { id: "active", label: "Активні проєкти", href: "/deals/active" },
@@ -292,7 +292,7 @@ export const NAV_SECTIONS: NavSection[] = [
         id: "reservations",
         label: "Резерви",
         href: "/warehouse/reservations",
-        description: "Матеріали зарезервовані під виробництво та угоди.",
+        description: "Матеріали зарезервовані під виробництво та замовлення.",
       },
       {
         id: "zones",
@@ -310,6 +310,12 @@ export const NAV_SECTIONS: NavSection[] = [
     permission: P.PRODUCTION_LAUNCH,
     subItems: [
       { id: "queue", label: "Черга робіт", href: "/crm/production", description: "Штаб виробництва: KPI, черга, цех." },
+      {
+        id: "constructor-workspaces",
+        label: "Воркспейси конструкторів",
+        href: "/crm/production/constructor",
+        description: "Список активних воркспейсів конструкторів після запуску у виробництво.",
+      },
       { id: "workshop", label: "Цеховий Kanban", href: "/crm/production/workshop" },
       {
         id: "mini-cutting",
@@ -337,9 +343,9 @@ export const NAV_SECTIONS: NavSection[] = [
       },
       {
         id: "legacy-line",
-        label: "Угоди на лінії (класичний)",
+        label: "Замовлення на лінії (класичний)",
         href: "/production/in-progress",
-        description: "Таблиця активних угод у виробництві без штабу потоку.",
+        description: "Таблиця активних замовлень у виробництві без штабу потоку.",
       },
       {
         id: "legacy-delays",
@@ -423,7 +429,7 @@ export const NAV_SECTIONS: NavSection[] = [
     permission: P.FILES_VIEW,
     subItems: [
       { id: "all", label: "Усі файли", href: "/files" },
-      { id: "by-deal", label: "За угодою", href: "/files/by-deal" },
+      { id: "by-deal", label: "За замовленням", href: "/files/by-deal" },
       { id: "by-lead", label: "За лідами", href: "/files/by-lead" },
       { id: "by-handoff", label: "За передачею", href: "/files/by-handoff" },
       { id: "missing", label: "Відсутні обовʼязкові", href: "/files/missing" },
@@ -468,13 +474,29 @@ export const NAV_SECTIONS: NavSection[] = [
         href: "/settings/permissions",
         permission: P.ROLES_MANAGE,
       },
+      {
+        id: "access-hierarchy",
+        label: "Ієрархія менеджерів",
+        href: "/settings/access-hierarchy",
+        permission: P.USERS_MANAGE,
+      },
       { id: "pipelines", label: "Воронки та стадії", href: "/settings/pipelines" },
       { id: "custom-fields", label: "Кастомні поля", href: "/settings/custom-fields" },
       { id: "file-categories", label: "Категорії файлів", href: "/settings/file-categories" },
       { id: "checklists", label: "Шаблони чек-листів", href: "/settings/checklists" },
+      { id: "contracts", label: "Договори та шаблони", href: "/settings/contracts" },
       { id: "notifications", label: "Сповіщення", href: "/settings/notifications" },
       { id: "calendar", label: "Календар", href: "/settings/calendar" },
       { id: "inbox", label: "Вхідні / Telegram", href: "/settings/inbox" },
+      { id: "communications", label: "Месенджери та телефонія", href: "/settings/communications" },
+      { id: "my-communications", label: "Мої підключення", href: "/settings/communications/me" },
+      {
+        id: "users-communications",
+        label: "Підключення співробітників",
+        href: "/settings/communications/users",
+        permission: P.USERS_VIEW,
+      },
+      { id: "communications-health", label: "Health каналів", href: "/settings/communications/health" },
       { id: "ai", label: "AI‑налаштування", href: "/settings/ai" },
       {
         id: "ai-admin-chat",
@@ -483,7 +505,15 @@ export const NAV_SECTIONS: NavSection[] = [
         permission: P.AI_ANALYTICS,
       },
       { id: "branding", label: "Брендинг / UI", href: "/settings/branding" },
-      { id: "integrations", label: "Інтеграції", href: "/settings/integrations" },
+      { id: "materials", label: "База матеріалів", href: "/settings/materials" },
+      { id: "suppliers", label: "Постачальники", href: "/settings/suppliers" },
+      {
+        id: "integrations",
+        label: "Інтеграції",
+        href: "/settings/integrations",
+        permission: P.ROLES_MANAGE,
+      },
+      { id: "meta-target", label: "Instagram / Meta таргет", href: "/settings/integrations/meta-target" },
     ],
   },
 ];

@@ -48,6 +48,12 @@ export function AppHeader({
   sidebarCompact = false,
   onToggleSidebar,
 }: AppHeaderProps = {}) {
+  const resolveInitialTheme = (): ThemeMode => {
+    if (typeof document === "undefined") return "light";
+    const htmlTheme = document.documentElement.getAttribute("data-theme");
+    return htmlTheme === "dark" || htmlTheme === "light" ? htmlTheme : "light";
+  };
+
   const reduceMotion = useReducedMotion();
   const [animationsReady, setAnimationsReady] = useState(false);
   const pathname = usePathname();
@@ -56,8 +62,9 @@ export function AppHeader({
   const [mobileNavMounted, setMobileNavMounted] = useState(false);
   const [alertsUnread, setAlertsUnread] = useState(0);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
-  const [theme, setTheme] = useState<ThemeMode>("light");
-  const [themeReady, setThemeReady] = useState(false);
+  const [theme, setTheme] = useState<ThemeMode>(() => {
+    return resolveInitialTheme();
+  });
   const shouldAnimate = animationsReady && !reduceMotion;
   const canViewAlerts = Boolean(
     session?.user?.permissionKeys?.includes("NOTIFICATIONS_VIEW"),
@@ -71,10 +78,6 @@ export function AppHeader({
     const root = document.documentElement;
     root.setAttribute("data-theme", value);
     root.style.colorScheme = value;
-  };
-
-  const applyThemeMode = (mode: ThemeMode) => {
-    applyTheme(mode);
   };
 
   useEffect(() => {
@@ -119,23 +122,12 @@ export function AppHeader({
   }, []);
 
   useEffect(() => {
-    const saved = window.localStorage.getItem(THEME_STORAGE_KEY);
-    const resolved: ThemeMode =
-      saved === "light" || saved === "dark"
-        ? saved
-        : "light";
-    setTheme(resolved);
-    applyThemeMode(resolved);
-    setThemeReady(true);
-  }, []);
+    applyTheme(theme);
+    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+  }, [theme]);
 
   const toggleTheme = () => {
-    setTheme((prev) => {
-      const next: ThemeMode = prev === "dark" ? "light" : "dark";
-      applyThemeMode(next);
-      window.localStorage.setItem(THEME_STORAGE_KEY, next);
-      return next;
-    });
+    setTheme((prev) => (prev === "dark" ? "light" : "dark"));
   };
 
   return (
@@ -267,40 +259,38 @@ export function AppHeader({
         ) : null}
 
         <div className="flex shrink-0 items-center gap-1.5 md:gap-2">
-          {themeReady ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={toggleTheme}
-                  aria-label={
-                    theme === "dark"
-                      ? "Увімкнути світлу тему"
-                      : "Увімкнути темну тему"
-                  }
-                  title={
-                    theme === "dark"
-                      ? "Увімкнути світлу тему"
-                      : "Увімкнути темну тему"
-                  }
-                >
-                  {theme === "dark" ? (
-                    <Sun className="h-4 w-4" />
-                  ) : (
-                    <Moon className="h-4 w-4" />
-                  )}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                {theme === "dark"
-                  ? "Наступна: світла тема"
-                  : "Наступна: темна тема"}
-              </TooltipContent>
-            </Tooltip>
-          ) : null}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={toggleTheme}
+                aria-label={
+                  theme === "dark"
+                    ? "Увімкнути світлу тему"
+                    : "Увімкнути темну тему"
+                }
+                title={
+                  theme === "dark"
+                    ? "Увімкнути світлу тему"
+                    : "Увімкнути темну тему"
+                }
+              >
+                {theme === "dark" ? (
+                  <Sun className="h-4 w-4" />
+                ) : (
+                  <Moon className="h-4 w-4" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              {theme === "dark"
+                ? "Наступна: світла тема"
+                : "Наступна: темна тема"}
+            </TooltipContent>
+          </Tooltip>
 
           <Tooltip>
             <TooltipTrigger asChild>
@@ -398,7 +388,7 @@ function getTitleFromPath(pathname: string | null): string {
       production: "Виробництво",
       erp: "Командний центр ERP",
       automation: "Автоматизація",
-      deal: "Угода",
+      deal: "Замовлення",
       external: "Зовнішній доступ",
     };
     const hub = segments[1] ?? "";
@@ -414,7 +404,7 @@ function getTitleFromPath(pathname: string | null): string {
     dashboard: "Дашборд",
     leads: "Ліди",
     contacts: "Контакти",
-    deals: "Угоди",
+    deals: "Замовлення",
     calendar: "Календар",
     inbox: "Вхідні",
     production: "Виробництво",

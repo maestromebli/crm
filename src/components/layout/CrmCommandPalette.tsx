@@ -50,7 +50,7 @@ const SYNONYMS_BY_SECTION: Record<string, string[]> = {
   dashboard: ["огляд", "контроль", "kpi"],
   leads: ["ліди", "продажі", "воронка", "клієнти"],
   contacts: ["контакти", "клієнти", "база"],
-  deals: ["угоди", "проєкти", "контракти"],
+  deals: ["замовлення", "проєкти", "контракти"],
   calendar: ["календар", "зустрічі", "монтажі"],
   inbox: ["вхідні", "повідомлення", "telegram", "чат"],
   finance: ["фінанси", "оплати", "каса", "платежі", "cashflow"],
@@ -86,9 +86,9 @@ const ACTION_COMMANDS: Array<{
   },
   {
     id: "action:risky-deals",
-    label: "Команда · Ризикові угоди",
+    label: "Команда · Ризикові замовлення",
     href: "/crm/dashboard?view=issues",
-    searchable: "ризики угоди problems issues",
+    searchable: "ризики замовлення problems issues",
     requiredSectionId: "dashboard",
   },
   {
@@ -707,7 +707,7 @@ type PaletteResultsProps = {
 const QUICK_FILTER_CHIPS: Array<{ label: string; q: string }> = [
   { label: "Ліди", q: "лід" },
   { label: "Фінанси", q: "фінанс" },
-  { label: "Угоди", q: "угод" },
+  { label: "Замовлення", q: "замов" },
   { label: "Задачі", q: "задач" },
   { label: "Виробництво", q: "вироб" },
   { label: "Звіти", q: "звіт" },

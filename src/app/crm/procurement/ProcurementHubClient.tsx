@@ -7,7 +7,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { useErpBridge } from "@/components/erp/ErpBridgeProvider";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ProcurementOrderedMonitorTable } from "@/features/procurement/components/ProcurementOrderedMonitorTable";
-import { postJson } from "@/lib/api/patch-json";
+import { patchJson, postJson } from "@/lib/api/patch-json";
 import {
   readHubSegment,
   writeHubSegment,
@@ -115,9 +115,6 @@ type PurchaseRequest = {
 type SupplierOnboarding = {
   name: string;
   category: string;
-  leadTimeDays: number;
-  rating: number;
-  paymentTerms: string;
 };
 
 const EMPTY_REQUEST: PurchaseRequest = {
@@ -132,12 +129,15 @@ const EMPTY_REQUEST: PurchaseRequest = {
 const EMPTY_SUPPLIER: SupplierOnboarding = {
   name: "",
   category: "Фурнітура",
-  leadTimeDays: 5,
-  rating: 4,
-  paymentTerms: "14 днів",
 };
 
-const DEFAULT_RISK = { systemicWarn: 55, supplierRiskWarn: 65, slaWarnBelow: 75 };
+const DEFAULT_RISK = {
+  systemicWarn: 55,
+  supplierRiskWarn: 65,
+  slaWarnBelow: 75,
+  criticalDueSoonWarn: 3,
+  priceVarianceWarnPct: 8,
+};
 
 const PRIO_RANK: Record<string, number> = {
   CRITICAL: 0,
@@ -145,6 +145,7 @@ const PRIO_RANK: Record<string, number> = {
   MEDIUM: 2,
   LOW: 3,
 };
+type PriorityCode = keyof typeof PRIO_RANK;
 
 function sortProcurementRequests(
   rows: NonNullable<Dash["procurementRequests"]>,
@@ -176,6 +177,40 @@ function dueHint(iso: string | null, nowMs: number): { label: string; overdue: b
   return { label: iso.slice(0, 10), overdue: false, soon: false };
 }
 
+function dueDays(iso: string | null, nowMs: number): number | null {
+  if (!iso) return null;
+  const end = new Date(iso).getTime();
+  if (Number.isNaN(end)) return null;
+  return Math.ceil((end - nowMs) / (24 * 60 * 60 * 1000));
+}
+
+function suggestPriorityBySignals(input: {
+  dueInDays: number | null;
+  priceVariancePct: number;
+  currentPriority: string | null;
+}): { priority: PriorityCode; reason: string } {
+  const current = (input.currentPriority ?? "").toUpperCase();
+  if (input.dueInDays !== null && input.dueInDays < 0) {
+    return { priority: "CRITICAL", reason: "дедлайн прострочено" };
+  }
+  if (input.dueInDays !== null && input.dueInDays <= 1) {
+    return { priority: "CRITICAL", reason: "дедлайн сьогодні/завтра" };
+  }
+  if (input.priceVariancePct >= 15) {
+    return { priority: "CRITICAL", reason: "цінове відхилення >= 15%" };
+  }
+  if (input.dueInDays !== null && input.dueInDays <= 3) {
+    return { priority: "HIGH", reason: "ризик зсуву виробництва (<= 3 дні)" };
+  }
+  if (input.priceVariancePct >= 8) {
+    return { priority: "HIGH", reason: "цінове відхилення >= 8%" };
+  }
+  if (current === "CRITICAL" || current === "HIGH" || current === "MEDIUM" || current === "LOW") {
+    return { priority: current as PriorityCode, reason: "поточний пріоритет збережено" };
+  }
+  return { priority: "MEDIUM", reason: "стандартна черга закупівлі" };
+}
+
 function readRiskConfigFromStorage() {
   if (typeof window === "undefined") return DEFAULT_RISK;
   try {
@@ -192,6 +227,8 @@ type ProcurementHubClientProps = {
   initialOpenNewRequest?: boolean;
   initialDealId?: string;
 };
+
+type ProcurementHubTab = "overview" | "operations" | "suppliers";
 
 export function ProcurementHubClient({
   initialOpenNewRequest = false,
@@ -210,16 +247,18 @@ export function ProcurementHubClient({
   const [supplierSaving, setSupplierSaving] = useState(false);
   const [dbRequestSaving, setDbRequestSaving] = useState(false);
   const [showAllBridge, setShowAllBridge] = useState(false);
+  const [applyingPriorityRequestId, setApplyingPriorityRequestId] = useState<string | null>(null);
   const [opsFeed, setOpsFeed] = useState<string[]>([]);
   const [riskConfig, setRiskConfig] = useState(DEFAULT_RISK);
   const skipFirstRiskPersist = useRef(true);
   const firedAlertsRef = useRef<Set<string>>(new Set());
   const [nowLabel, setNowLabel] = useState("—");
   const [lineMonitorFilter, setLineMonitorFilter] = useState<HubSegment>("all");
+  const [activeTab, setActiveTab] = useState<ProcurementHubTab>("overview");
   const [hubMonitorSegmentReady, setHubMonitorSegmentReady] = useState(false);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const [pollMs, setPollMs] = useState(0);
-  const [clock, setClock] = useState(0);
+  const [clock, setClock] = useState(() => Date.now());
   const requestFormRef = useRef<HTMLFormElement | null>(null);
   const quickActionAppliedRef = useRef(false);
   const {
@@ -312,8 +351,9 @@ export function ProcurementHubClient({
     }
 
     if (shouldOpenNewRequest) {
+      setActiveTab("overview");
       setOpsFeed((prev) => [
-        `Швидка дія → форма нової заявки готова${linkedDealId ? ` (угода ${linkedDealId})` : ""}`,
+        `Швидка дія → форма нової заявки готова${linkedDealId ? ` (замовлення ${linkedDealId})` : ""}`,
         ...prev,
       ]);
       window.requestAnimationFrame(() => {
@@ -332,11 +372,17 @@ export function ProcurementHubClient({
   }, [initialDealId, initialOpenNewRequest, pathname, router, searchParams]);
 
   useEffect(() => {
+    if (window.location.hash === "#supplier-onboarding" || window.location.hash === "#new-request") {
+      setActiveTab("overview");
+    }
+  }, []);
+
+  useEffect(() => {
     if (!dealId || deals.length === 0) return;
     if (deals.some((d) => d.id === dealId)) return;
     setDealId("");
     setOpsFeed((prev) => [
-      `Швидка дія → угоду ${dealId} не знайдено, оберіть вручну`,
+      `Швидка дія → замовлення ${dealId} не знайдено, оберіть вручну`,
       ...prev,
     ]);
   }, [dealId, deals]);
@@ -349,7 +395,7 @@ export function ProcurementHubClient({
   }, []);
 
   useEffect(() => {
-    const id = window.setInterval(() => setClock((c) => c + 1), 30_000);
+    const id = window.setInterval(() => setClock(Date.now()), 30_000);
     return () => window.clearInterval(id);
   }, []);
 
@@ -422,6 +468,68 @@ export function ProcurementHubClient({
   }, [data?.procurementRequests]);
 
   const nowMsForDueHints = clock;
+  const criticalDueSoonCount = useMemo(() => {
+    if (!sortedCrmRequests.length) return 0;
+    return sortedCrmRequests.filter((r) => {
+      if (!r.neededByDate) return false;
+      if (r.status === "RECEIVED" || r.status === "CLOSED" || r.status === "CANCELLED") return false;
+      const d = dueHint(r.neededByDate, nowMsForDueHints);
+      return d.overdue || d.soon;
+    }).length;
+  }, [nowMsForDueHints, sortedCrmRequests]);
+  const maxPriceVariancePct = useMemo(() => {
+    const deviations = data?.dashboard?.priceDeviations ?? [];
+    if (!deviations.length) return 0;
+    return deviations.reduce((max, row) => {
+      if (row.planned <= 0) return max;
+      const pct = Math.abs((row.variance / row.planned) * 100);
+      return Math.max(max, pct);
+    }, 0);
+  }, [data?.dashboard?.priceDeviations]);
+  const priceVarianceByRequestPct = useMemo(() => {
+    const map = new Map<string, number>();
+    const deviations = data?.dashboard?.priceDeviations ?? [];
+    for (const row of deviations) {
+      if (row.planned <= 0) continue;
+      const pct = Math.abs((row.variance / row.planned) * 100);
+      map.set(row.requestId, Math.max(map.get(row.requestId) ?? 0, pct));
+    }
+    return map;
+  }, [data?.dashboard?.priceDeviations]);
+  const prioritizedRequests = useMemo(() => {
+    return sortedCrmRequests.map((r) => {
+      const dueInDays = dueDays(r.neededByDate ?? null, nowMsForDueHints);
+      const priceVariancePct = priceVarianceByRequestPct.get(r.id) ?? 0;
+      const suggested = suggestPriorityBySignals({
+        dueInDays,
+        priceVariancePct,
+        currentPriority: r.priority,
+      });
+      return {
+        ...r,
+        dueInDays,
+        priceVariancePct,
+        suggestedPriority: suggested.priority,
+        suggestedReason: suggested.reason,
+      };
+    });
+  }, [nowMsForDueHints, priceVarianceByRequestPct, sortedCrmRequests]);
+  const redLineBlockers = useMemo(() => {
+    const rows = data?.dashboard?.orderedLineMonitor ?? [];
+    return rows
+      .filter((row) => {
+        const hasOpenGap = row.qtyRemaining > 0;
+        if (!hasOpenGap) return false;
+        return row.deadlineStatus === "overdue" || row.deadlineStatus === "soon" || row.financeFlag === "overrun";
+      })
+      .sort((a, b) => {
+        const rank = (v: "overdue" | "soon" | "ok" | "none") => (v === "overdue" ? 0 : v === "soon" ? 1 : 2);
+        const byDeadline = rank(a.deadlineStatus) - rank(b.deadlineStatus);
+        if (byDeadline !== 0) return byDeadline;
+        return b.valueRemainingPlanned - a.valueRemainingPlanned;
+      })
+      .slice(0, 12);
+  }, [data?.dashboard?.orderedLineMonitor]);
 
   useEffect(() => {
     if (!data) return;
@@ -444,6 +552,24 @@ export function ProcurementHubClient({
         message: `SLA постачальника ${supplierRiskTop.supplierName} впав до ${supplierRiskTop.slaPct}%.`,
       });
     }
+    if (criticalDueSoonCount >= riskConfig.criticalDueSoonWarn) {
+      alerts.push({
+        key: `proc-critical-due-${criticalDueSoonCount}-${riskConfig.criticalDueSoonWarn}`,
+        message: `Критичних заявок за строками: ${criticalDueSoonCount} (поріг ${riskConfig.criticalDueSoonWarn}).`,
+      });
+    }
+    if (maxPriceVariancePct >= riskConfig.priceVarianceWarnPct) {
+      alerts.push({
+        key: `proc-price-var-${Math.round(maxPriceVariancePct)}-${riskConfig.priceVarianceWarnPct}`,
+        message: `Максимальне відхилення ціни ${maxPriceVariancePct.toFixed(1)}% перевищило поріг ${riskConfig.priceVarianceWarnPct}%.`,
+      });
+    }
+    if (redLineBlockers.length > 0) {
+      alerts.push({
+        key: `proc-blockers-${redLineBlockers.length}`,
+        message: `У червоному списку ${redLineBlockers.length} блокаторів виробництва.`,
+      });
+    }
     for (const alert of alerts) {
       if (firedAlertsRef.current.has(alert.key)) continue;
       firedAlertsRef.current.add(alert.key);
@@ -456,15 +582,16 @@ export function ProcurementHubClient({
       });
       setOpsFeed((prev) => [`СПОВІЩЕННЯ → ${alert.message}`, ...prev].slice(0, 80));
     }
-  }, [addEvent, data, riskConfig, supplierRiskTop]);
+  }, [addEvent, criticalDueSoonCount, data, maxPriceVariancePct, redLineBlockers.length, riskConfig, supplierRiskTop]);
 
   async function createPurchaseRequest() {
     if (!requestForm.productionOrder.trim() || !requestForm.materialCode.trim()) return;
-    if (dealId.trim()) {
+    const normalizedDealId = dealId.trim();
+    if (normalizedDealId) {
       setDbRequestSaving(true);
       try {
         await postJson<{ ok?: boolean }>("/api/crm/procurement/requests", {
-          dealId: dealId.trim(),
+          dealId: normalizedDealId,
           lines: [
             {
               name: requestForm.materialCode.trim(),
@@ -477,7 +604,7 @@ export function ProcurementHubClient({
           comment: requestForm.comment || null,
         });
         setOpsFeed((prev) => [
-          `CRM → заявка збережена для угоди, матеріал ${requestForm.materialCode}`,
+          `CRM → заявка збережена для замовлення, матеріал ${requestForm.materialCode}`,
           ...prev,
         ]);
         void load(q);
@@ -486,6 +613,7 @@ export function ProcurementHubClient({
           `ПОМИЛКА CRM → ${e instanceof Error ? e.message : "невідомо"}`,
           ...prev,
         ]);
+        return;
       } finally {
         setDbRequestSaving(false);
       }
@@ -527,7 +655,7 @@ export function ProcurementHubClient({
         module: "procurement",
         type: "SUPPLIER_ONBOARDING",
         message: `Постачальник ${name} додано в CRM`,
-        payload: { leadTime: supplierForm.leadTimeDays, rating: supplierForm.rating },
+        payload: { category },
       });
       setOpsFeed((prev) => [`CRM → ${name} / ${category} збережено в довіднику`, ...prev]);
       setSupplierForm(EMPTY_SUPPLIER);
@@ -539,6 +667,29 @@ export function ProcurementHubClient({
       ]);
     } finally {
       setSupplierSaving(false);
+    }
+  }
+
+  async function applySuggestedPriority(requestId: string, priority: PriorityCode) {
+    if (!requestId) return;
+    setApplyingPriorityRequestId(requestId);
+    try {
+      const response = await patchJson<{ request?: { id: string; priority: string } }>(
+        `/api/crm/procurement/requests/${requestId}/priority`,
+        { priority },
+      );
+      setOpsFeed((prev) => [
+        `MTO-priority → ${requestId.slice(0, 8)}… встановлено ${response.request?.priority ?? priority}`,
+        ...prev,
+      ]);
+      await load(q);
+    } catch (error) {
+      setOpsFeed((prev) => [
+        `ПОМИЛКА MTO-priority → ${error instanceof Error ? error.message : "невідомо"}`,
+        ...prev,
+      ]);
+    } finally {
+      setApplyingPriorityRequestId(null);
     }
   }
 
@@ -629,6 +780,20 @@ export function ProcurementHubClient({
           />
           <MetricCard label="Постачальників у радарі" value={`${data?.enterprise.supplierRiskRadar.length ?? 0}`} dark />
         </div>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <MetricCard
+            label="Критичні дедлайни (<=3 дні)"
+            value={`${criticalDueSoonCount}`}
+            tone={criticalDueSoonCount > 0 ? "warn" : "ok"}
+            dark
+          />
+          <MetricCard
+            label="Макс відхилення ціни"
+            value={`${maxPriceVariancePct.toFixed(1)}%`}
+            tone={maxPriceVariancePct >= riskConfig.priceVarianceWarnPct ? "warn" : "ok"}
+            dark
+          />
+        </div>
         <div className="mt-3 grid gap-2 text-xs text-slate-300 sm:grid-cols-3">
           <p className="rounded-lg border border-slate-700 bg-slate-900/60 px-2 py-1">
             ERP замовлення з виробництва: {productionOrders.length}
@@ -644,52 +809,108 @@ export function ProcurementHubClient({
         <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">{err}</div>
       ) : null}
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <h2 className="text-sm font-semibold text-slate-900">Пороги сповіщень (зберігаються в браузері)</h2>
-        <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-          <label className="text-xs text-slate-600">
-            Системний ризик, від
-            <input
-              type="number"
-              min={0}
-              max={100}
-              className="mt-1 w-full rounded border border-slate-300 px-2 py-1"
-              value={riskConfig.systemicWarn}
-              onChange={(event) =>
-                setRiskConfig((prev) => ({ ...prev, systemicWarn: Number(event.target.value || 0) }))
-              }
-            />
-          </label>
-          <label className="text-xs text-slate-600">
-            Ризик постачальника, від
-            <input
-              type="number"
-              min={0}
-              max={100}
-              className="mt-1 w-full rounded border border-slate-300 px-2 py-1"
-              value={riskConfig.supplierRiskWarn}
-              onChange={(event) =>
-                setRiskConfig((prev) => ({ ...prev, supplierRiskWarn: Number(event.target.value || 0) }))
-              }
-            />
-          </label>
-          <label className="text-xs text-slate-600">
-            SLA нижче, %
-            <input
-              type="number"
-              min={0}
-              max={100}
-              className="mt-1 w-full rounded border border-slate-300 px-2 py-1"
-              value={riskConfig.slaWarnBelow}
-              onChange={(event) =>
-                setRiskConfig((prev) => ({ ...prev, slaWarnBelow: Number(event.target.value || 0) }))
-              }
-            />
-          </label>
+      <section className="rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+        <div className="flex flex-wrap gap-2">
+          {(
+            [
+              ["overview", "Огляд закупівель"],
+              ["operations", "Операційний журнал"],
+              ["suppliers", "Склад і постачальники"],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setActiveTab(id)}
+              className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition ${
+                activeTab === id
+                  ? "bg-slate-900 text-white shadow-sm"
+                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[1.35fr_1fr]">
+      {activeTab === "overview" ? (
+        <>
+          <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <h2 className="text-sm font-semibold text-slate-900">Пороги сповіщень (зберігаються в браузері)</h2>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+              <label className="text-xs text-slate-600">
+                Системний ризик, від
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  className="mt-1 w-full rounded border border-slate-300 px-2 py-1"
+                  value={riskConfig.systemicWarn}
+                  onChange={(event) =>
+                    setRiskConfig((prev) => ({ ...prev, systemicWarn: Number(event.target.value || 0) }))
+                  }
+                />
+              </label>
+              <label className="text-xs text-slate-600">
+                Ризик постачальника, від
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  className="mt-1 w-full rounded border border-slate-300 px-2 py-1"
+                  value={riskConfig.supplierRiskWarn}
+                  onChange={(event) =>
+                    setRiskConfig((prev) => ({ ...prev, supplierRiskWarn: Number(event.target.value || 0) }))
+                  }
+                />
+              </label>
+              <label className="text-xs text-slate-600">
+                SLA нижче, %
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  className="mt-1 w-full rounded border border-slate-300 px-2 py-1"
+                  value={riskConfig.slaWarnBelow}
+                  onChange={(event) =>
+                    setRiskConfig((prev) => ({ ...prev, slaWarnBelow: Number(event.target.value || 0) }))
+                  }
+                />
+              </label>
+              <label className="text-xs text-slate-600">
+                Критичних строків, від
+                <input
+                  type="number"
+                  min={1}
+                  max={99}
+                  className="mt-1 w-full rounded border border-slate-300 px-2 py-1"
+                  value={riskConfig.criticalDueSoonWarn}
+                  onChange={(event) =>
+                    setRiskConfig((prev) => ({ ...prev, criticalDueSoonWarn: Math.max(1, Number(event.target.value || 1)) }))
+                  }
+                />
+              </label>
+              <label className="text-xs text-slate-600">
+                Відхилення ціни, %
+                <input
+                  type="number"
+                  min={1}
+                  max={100}
+                  className="mt-1 w-full rounded border border-slate-300 px-2 py-1"
+                  value={riskConfig.priceVarianceWarnPct}
+                  onChange={(event) =>
+                    setRiskConfig((prev) => ({
+                      ...prev,
+                      priceVarianceWarnPct: Math.max(1, Number(event.target.value || 1)),
+                    }))
+                  }
+                />
+              </label>
+            </div>
+          </section>
+
+          <section className="grid gap-4 xl:grid-cols-[1.35fr_1fr]">
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex flex-wrap items-center gap-2">
             <input
@@ -819,7 +1040,7 @@ export function ProcurementHubClient({
                           {d.label}
                         </span>
                       </div>
-                      <p className="mt-0.5 font-medium text-slate-800">{r.dealTitle ?? "Угода"}</p>
+                      <p className="mt-0.5 font-medium text-slate-800">{r.dealTitle ?? "Замовлення"}</p>
                       <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-slate-500">
                         <span>{r.status}</span>
                         {r.priority ? <span>· пріоритет {r.priority}</span> : null}
@@ -829,13 +1050,105 @@ export function ProcurementHubClient({
                             className="text-sky-700 underline-offset-2 hover:underline"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            відкрити угоду
+                            відкрити замовлення
                           </Link>
                         ) : null}
                       </div>
                     </li>
                   );
                 })}
+              </ul>
+            </div>
+          ) : null}
+          {prioritizedRequests.length > 0 ? (
+            <div className="mt-4">
+              <h3 className="text-sm font-semibold text-slate-900">Автопріоритезація MTO (SLA + ціна)</h3>
+              <div className="mt-2 max-h-56 overflow-auto rounded-lg border border-slate-100">
+                <table className="w-full text-left text-xs">
+                  <thead className="sticky top-0 bg-slate-50 text-slate-500">
+                    <tr>
+                      <th className="px-2 py-1.5">Заявка</th>
+                      <th className="px-2 py-1.5">Поточний</th>
+                      <th className="px-2 py-1.5">Рекоменд.</th>
+                      <th className="px-2 py-1.5">Δ ціни</th>
+                      <th className="px-2 py-1.5">Причина</th>
+                      <th className="px-2 py-1.5">Дія</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {prioritizedRequests.slice(0, 14).map((row) => {
+                      const currentPriority = (row.priority ?? "").toUpperCase();
+                      const canApply = currentPriority !== row.suggestedPriority;
+                      const isApplying = applyingPriorityRequestId === row.id;
+                      return (
+                      <tr key={`prio-${row.id}`} className="border-t border-slate-50">
+                        <td className="px-2 py-1.5 font-mono text-[11px] text-slate-600">{row.id.slice(0, 8)}…</td>
+                        <td className="px-2 py-1.5">{row.priority ?? "—"}</td>
+                        <td className="px-2 py-1.5">
+                          <span
+                            className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+                              row.suggestedPriority === "CRITICAL"
+                                ? "bg-rose-100 text-rose-900"
+                                : row.suggestedPriority === "HIGH"
+                                  ? "bg-amber-100 text-amber-900"
+                                  : row.suggestedPriority === "LOW"
+                                    ? "bg-emerald-100 text-emerald-900"
+                                    : "bg-slate-100 text-slate-700"
+                            }`}
+                          >
+                            {row.suggestedPriority}
+                          </span>
+                        </td>
+                        <td className="px-2 py-1.5 tabular-nums">{row.priceVariancePct.toFixed(1)}%</td>
+                        <td className="px-2 py-1.5 text-slate-600">{row.suggestedReason}</td>
+                        <td className="px-2 py-1.5">
+                          {canApply ? (
+                            <button
+                              type="button"
+                              disabled={isApplying}
+                              onClick={() => void applySuggestedPriority(row.id, row.suggestedPriority)}
+                              className="rounded border border-slate-300 bg-white px-2 py-0.5 text-[10px] font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-60"
+                            >
+                              {isApplying ? "Застосування…" : "Застосувати"}
+                            </button>
+                          ) : (
+                            <span className="text-[10px] text-slate-400">Актуально</span>
+                          )}
+                        </td>
+                      </tr>
+                    )})}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : null}
+
+          {redLineBlockers.length > 0 ? (
+            <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50/70 p-3">
+              <h3 className="text-sm font-semibold text-rose-900">Червоний список блокаторів виробництва</h3>
+              <p className="mt-1 text-[11px] text-rose-800">
+                Позиції з відкритим дефіцитом, що ризикують зірвати виготовлення замовних меблів.
+              </p>
+              <ul className="mt-2 space-y-1.5 text-xs">
+                {redLineBlockers.map((row) => (
+                  <li key={`block-${row.rowKey}`} className="rounded-lg border border-rose-200/80 bg-white/80 px-2 py-1.5">
+                    <div className="flex flex-wrap items-center justify-between gap-1">
+                      <span className="font-medium text-slate-800">{row.itemName}</span>
+                      <span className="font-mono text-[11px] text-slate-500">{row.requestId.slice(0, 8)}…</span>
+                    </div>
+                    <p className="mt-0.5 text-[11px] text-slate-600">
+                      {row.dealTitle} · залишок {row.qtyRemaining} од. · {row.valueRemainingPlanned.toLocaleString("uk-UA")} ₴
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-rose-900">
+                      {row.deadlineStatus === "overdue"
+                        ? "Прострочено"
+                        : row.deadlineStatus === "soon"
+                          ? "Дедлайн наближається"
+                          : "Фінансовий ризик"}{" "}
+                      · {row.financeFlag === "overrun" ? "перевищення бюджету" : "контроль"}
+                    </p>
+                  </li>
+                ))}
               </ul>
             </div>
           ) : null}
@@ -848,7 +1161,7 @@ export function ProcurementHubClient({
                   <thead className="sticky top-0 bg-slate-50 text-slate-500">
                     <tr>
                       <th className="px-2 py-1.5">Позиція</th>
-                      <th className="px-2 py-1.5">Угода</th>
+                      <th className="px-2 py-1.5">Замовлення</th>
                       <th className="px-2 py-1.5">Δ</th>
                     </tr>
                   </thead>
@@ -925,7 +1238,7 @@ export function ProcurementHubClient({
             }}
           >
             <p className="text-xs font-semibold text-slate-700">Нова заявка від виробництва</p>
-            <label className="text-[11px] text-slate-600">Угода в CRM (опційно — збере заявку в БД)</label>
+            <label className="text-[11px] text-slate-600">Замовлення в CRM (опційно — збере заявку в БД)</label>
             <select
               className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
               value={dealId}
@@ -1026,35 +1339,6 @@ export function ProcurementHubClient({
               value={supplierForm.category}
               onChange={(event) => setSupplierForm((prev) => ({ ...prev, category: event.target.value }))}
             />
-            <div className="grid grid-cols-2 gap-2">
-              <input
-                type="number"
-                min={1}
-                max={60}
-                className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
-                value={supplierForm.leadTimeDays}
-                onChange={(event) =>
-                  setSupplierForm((prev) => ({ ...prev, leadTimeDays: Number(event.target.value || 1) }))
-                }
-              />
-              <input
-                type="number"
-                min={1}
-                max={5}
-                step={0.1}
-                className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
-                value={supplierForm.rating}
-                onChange={(event) =>
-                  setSupplierForm((prev) => ({ ...prev, rating: Number(event.target.value || 1) }))
-                }
-              />
-            </div>
-            <input
-              className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
-              placeholder="Умови оплати"
-              value={supplierForm.paymentTerms}
-              onChange={(event) => setSupplierForm((prev) => ({ ...prev, paymentTerms: event.target.value }))}
-            />
             <button
               type="submit"
               disabled={supplierSaving}
@@ -1064,9 +1348,13 @@ export function ProcurementHubClient({
             </button>
           </form>
         </div>
-      </section>
+          </section>
+        </>
+      ) : null}
 
-      <section className="grid gap-4 xl:grid-cols-2">
+      {activeTab === "suppliers" ? (
+        <>
+          <section className="grid gap-4 xl:grid-cols-2">
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <h2 className="text-sm font-semibold text-slate-900">Склад і покриття запасів</h2>
           <div className="mt-3 overflow-x-auto">
@@ -1116,50 +1404,53 @@ export function ProcurementHubClient({
             ))}
           </ul>
         </div>
-      </section>
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <h2 className="text-sm font-semibold text-slate-900">Радар ризиків постачальників</h2>
-        <div className="mt-3 overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-slate-100 text-xs text-slate-500">
-                <th className="py-2 pr-2">Постачальник</th>
-                <th className="py-2 pr-2">SLA</th>
-                <th className="py-2 pr-2">Оплати вчасно</th>
-                <th className="py-2 pr-2">Затримані PO</th>
-                <th className="py-2 pr-2">Витрати</th>
-                <th className="py-2">Ризик</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data?.enterprise.supplierRiskRadar.map((row) => (
-                <tr key={row.supplierId} className="border-b border-slate-50">
-                  <td className="py-2 pr-2 font-medium text-slate-900">{row.supplierName}</td>
-                  <td className="py-2 pr-2">{row.slaPct}%</td>
-                  <td className="py-2 pr-2">{row.paymentDisciplinePct}%</td>
-                  <td className="py-2 pr-2">{row.delayedOrders}</td>
-                  <td className="py-2 pr-2">{formatMoney(row.spend)} ₴</td>
-                  <td className="py-2">
-                    <span
-                      className={`rounded px-2 py-0.5 text-[11px] font-semibold ${
-                        row.riskScore >= 70
-                          ? "bg-rose-100 text-rose-800"
-                          : row.riskScore >= 45
-                            ? "bg-amber-100 text-amber-800"
-                            : "bg-emerald-100 text-emerald-800"
-                      }`}
-                    >
-                      {row.riskScore}/100 · {row.riskLabel}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
+          </section>
+          <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <h2 className="text-sm font-semibold text-slate-900">Радар ризиків постачальників</h2>
+            <div className="mt-3 overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-slate-100 text-xs text-slate-500">
+                    <th className="py-2 pr-2">Постачальник</th>
+                    <th className="py-2 pr-2">SLA</th>
+                    <th className="py-2 pr-2">Оплати вчасно</th>
+                    <th className="py-2 pr-2">Затримані PO</th>
+                    <th className="py-2 pr-2">Витрати</th>
+                    <th className="py-2">Ризик</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data?.enterprise.supplierRiskRadar.map((row) => (
+                    <tr key={row.supplierId} className="border-b border-slate-50">
+                      <td className="py-2 pr-2 font-medium text-slate-900">{row.supplierName}</td>
+                      <td className="py-2 pr-2">{row.slaPct}%</td>
+                      <td className="py-2 pr-2">{row.paymentDisciplinePct}%</td>
+                      <td className="py-2 pr-2">{row.delayedOrders}</td>
+                      <td className="py-2 pr-2">{formatMoney(row.spend)} ₴</td>
+                      <td className="py-2">
+                        <span
+                          className={`rounded px-2 py-0.5 text-[11px] font-semibold ${
+                            row.riskScore >= 70
+                              ? "bg-rose-100 text-rose-800"
+                              : row.riskScore >= 45
+                                ? "bg-amber-100 text-amber-800"
+                                : "bg-emerald-100 text-emerald-800"
+                          }`}
+                        >
+                          {row.riskScore}/100 · {row.riskLabel}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </>
+      ) : null}
 
-      <section className="grid gap-4 xl:grid-cols-[1.2fr_1fr]">
+      {activeTab === "operations" ? (
+        <section className="grid gap-4 xl:grid-cols-[1.2fr_1fr]">
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <h2 className="text-sm font-semibold text-slate-900">Операційний лог контуру</h2>
           <ul className="mt-3 space-y-2 text-xs">
@@ -1226,7 +1517,8 @@ export function ProcurementHubClient({
           <QuickLink href="/crm/erp" title="Глобальний ERP-командний центр" subtitle="ланцюжок погоджень і наскрізна стрічка подій" />
           </div>
         </div>
-      </section>
+        </section>
+      ) : null}
     </div>
   );
 }

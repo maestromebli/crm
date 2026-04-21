@@ -41,7 +41,7 @@ export async function POST(req: Request, ctx: Ctx) {
     });
 
     if (!deal) {
-      return NextResponse.json({ error: "Угоду не знайдено" }, { status: 404 });
+      return NextResponse.json({ error: "Замовлення не знайдено" }, { status: 404 });
     }
 
     const denied = await forbidUnlessDealAccess(user, P.PRODUCTION_LAUNCH, deal);
@@ -130,7 +130,7 @@ export async function GET(req: Request, ctx: Ctx) {
       select: { id: true, ownerId: true },
     });
     if (!deal) {
-      return NextResponse.json({ error: "Угоду не знайдено" }, { status: 404 });
+      return NextResponse.json({ error: "Замовлення не знайдено" }, { status: 404 });
     }
     const denied = await forbidUnlessDealAccess(user, P.DEALS_VIEW, deal);
     if (denied) return denied;
@@ -176,7 +176,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
     select: { id: true, ownerId: true },
   });
   if (!deal) {
-    return NextResponse.json({ error: "Угоду не знайдено" }, { status: 404 });
+    return NextResponse.json({ error: "Замовлення не знайдено" }, { status: 404 });
   }
   const denied = await forbidUnlessDealAccess(user, P.PRODUCTION_LAUNCH, deal);
   if (denied) return denied;

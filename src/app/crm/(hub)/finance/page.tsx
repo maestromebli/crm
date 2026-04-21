@@ -18,7 +18,7 @@ import { FinancePayrollEntryDrawer } from "../../../../features/finance/componen
 import { FinanceDirectorIntakePanel } from "../../../../features/finance/components/FinanceDirectorIntakePanel";
 import { AiV2InsightCard } from "../../../../features/ai-v2";
 
-type Props = { searchParams?: Promise<{ role?: string; view?: string }> };
+type Props = { searchParams?: Promise<{ role?: string; view?: string; tab?: string }> };
 
 export default async function FinanceOverviewPage({ searchParams }: Props) {
   const params = await searchParams;
@@ -35,11 +35,11 @@ export default async function FinanceOverviewPage({ searchParams }: Props) {
             <div className="inline-flex rounded-lg border border-[var(--enver-border)] bg-[var(--enver-bg)] p-1">
               <Link
                 href="/crm/finance"
-                className="rounded-md px-3 py-1.5 text-xs font-medium text-[var(--enver-muted)] hover:bg-[var(--enver-hover)]"
+                className="enver-cta enver-cta-sm enver-cta-ghost"
               >
                 Аналітичний огляд
               </Link>
-              <span className="rounded-md bg-[var(--enver-accent-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--enver-accent-hover)]">
+              <span className="enver-cta enver-cta-sm enver-cta-primary">
                 Оперативний хаб
               </span>
             </div>
@@ -70,6 +70,8 @@ export default async function FinanceOverviewPage({ searchParams }: Props) {
   }
 
   const data = await getFinanceOverviewData();
+  const overviewTab = params?.tab === "saas" ? "saas" : "core";
+  const roleQuery = params?.role ? `&role=${encodeURIComponent(params.role)}` : "";
   const projectNameById = data.saasAccounting.projectNameById;
   const categoryNameById = Object.fromEntries(data.categories.map((c) => [c.id, c.name]));
   const objectNameById = Object.fromEntries(
@@ -87,16 +89,16 @@ export default async function FinanceOverviewPage({ searchParams }: Props) {
     <main className="mx-auto max-w-[min(100%,1680px)] space-y-6 px-4 py-5 sm:px-6 sm:py-6">
       <PageHeader
         title="Фінанси"
-        subtitle="Контроль грошей, боргів, витрат і прибутковості: угода (проєкт) → об'єкт → закупівля; зведення портфеля та зріз по кожній адресі."
+        subtitle="Контроль грошей, боргів, витрат і прибутковості: замовлення (проєкт) → об'єкт → закупівля; зведення портфеля та зріз по кожній адресі."
         actionsSlot={
           <div className="flex flex-wrap items-center gap-2">
             <div className="inline-flex rounded-lg border border-[var(--enver-border)] bg-[var(--enver-bg)] p-1">
-              <span className="rounded-md bg-[var(--enver-accent-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--enver-accent-hover)]">
+              <span className="enver-cta enver-cta-sm enver-cta-primary">
                 Аналітичний огляд
               </span>
               <Link
                 href="/crm/finance?view=hub"
-                className="rounded-md px-3 py-1.5 text-xs font-medium text-[var(--enver-muted)] hover:bg-[var(--enver-hover)]"
+                className="enver-cta enver-cta-sm enver-cta-ghost"
               >
                 Оперативний хаб
               </Link>
@@ -130,6 +132,32 @@ export default async function FinanceOverviewPage({ searchParams }: Props) {
         </Link>
       </p>
       <AiV2InsightCard context="finance" />
+      <div className="rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href={`/crm/finance?tab=core${roleQuery}`}
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+              overviewTab === "core"
+                ? "bg-slate-900 text-white shadow-sm"
+                : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+            }`}
+          >
+            Операційний контур
+          </Link>
+          <Link
+            href={`/crm/finance?tab=saas${roleQuery}`}
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+              overviewTab === "saas"
+                ? "bg-slate-900 text-white shadow-sm"
+                : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+            }`}
+          >
+            SaaS-контроль і прогноз
+          </Link>
+        </div>
+      </div>
+      {overviewTab === "core" ? (
+        <>
       <div className="flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-gradient-to-br from-slate-50/90 via-white to-slate-50/50 p-4 shadow-sm sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <p className="text-sm text-slate-600">
           <span className="font-medium text-slate-800">Швидкі дії:</span> нова проводка або нарахування зарплати
@@ -143,8 +171,8 @@ export default async function FinanceOverviewPage({ searchParams }: Props) {
       </div>
 
       <SectionCard
-        title="Бухгалтерія та контур угод"
-        subtitle="Посилання на угоди та закупівлі; нижче — форми для керівників напрямів (бюджет, виплати, зміни до договору)."
+        title="Бухгалтерія та контур замовлень"
+        subtitle="Посилання на замовлення та закупівлі; нижче — форми для керівників напрямів (бюджет, виплати, зміни до договору)."
       >
         <div className="mb-5 flex flex-wrap gap-2">
           <Link
@@ -152,7 +180,7 @@ export default async function FinanceOverviewPage({ searchParams }: Props) {
             className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-800 shadow-sm transition hover:border-blue-300 hover:bg-blue-50/70"
           >
             <span className="inline-block h-2 w-2 rounded-full bg-blue-500" aria-hidden />
-            Угоди CRM
+            Замовлення CRM
           </Link>
           <Link
             href="/crm/procurement"
@@ -166,7 +194,7 @@ export default async function FinanceOverviewPage({ searchParams }: Props) {
       </SectionCard>
 
       <SectionCard
-        title="Матриця об'єктів і угод"
+        title="Матриця об'єктів і замовлень"
         subtitle="Показники по кожній адресі окремо; внизу рядок — усі об'єкти разом. Закупівлі з позицій, cash — з проводок."
       >
         <FinanceObjectFinanceMatrix
@@ -198,6 +226,10 @@ export default async function FinanceOverviewPage({ searchParams }: Props) {
       </SectionCard>
 
       <FinanceKpiCards kpi={data.kpi} />
+        </>
+      ) : null}
+      {overviewTab === "saas" ? (
+        <>
       <SectionCard
         title="SaaS бухгалтерський контроль"
         subtitle="Старіння боргів, фінансовий запас, покриття зобовʼязань і концентрація постачальників"
@@ -380,6 +412,8 @@ export default async function FinanceOverviewPage({ searchParams }: Props) {
           <FinanceSummaryPanel alerts={data.financeAlerts} />
         </StickySidePanel>
       </div>
+        </>
+      ) : null}
     </main>
   );
 }

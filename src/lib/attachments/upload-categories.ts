@@ -1,6 +1,6 @@
 import type { AttachmentCategory } from "@prisma/client";
 
-/** Категорії, дозволені при ручному завантаженні вкладень (угода / лід). */
+/** Категорії, дозволені при ручному завантаженні вкладень (замовлення / лід). */
 export const ATTACHMENT_UPLOAD_CATEGORIES: AttachmentCategory[] = [
   "OBJECT_PHOTO",
   "MEASUREMENT_SHEET",

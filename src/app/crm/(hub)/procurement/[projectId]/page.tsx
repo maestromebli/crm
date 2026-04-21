@@ -36,13 +36,13 @@ export default async function ProcurementProjectPage({ params, searchParams }: P
         </Link>
         <span aria-hidden>·</span>
         <span className="text-[var(--enver-text)]">
-          {data.dataSource === "live" ? "Угода (CRM)" : "Проєкт (демо)"}
+          {data.dataSource === "live" ? "Замовлення (CRM)" : "Проєкт (демо)"}
         </span>
       </div>
 
       {data.dataSource === "demo" ? (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
-          Демо-проєкт з mock-даних. Для реальної угоди відкрийте сторінку з ID угоди з CRM (той самий маршрут з{" "}
+          Демо-проєкт з mock-даних. Для реального замовлення відкрийте сторінку з ID замовлення з CRM (той самий маршрут з{" "}
           <code className="rounded bg-slate-100 px-1">dealId</code>).
         </p>
       ) : null}
@@ -51,7 +51,7 @@ export default async function ProcurementProjectPage({ params, searchParams }: P
         title={`${data.project.title} (${data.project.code})`}
         subtitle={
           data.dataSource === "live"
-            ? "Закупівлі по угоді: заявки, позиції, замовлення постачальникам (дані з CRM)."
+            ? "Закупівлі по замовленню: заявки, позиції, замовлення постачальникам (дані з CRM)."
             : "Закупівлі проєкту: бюджет, замовлення, поставки (демо)."
         }
         actionsSlot={
@@ -61,7 +61,7 @@ export default async function ProcurementProjectPage({ params, searchParams }: P
                 href={`/deals/${projectId}/workspace`}
                 className="rounded-lg border border-[var(--enver-border)] bg-[var(--enver-card)] px-3 py-1.5 text-xs font-medium text-[var(--enver-text)] hover:bg-[var(--enver-hover)]"
               >
-                Робоче місце угоди
+                Робоче місце замовлення
               </Link>
             ) : null}
             {canAccess(role, "PROCUREMENT_FULL") ? (

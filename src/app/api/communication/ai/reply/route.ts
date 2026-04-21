@@ -17,6 +17,9 @@ import {
   buildContinuousLearningBlock,
   recordContinuousLearningEvent,
 } from "../../../../../lib/ai/continuous-learning";
+import { requireAiRateLimit } from "../../../../../lib/ai/route-guard";
+import { logAiEvent } from "../../../../../lib/ai/log-ai-event";
+import { evaluateAiTextQuality } from "../../../../../lib/ai/evals/quality";
 
 export const runtime = "nodejs";
 
@@ -60,6 +63,13 @@ export async function POST(request: Request) {
 
   const { leadId, dealId } = parsed.data;
   const style = (parsed.data.style ?? "standard") as ReplyStyle;
+  const limited = await requireAiRateLimit({
+    userId: user.id,
+    action: "comm_suggested_reply",
+    maxRequests: 30,
+    windowMinutes: 10,
+  });
+  if (limited) return limited;
 
   if ((!leadId && !dealId) || (leadId && dealId)) {
     return NextResponse.json(
@@ -106,8 +116,25 @@ export async function POST(request: Request) {
       stageHint: lead.stage?.name ?? null,
     });
     if (gen.ok === false) {
+      await logAiEvent({
+        userId: user.id,
+        action: "comm_suggested_reply",
+        model: process.env.AI_MODEL ?? null,
+        ok: false,
+        errorMessage: gen.error,
+        entityType: "LEAD",
+        entityId: leadId,
+        metadata: { style, usedLearningMemory: Boolean(memory) },
+      });
       return NextResponse.json({ error: gen.error }, { status: 503 });
     }
+    const quality = evaluateAiTextQuality({
+      text: gen.text,
+      maxSentences: 6,
+      minChars: 12,
+      requireUkrainian: true,
+      allowMarkdown: false,
+    });
 
     await recordContinuousLearningEvent({
       userId: user.id,
@@ -116,10 +143,43 @@ export async function POST(request: Request) {
       entityType: "LEAD",
       entityId: leadId,
       ok: true,
-      metadata: { style, usedLearningMemory: Boolean(memory) },
+      metadata: {
+        style,
+        usedLearningMemory: Boolean(memory),
+        promptTokens: gen.usage?.promptTokens ?? 0,
+        completionTokens: gen.usage?.completionTokens ?? 0,
+        totalTokens: gen.usage?.totalTokens ?? 0,
+        tokensApprox: gen.tokensApprox,
+        costUsdApprox: gen.costUsdApprox,
+        qualityScore: quality.score,
+        qualityViolations: quality.violations,
+      },
+    });
+    await logAiEvent({
+      userId: user.id,
+      action: "comm_suggested_reply",
+      model: gen.model,
+      ok: true,
+      tokensApprox:
+        gen.usage?.totalTokens && gen.usage.totalTokens > 0
+          ? gen.usage.totalTokens
+          : gen.tokensApprox,
+      entityType: "LEAD",
+      entityId: leadId,
+      metadata: {
+        style,
+        usedLearningMemory: Boolean(memory),
+        promptTokens: gen.usage?.promptTokens ?? 0,
+        completionTokens: gen.usage?.completionTokens ?? 0,
+        totalTokens: gen.usage?.totalTokens ?? 0,
+        tokensApprox: gen.tokensApprox,
+        costUsdApprox: gen.costUsdApprox,
+        qualityScore: quality.score,
+        qualityViolations: quality.violations,
+      },
     });
 
-    return NextResponse.json({ ok: true, text: gen.text });
+    return NextResponse.json({ ok: true, text: gen.text, quality });
   }
 
   const deal = await prisma.deal.findUnique({
@@ -127,7 +187,7 @@ export async function POST(request: Request) {
     select: { id: true, ownerId: true, stage: { select: { name: true } } },
   });
   if (!deal) {
-    return NextResponse.json({ error: "Угоду не знайдено" }, { status: 404 });
+    return NextResponse.json({ error: "Замовлення не знайдено" }, { status: 404 });
   }
   const denied = await forbidUnlessDealAccess(user, P.DEALS_UPDATE, deal);
   if (denied) return denied;
@@ -159,8 +219,25 @@ export async function POST(request: Request) {
     stageHint: deal.stage?.name ?? null,
   });
   if (gen.ok === false) {
+    await logAiEvent({
+      userId: user.id,
+      action: "comm_suggested_reply",
+      model: process.env.AI_MODEL ?? null,
+      ok: false,
+      errorMessage: gen.error,
+      entityType: "DEAL",
+      entityId: dealId!,
+      metadata: { style, usedLearningMemory: Boolean(memory) },
+    });
     return NextResponse.json({ error: gen.error }, { status: 503 });
   }
+  const quality = evaluateAiTextQuality({
+    text: gen.text,
+    maxSentences: 6,
+    minChars: 12,
+    requireUkrainian: true,
+    allowMarkdown: false,
+  });
 
   await recordContinuousLearningEvent({
     userId: user.id,
@@ -169,8 +246,41 @@ export async function POST(request: Request) {
     entityType: "DEAL",
     entityId: dealId!,
     ok: true,
-    metadata: { style, usedLearningMemory: Boolean(memory) },
+    metadata: {
+      style,
+      usedLearningMemory: Boolean(memory),
+      promptTokens: gen.usage?.promptTokens ?? 0,
+      completionTokens: gen.usage?.completionTokens ?? 0,
+      totalTokens: gen.usage?.totalTokens ?? 0,
+      tokensApprox: gen.tokensApprox,
+      costUsdApprox: gen.costUsdApprox,
+      qualityScore: quality.score,
+      qualityViolations: quality.violations,
+    },
+  });
+  await logAiEvent({
+    userId: user.id,
+    action: "comm_suggested_reply",
+    model: gen.model,
+    ok: true,
+    tokensApprox:
+      gen.usage?.totalTokens && gen.usage.totalTokens > 0
+        ? gen.usage.totalTokens
+        : gen.tokensApprox,
+    entityType: "DEAL",
+    entityId: dealId!,
+    metadata: {
+      style,
+      usedLearningMemory: Boolean(memory),
+      promptTokens: gen.usage?.promptTokens ?? 0,
+      completionTokens: gen.usage?.completionTokens ?? 0,
+      totalTokens: gen.usage?.totalTokens ?? 0,
+      tokensApprox: gen.tokensApprox,
+      costUsdApprox: gen.costUsdApprox,
+      qualityScore: quality.score,
+      qualityViolations: quality.violations,
+    },
   });
 
-  return NextResponse.json({ ok: true, text: gen.text });
+  return NextResponse.json({ ok: true, text: gen.text, quality });
 }

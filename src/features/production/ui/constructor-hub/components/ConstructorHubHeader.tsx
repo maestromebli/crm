@@ -26,7 +26,7 @@ export function ConstructorHubHeader({ header }: { header: ConstructorProjectHea
       </div>
 
       <div className="mt-4 grid gap-2 text-xs text-slate-600 sm:grid-cols-2 lg:grid-cols-4">
-        <HeaderMeta icon={Hash} label="Замовлення / угода" value={header.dealNumber} />
+        <HeaderMeta icon={Hash} label="Замовлення / замовлення" value={header.dealNumber} />
         <HeaderMeta icon={MapPin} label="Адреса обʼєкта" value={header.objectAddress} />
         <HeaderMeta icon={UserRound} label="Менеджер" value={header.managerName} />
         <HeaderMeta icon={Factory} label="Кер. виробництва" value={header.headOfProductionName} />

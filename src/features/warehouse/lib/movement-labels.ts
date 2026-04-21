@@ -14,7 +14,7 @@ export const WAREHOUSE_REF_KIND_UK: Record<string, string> = {
   PRODUCTION_TASK: "Задача цеху",
   PRODUCTION_FLOW: "Потік",
   MANUAL: "Вручну",
-  DEAL: "Угода",
+  DEAL: "Замовлення",
 };
 
 export function movementKindLabel(kind: string): string {

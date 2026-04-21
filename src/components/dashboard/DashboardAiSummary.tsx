@@ -47,7 +47,7 @@ export function DashboardAiSummary({
         const data = await postJson<{ text?: string }>("/api/ai/summary", {
           type: "dashboard",
           context:
-            "Онбордингова CRM для меблів під замовлення. Потрібен короткий огляд дня по лідах, угодах та handoff.",
+            "Онбордингова CRM для меблів під замовлення. Потрібен короткий огляд дня по лідах, замовленнях та handoff.",
         });
         if (data.text) setText(data.text);
       } catch {

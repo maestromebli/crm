@@ -17,7 +17,7 @@ export function runAiV2DecisionEngine(context: AiV2ContextSnapshot): AiV2Decisio
   const blockers: string[] = [];
   if (flags.missingFiles > 0) blockers.push("Не вистачає обов'язкових файлів.");
   if (flags.missingDataCount > 0) {
-    blockers.push("Не заповнені ключові поля даних по клієнту/угоді.");
+    blockers.push("Не заповнені ключові поля даних по клієнту/замовленні.");
   }
   if (flags.slaBreached) {
     blockers.push(`Порушено SLA першого контакту (+${flags.slaOverdueHours} год).`);
@@ -42,7 +42,7 @@ export function runAiV2DecisionEngine(context: AiV2ContextSnapshot): AiV2Decisio
     blockers[0] ??
     (followUpUrgency === "high"
       ? "Потрібен терміновий follow-up із клієнтом."
-      : "Оновіть задачі та зафіксуйте наступний крок по угоді.");
+      : "Оновіть задачі та зафіксуйте наступний крок по замовленні.");
 
   const summary =
     riskScore >= 70

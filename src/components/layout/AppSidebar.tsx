@@ -194,15 +194,30 @@ export function AppSidebar({
             )}
           >
             <Image
-              src="/enver-logo.png"
+              src="/enver-logo-white.png"
               alt="ENVER CRM · CRM-ERP система"
               width={1696}
               height={604}
-              className={
+              className={cn(
+                styles.logoForDarkBg,
                 compact
-                  ? "bg-transparent h-auto w-full object-contain object-center"
-                  : "bg-transparent h-auto w-full max-w-full object-contain object-center"
-              }
+                  ? "h-auto w-full object-contain object-center"
+                  : "h-auto w-full max-w-full object-contain object-center",
+              )}
+              sizes={compact ? "32px" : "240px"}
+              priority
+            />
+            <Image
+              src="/enver-logo-black.png"
+              alt="ENVER CRM · CRM-ERP система"
+              width={1696}
+              height={604}
+              className={cn(
+                styles.logoForLightBg,
+                compact
+                  ? "h-auto w-full object-contain object-center"
+                  : "h-auto w-full max-w-full object-contain object-center",
+              )}
               sizes={compact ? "32px" : "240px"}
               priority
             />
@@ -302,7 +317,7 @@ export function AppSidebar({
                     !compact &&
                       "group/main [&:focus-visible]:outline [&:focus-visible]:outline-2 [&:focus-visible]:outline-offset-2 [&:focus-visible]:outline-[var(--enver-accent)]/40",
                     isActive &&
-                      "bg-[var(--enver-accent-soft)] font-semibold text-[var(--enver-accent)] ring-1 ring-[var(--enver-accent-ring)]/80",
+                      "bg-[var(--enver-accent-soft)] font-semibold text-[var(--enver-text)] ring-1 ring-[var(--enver-accent-ring)]/80",
                   )}
                 >
                   <span
@@ -361,7 +376,7 @@ export function AppSidebar({
                   role="menu"
                   aria-labelledby={linkId}
                   className={cn(
-                    "absolute left-[calc(100%+8px)] top-0 z-40 min-w-56 rounded-lg border border-slate-600/60 bg-[var(--enver-card)] p-2 text-[var(--enver-text)] shadow-xl transition-[opacity,transform,visibility] duration-200 ease-out",
+                    "absolute left-[calc(100%+8px)] top-0 z-40 min-w-56 rounded-lg border border-[var(--enver-border)] bg-[var(--enver-card)] p-2 text-[var(--enver-text)] shadow-xl transition-[opacity,transform,visibility] duration-200 ease-out",
                     hoveredSectionId === section.id
                       ? "pointer-events-auto visible translate-x-0 scale-100 opacity-100"
                       : "pointer-events-none invisible -translate-x-1 scale-[0.98] opacity-0",
@@ -380,7 +395,7 @@ export function AppSidebar({
                           role="menuitem"
                           className={cn(
                             "flex items-center rounded-[12px] px-2 py-1.5 text-xs transition-colors hover:bg-[var(--enver-hover)]",
-                            subActive && "bg-[var(--enver-accent-soft)] font-semibold text-[var(--enver-accent-hover)]",
+                            subActive && "bg-[var(--enver-accent-soft)] font-semibold text-[var(--enver-text)] ring-1 ring-[var(--enver-accent-ring)]/70",
                           )}
                         >
                           <span className="truncate">{sub.label}</span>
@@ -406,7 +421,7 @@ export function AppSidebar({
                             styles.navLinkMuted,
                             "flex items-center justify-between rounded-[12px] px-2.5 py-2 transition-colors duration-200 ease-out hover:bg-[var(--enver-hover)] hover:text-[var(--enver-text)]",
                             subActive &&
-                              "bg-[var(--enver-accent-soft)] font-medium !text-[var(--enver-accent-hover)] ring-1 ring-[var(--enver-accent-ring)]",
+                              "bg-[var(--enver-accent-soft)] font-medium !text-[var(--enver-text)] ring-1 ring-[var(--enver-accent-ring)]",
                           )}
                         >
                           <span className="truncate">{sub.label}</span>

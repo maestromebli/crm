@@ -149,8 +149,8 @@ export function LeadRow({ lead, duplicatePhone }: LeadRowProps) {
           </Link>
           <Link
             href={`/leads/${lead.id}#lead-convert`}
-            title="У угоду"
-            aria-label={`Конвертувати лід ${lead.title} в угоду`}
+            title="В замовлення"
+            aria-label={`Конвертувати лід ${lead.title} в замовлення`}
             className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-700 hover:bg-[var(--enver-hover)]"
           >
             <KanbanSquare className="h-3.5 w-3.5" strokeWidth={2} />

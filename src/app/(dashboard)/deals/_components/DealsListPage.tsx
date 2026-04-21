@@ -23,7 +23,7 @@ import { DealsModuleNav } from "./DealsModuleNav";
 import { DEAL_LIST_COPY } from "./deals-list-copy";
 
 export const dealsRootMetadata: Metadata = {
-  title: "Угоди · ENVER CRM",
+  title: "Замовлення · ENVER CRM",
 };
 
 type Props = {
@@ -79,9 +79,9 @@ export async function DealsListPage({ view, defaultLayout = "table" }: Props) {
           >
             Дашборд
           </Link>
-          <span className="mx-1.5 text-[var(--enver-border-strong)]">/</span>
-          <span className="font-medium text-[var(--enver-text)]">Угоди</span>
-          <span className="mx-1.5 text-[var(--enver-border-strong)]">/</span>
+          <span className="mx-1.5 text-[var(--enver-muted)]">/</span>
+          <span className="font-medium text-[var(--enver-text)]">Замовлення</span>
+          <span className="mx-1.5 text-[var(--enver-muted)]">/</span>
           <span className="text-[var(--enver-text-muted)]">{copy.title}</span>
         </nav>
 
@@ -106,7 +106,7 @@ export async function DealsListPage({ view, defaultLayout = "table" }: Props) {
                 </p>
                 <p className="mt-3 flex flex-wrap gap-2 text-[11px] text-[var(--enver-muted)]">
                   <span className="rounded-full border border-[var(--enver-border)] bg-[var(--enver-surface)] px-2 py-0.5">
-                    Єдине робоче місце угоди
+                    Єдине робоче місце замовлення
                   </span>
                   <span className="rounded-full border border-[var(--enver-border)] bg-[var(--enver-surface)] px-2 py-0.5">
                     Таблиця · канбан · CSV
@@ -131,21 +131,21 @@ export async function DealsListPage({ view, defaultLayout = "table" }: Props) {
             <div className="flex flex-wrap items-center gap-2 text-[10px]">
               <Link
                 href="/leads"
-                className="inline-flex items-center gap-1 rounded-full border border-[var(--enver-border)] bg-[var(--enver-surface)] px-2.5 py-1 font-semibold text-[var(--enver-text-muted)] transition hover:bg-[var(--enver-hover)] hover:text-[var(--enver-text)]"
+                className="enver-cta enver-cta-xs enver-cta-secondary enver-cta-pill"
               >
                 <UserPlus className="h-3 w-3" aria-hidden />
                 Ліди
               </Link>
               <Link
                 href="/settings/pipelines"
-                className="inline-flex items-center gap-1 rounded-full border border-[var(--enver-border)] bg-[var(--enver-surface)] px-2.5 py-1 font-semibold text-[var(--enver-text-muted)] transition hover:bg-[var(--enver-hover)] hover:text-[var(--enver-text)]"
+                className="enver-cta enver-cta-xs enver-cta-secondary enver-cta-pill"
               >
                 <Settings2 className="h-3 w-3" aria-hidden />
                 Воронки
               </Link>
-              <span className="hidden items-center gap-1 rounded-full border border-[var(--enver-accent)]/30 bg-[var(--enver-accent-soft)] px-2.5 py-1 font-semibold text-[var(--enver-accent-hover)] sm:inline-flex">
+              <span className="enver-cta enver-cta-xs enver-cta-primary enver-cta-pill hidden sm:inline-flex">
                 <Sparkles className="h-3 w-3" aria-hidden />
-                Робоче місце угоди
+                Робоче місце замовлення
               </span>
             </div>
           </div>
@@ -163,14 +163,14 @@ export async function DealsListPage({ view, defaultLayout = "table" }: Props) {
             className="enver-card-appear rounded-xl border border-dashed border-[var(--enver-border)] bg-[var(--enver-card)] px-4 py-10 text-center text-sm text-[var(--enver-text-muted)] shadow-[var(--enver-shadow)]"
             style={stagger(2)}
           >
-            <p>{copy.emptyExtra ?? "Немає угод у цьому вигляді."}</p>
+            <p>{copy.emptyExtra ?? "Немає замовлень у цьому вигляді."}</p>
             <p className="mt-2 text-xs text-[var(--enver-muted)]">
               Перегляньте{" "}
               <Link
                 href="/deals"
-                className="font-semibold text-[var(--enver-accent-hover)] underline-offset-2 hover:underline"
+                className="font-semibold text-[var(--enver-accent)] underline-offset-2 hover:text-[var(--enver-accent-hover)] hover:underline"
               >
-                усі угоди
+                усі замовлення
               </Link>{" "}
               або змініть розділ вище.
             </p>
@@ -185,21 +185,21 @@ export async function DealsListPage({ view, defaultLayout = "table" }: Props) {
             className="enver-card-appear rounded-xl border border-dashed border-[var(--enver-border)] bg-[var(--enver-card)] px-4 py-12 text-center text-sm text-[var(--enver-text-muted)] shadow-[var(--enver-shadow)]"
             style={stagger(2)}
           >
-            <p>Немає угод у вашій зоні видимості.</p>
+            <p>Немає замовлень у вашій зоні видимості.</p>
             <p className="mt-2 text-xs text-[var(--enver-muted)]">
               Почніть з{" "}
               <Link
                 href="/leads"
-                className="font-semibold text-[var(--enver-accent-hover)] underline-offset-2 hover:underline"
+                className="font-semibold text-[var(--enver-accent)] underline-offset-2 hover:text-[var(--enver-accent-hover)] hover:underline"
               >
                 лідів
               </Link>{" "}
               або відкрийте{" "}
               <Link
                 href="/deals/pipeline"
-                className="font-semibold text-[var(--enver-accent-hover)] underline-offset-2 hover:underline"
+                className="font-semibold text-[var(--enver-accent)] underline-offset-2 hover:text-[var(--enver-accent-hover)] hover:underline"
               >
-                воронку угод
+                воронку замовлень
               </Link>{" "}
               для швидкої навігації.
             </p>

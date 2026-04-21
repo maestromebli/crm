@@ -15,6 +15,8 @@ import {
   buildContinuousLearningBlock,
   recordContinuousLearningEvent,
 } from "../../../../../lib/ai/continuous-learning";
+import { requireAiRateLimit } from "../../../../../lib/ai/route-guard";
+import { logAiEvent } from "../../../../../lib/ai/log-ai-event";
 
 export const runtime = "nodejs";
 
@@ -56,6 +58,13 @@ export async function POST(request: Request) {
   }
 
   const { leadId, dealId } = parsed.data;
+  const limited = await requireAiRateLimit({
+    userId: user.id,
+    action: "comm_conversation_insight",
+    maxRequests: 24,
+    windowMinutes: 10,
+  });
+  if (limited) return limited;
   if ((!leadId && !dealId) || (leadId && dealId)) {
     return NextResponse.json(
       { error: "Вкажіть leadId або dealId" },
@@ -81,7 +90,7 @@ export async function POST(request: Request) {
       select: { id: true, ownerId: true },
     });
     if (!deal) {
-      return NextResponse.json({ error: "Угоду не знайдено" }, { status: 404 });
+      return NextResponse.json({ error: "Замовлення не знайдено" }, { status: 404 });
     }
     const denied = await forbidUnlessDealAccess(user, P.DEALS_UPDATE, deal);
     if (denied) return denied;
@@ -124,6 +133,15 @@ export async function POST(request: Request) {
     : transcript;
   const gen = await generateConversationInsight({ transcript: transcriptForAi });
   if (gen.ok === false) {
+    await logAiEvent({
+      userId: user.id,
+      action: "comm_conversation_insight",
+      model: process.env.AI_MODEL ?? null,
+      ok: false,
+      errorMessage: gen.error,
+      entityType: hub.entity,
+      entityId: hub.entityId,
+    });
     return NextResponse.json({ error: gen.error }, { status: 503 });
   }
 
@@ -151,8 +169,34 @@ export async function POST(request: Request) {
     ok: true,
     metadata: {
       threadId: tid,
-      model: process.env.AI_MODEL ?? null,
+      model: gen.model,
       usedLearningMemory: Boolean(memory),
+      promptTokens: gen.usage?.promptTokens ?? 0,
+      completionTokens: gen.usage?.completionTokens ?? 0,
+      totalTokens: gen.usage?.totalTokens ?? 0,
+      tokensApprox: gen.tokensApprox,
+      costUsdApprox: gen.costUsdApprox,
+    },
+  });
+  await logAiEvent({
+    userId: user.id,
+    action: "comm_conversation_insight",
+    model: gen.model,
+    ok: true,
+    tokensApprox:
+      gen.usage?.totalTokens && gen.usage.totalTokens > 0
+        ? gen.usage.totalTokens
+        : gen.tokensApprox,
+    entityType: hub.entity,
+    entityId: hub.entityId,
+    metadata: {
+      threadId: tid,
+      usedLearningMemory: Boolean(memory),
+      promptTokens: gen.usage?.promptTokens ?? 0,
+      completionTokens: gen.usage?.completionTokens ?? 0,
+      totalTokens: gen.usage?.totalTokens ?? 0,
+      tokensApprox: gen.tokensApprox,
+      costUsdApprox: gen.costUsdApprox,
     },
   });
 

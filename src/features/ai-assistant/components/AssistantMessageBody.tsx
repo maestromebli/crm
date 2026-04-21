@@ -4,10 +4,10 @@ import { cn } from "../../../lib/utils";
 
 const TOOL_LABELS: Record<string, string> = {
   crm_list_leads: "Ліди",
-  crm_list_deals: "Угоди",
+  crm_list_deals: "Замовлення",
   crm_list_open_tasks: "Задачі",
   crm_get_lead: "Лід",
-  crm_get_deal: "Угода",
+  crm_get_deal: "Замовлення",
   crm_quick_overview: "Огляд CRM",
   crm_nav_menu: "Меню",
   crm_calendar_upcoming: "Календар",

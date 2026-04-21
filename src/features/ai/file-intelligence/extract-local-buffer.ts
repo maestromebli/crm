@@ -99,7 +99,7 @@ export function guessCategoryFromSignals(input: {
   if (/техніч|специфікац|spec|tz|тз/i.test(n + t)) return "TECHNICAL";
 
   if (m === "application/pdf" || n.endsWith(".docx") || n.endsWith(".doc")) {
-    if (/догов|угод|contract/i.test(t)) return "CONTRACT";
+    if (/догов|замовлень|contract/i.test(t)) return "CONTRACT";
     if (/кп|пропозиці|комерц/i.test(t)) return "COMMERCIAL_PROPOSAL";
     if (/рахунок|до сплати|invoice/i.test(t)) return "INVOICE";
     if (/розмір|замір|план|кімнат/i.test(t)) return "DIMENSIONS";

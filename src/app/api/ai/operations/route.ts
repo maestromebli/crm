@@ -10,6 +10,8 @@ import { hasEffectivePermission, P } from "../../../../lib/authz/permissions";
 import { requireDatabaseUrl } from "../../../../lib/api/route-guards";
 import { recordContinuousLearningEvent } from "../../../../lib/ai/continuous-learning";
 import { resolveAiExecutionPolicy } from "../../../../features/ai/policies/ai-action-guard";
+import { requireAiRateLimit } from "../../../../lib/ai/route-guard";
+import { logAiEvent } from "../../../../lib/ai/log-ai-event";
 
 export const runtime = "nodejs";
 
@@ -91,6 +93,13 @@ export async function POST(request: Request) {
   }
 
   const { operation, leadId, dealId, dashboardContext, tone } = parsed.data;
+  const limited = await requireAiRateLimit({
+    userId: user.id,
+    action: "ai_operation",
+    maxRequests: 24,
+    windowMinutes: 10,
+  });
+  if (limited) return limited;
 
   if (!canRunOperation(user, operation)) {
     return NextResponse.json({ error: "Недостатньо прав" }, { status: 403 });
@@ -141,6 +150,14 @@ export async function POST(request: Request) {
   });
 
   if (result.ok === false) {
+    await logAiEvent({
+      userId: user.id,
+      action: "ai_operation",
+      model: process.env.AI_MODEL ?? "gpt-4.1-mini",
+      ok: false,
+      errorMessage: result.error,
+      metadata: { operation, leadId, dealId, status: result.status },
+    });
     await recordContinuousLearningEvent({
       userId: user.id,
       action: "ai_operation",
@@ -162,6 +179,19 @@ export async function POST(request: Request) {
     ok: true,
     metadata: {
       operation,
+      advisoryOnly: policy.advisoryOnly,
+      reason: policy.reason,
+    },
+  });
+  await logAiEvent({
+    userId: user.id,
+    action: "ai_operation",
+    model: process.env.AI_MODEL ?? "gpt-4.1-mini",
+    ok: true,
+    metadata: {
+      operation,
+      leadId,
+      dealId,
       advisoryOnly: policy.advisoryOnly,
       reason: policy.reason,
     },

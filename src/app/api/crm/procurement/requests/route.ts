@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireSessionUser } from "@/lib/authz/api-guard";
+import { canAccessOwner, resolveAccessContext } from "@/lib/authz/data-scope";
 import { canProcurementAction } from "@/features/procurement/lib/permissions";
 
 type Line = {
@@ -8,6 +9,7 @@ type Line = {
   qty?: number;
   plannedUnitCost?: number;
 };
+const ALLOWED_PRIORITIES = new Set(["LOW", "MEDIUM", "HIGH", "CRITICAL"]);
 
 export async function POST(req: Request) {
   if (!process.env.DATABASE_URL?.trim()) {
@@ -30,12 +32,22 @@ export async function POST(req: Request) {
 
     const dealId = body.dealId?.trim() ?? "";
     if (!dealId) {
-      return NextResponse.json({ error: "Оберіть угоду (проєкт)" }, { status: 400 });
+      return NextResponse.json({ error: "Оберіть замовлення (проєкт)" }, { status: 400 });
     }
 
-    const deal = await prisma.deal.findUnique({ where: { id: dealId }, select: { id: true } });
+    const deal = await prisma.deal.findUnique({
+      where: { id: dealId },
+      select: { id: true, ownerId: true },
+    });
     if (!deal) {
-      return NextResponse.json({ error: "Угоду не знайдено" }, { status: 404 });
+      return NextResponse.json({ error: "Замовлення не знайдено" }, { status: 404 });
+    }
+    const access = await resolveAccessContext(prisma, {
+      id: user.id,
+      role: user.dbRole,
+    });
+    if (!canAccessOwner(access, deal.ownerId)) {
+      return NextResponse.json({ error: "Замовлення не знайдено" }, { status: 404 });
     }
 
     const lines = (body.lines ?? []).filter((l) => (l.name ?? "").trim().length > 0);
@@ -43,12 +55,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Додайте хоча б одну позицію з назвою" }, { status: 400 });
     }
 
-    const neededByDate =
-      body.neededByDate && body.neededByDate.trim()
-        ? new Date(`${body.neededByDate}T12:00:00.000Z`)
-        : null;
+    const neededByDateRaw = body.neededByDate?.trim() ?? "";
+    const neededByDate = neededByDateRaw ? new Date(`${neededByDateRaw}T12:00:00.000Z`) : null;
+    if (neededByDate && Number.isNaN(neededByDate.getTime())) {
+      return NextResponse.json({ error: "Невірний формат дати потреби" }, { status: 400 });
+    }
 
-    const priority = (body.priority ?? "MEDIUM").trim() || "MEDIUM";
+    const priorityCandidate = (body.priority ?? "MEDIUM").trim().toUpperCase() || "MEDIUM";
+    const priority = ALLOWED_PRIORITIES.has(priorityCandidate) ? priorityCandidate : "MEDIUM";
 
     const created = await prisma.procurementRequest.create({
       data: {

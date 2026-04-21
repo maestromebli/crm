@@ -16,10 +16,29 @@ type NavVisibilityContext = {
   menuAccess?: MenuAccessState | null;
 };
 
+const MANAGER_VISIBLE_SECTIONS = new Set([
+  "dashboard",
+  "leads",
+  "contacts",
+  "deals",
+  "calendar",
+  "inbox",
+  "tasks",
+  "files",
+  "reports",
+]);
+
 function canSeeSection(
   section: NavSection,
   ctx: Omit<NavVisibilityContext, "menuAccess">,
 ): boolean {
+  if (
+    ctx.realRole === "MANAGER" ||
+    ctx.realRole === "HEAD_MANAGER"
+  ) {
+    if (!MANAGER_VISIBLE_SECTIONS.has(section.id)) return false;
+  }
+
   const permissionCtx = {
     realRole: ctx.realRole,
     impersonatorId: ctx.impersonatorId ?? undefined,

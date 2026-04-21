@@ -89,7 +89,7 @@ export function DealFinanceProjectLinks({ data }: Props) {
   };
 
   const unlink = async (projectId: string) => {
-    if (!confirm("Відв’язати цей фінансовий проєкт від угоди?")) return;
+    if (!confirm("Відв’язати цей фінансовий проєкт від замовлення?")) return;
     setBusyId(projectId);
     setErr(null);
     try {
@@ -173,13 +173,13 @@ export function DealFinanceProjectLinks({ data }: Props) {
       {open && canManage ? (
         <div className="mt-2 rounded-lg border border-indigo-200 bg-[var(--enver-card)] p-2">
           <p className="mb-1.5 text-[11px] text-slate-600">
-            Проєкти без угоди (з бази). Після прив’язки вони з’являться тут і в модулі фінансів.
+            Проєкти без замовлення (з бази). Після прив’язки вони з’являться тут і в модулі фінансів.
           </p>
           {loading ? (
             <p className="text-[12px] text-slate-500">Завантаження…</p>
           ) : linkable.length === 0 ? (
             <p className="text-[12px] text-slate-600">
-              Немає вільних проєктів. Створіть проєкт у БД або відв’язайте від іншої угоди.
+              Немає вільних проєктів. Створіть проєкт у БД або відв’язайте від іншого замовлення.
             </p>
           ) : (
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">

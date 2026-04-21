@@ -95,7 +95,7 @@ export async function runAiOperation(params: {
     }
     const data = await getDealWorkspacePayload(dealId, ctx);
     if (!data) {
-      return fail("Угоду не знайдено", 404);
+      return fail("Замовлення не знайдено", 404);
     }
     return { data };
   };

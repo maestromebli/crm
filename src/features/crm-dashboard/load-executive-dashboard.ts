@@ -91,6 +91,60 @@ import type {
 import { loadBehaviorSnapshot } from "../behavior-engine/load-behavior-snapshot";
 import { buildDailyOperatingSnapshot } from "../daily-operating-system/build-daily-operating-snapshot";
 
+type DashboardCacheEntry = {
+  expiresAt: number;
+  value: ExecutiveDashboardPayload;
+};
+
+const DASHBOARD_CACHE_TTL_MS = 15_000;
+const DASHBOARD_CACHE_MAX_ENTRIES = 80;
+const dashboardPayloadCache = new Map<string, DashboardCacheEntry>();
+
+function makeDashboardCacheKey(input: {
+  access: SessionAccess;
+  perms: ExecutiveDashboardPerms;
+  role: EffectiveRole;
+  query: ExecutiveDashboardQuery;
+}): string {
+  return JSON.stringify({
+    userId: input.access.userId,
+    role: input.role,
+    realRole: input.access.realRole,
+    impersonatorId: input.access.impersonatorId ?? null,
+    ctx: input.access.ctx,
+    perms: input.perms,
+    query: input.query,
+  });
+}
+
+function readDashboardPayloadCache(key: string): ExecutiveDashboardPayload | null {
+  const entry = dashboardPayloadCache.get(key);
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) {
+    dashboardPayloadCache.delete(key);
+    return null;
+  }
+  return entry.value;
+}
+
+function writeDashboardPayloadCache(key: string, value: ExecutiveDashboardPayload): void {
+  if (dashboardPayloadCache.size >= DASHBOARD_CACHE_MAX_ENTRIES) {
+    let oldestKey: string | null = null;
+    let oldestExpiry = Number.POSITIVE_INFINITY;
+    for (const [existingKey, existing] of dashboardPayloadCache.entries()) {
+      if (existing.expiresAt < oldestExpiry) {
+        oldestExpiry = existing.expiresAt;
+        oldestKey = existingKey;
+      }
+    }
+    if (oldestKey) dashboardPayloadCache.delete(oldestKey);
+  }
+  dashboardPayloadCache.set(key, {
+    value,
+    expiresAt: Date.now() + DASHBOARD_CACHE_TTL_MS,
+  });
+}
+
 function num(n: unknown): number {
   if (n == null) return 0;
   if (typeof n === "number") return Number.isFinite(n) ? n : 0;
@@ -239,11 +293,24 @@ export async function loadExecutiveDashboard(
   query: ExecutiveDashboardQuery,
 ): Promise<ExecutiveDashboardPayload> {
   const layout = getExecutiveLayoutMode(role);
+  const cacheKey = makeDashboardCacheKey({ access, perms, role, query });
+  const cached = readDashboardPayloadCache(cacheKey);
+  if (cached) {
+    return cached;
+  }
+  const cacheAndReturn = (payload: ExecutiveDashboardPayload) => {
+    if (!payload.error) {
+      writeDashboardPayloadCache(cacheKey, payload);
+    }
+    return payload;
+  };
 
   if (!process.env.DATABASE_URL?.trim()) {
-    return buildEmptyDashboardPayload(layout, query, {
-      error: "База даних не налаштована.",
-    });
+    return cacheAndReturn(
+      buildEmptyDashboardPayload(layout, query, {
+        error: "База даних не налаштована.",
+      }),
+    );
   }
 
   const ctx = access.ctx;
@@ -288,11 +355,59 @@ export async function loadExecutiveDashboard(
   const monthStart = startOfMonth(now);
   const prevMonthStart = subMonths(monthStart, 1);
   const prevMonthEnd = endOfMonth(subMonths(now, 1));
+  const staleLeadsCountPromise =
+    perms.leadsView
+      ? prisma.lead.count({
+          where: {
+            ...leadWhere,
+            stage: { isFinal: false },
+            OR: [
+              { lastActivityAt: null },
+              { lastActivityAt: { lt: subDays(now, 2) } },
+            ],
+          },
+        })
+      : Promise.resolve(0);
+  const overdueTasksCountPromise =
+    perms.tasksView && taskScope
+      ? prisma.task.count({
+          where: {
+            AND: [
+              taskScope,
+              {
+                status: { in: [TaskStatus.OPEN, TaskStatus.IN_PROGRESS] },
+                dueAt: { not: null, lt: now },
+              },
+            ],
+          },
+        })
+      : Promise.resolve(0);
+  const submittedHandoffsCountPromise =
+    perms.dealsView
+      ? prisma.dealHandoff.count({
+          where: {
+            status: HandoffStatus.SUBMITTED,
+            deal: { is: dealWhere },
+          },
+        })
+      : Promise.resolve(0);
+  const teamBlockPromise =
+    layout === "sales"
+      ? Promise.resolve(null)
+      : overdueTasksCountPromise.then((overdueTasksCount) =>
+          loadTeamPerformance(
+            perms,
+            sessionUser,
+            dealWhere,
+            now,
+            overdueTasksCount,
+          ),
+        );
 
   try {
     if (layout === "measurer") {
       const schedule = await loadSchedulePreview(access, perms, role);
-      return {
+      return cacheAndReturn({
         layout,
         query,
         kpis: [],
@@ -310,7 +425,7 @@ export async function loadExecutiveDashboard(
         behavior: DEFAULT_DASHBOARD_BEHAVIOR,
         daily: DEFAULT_DASHBOARD_DAILY,
         legacyAttentionCount: 0,
-      };
+      });
     }
 
     const [
@@ -329,10 +444,10 @@ export async function loadExecutiveDashboard(
       procurementBlock,
       schedule,
       riskRows,
-      nextActions,
       teamBlock,
       staleLeadsCount,
       overdueTasksCount,
+      submittedHandoffsCount,
     ] = await Promise.all([
       perms.dealsView
         ? prisma.deal.aggregate({
@@ -424,6 +539,7 @@ export async function loadExecutiveDashboard(
             ready: 0,
             loadPct: 0,
             ringPct: 0,
+            atRiskCount: 0,
             issues: [] as { id: string; title: string; orderId: string }[],
             delayedOrders: [] as {
               id: string;
@@ -457,44 +573,17 @@ export async function loadExecutiveDashboard(
       perms.dealsView
         ? loadRisks(dealWhere, prodWhere, now)
         : Promise.resolve([] as RiskRow[]),
-      loadNextActions(
-        access,
-        perms,
-        sessionUser,
-        leadWhere,
-        dealWhere,
-        now,
-      ),
-      layout === "sales"
-        ? Promise.resolve(null)
-        : loadTeamPerformance(perms, sessionUser, dealWhere, now),
-      perms.leadsView
-        ? prisma.lead.count({
-            where: {
-              ...leadWhere,
-              stage: { isFinal: false },
-              OR: [
-                { lastActivityAt: null },
-                { lastActivityAt: { lt: subDays(now, 2) } },
-              ],
-            },
-          })
-        : Promise.resolve(0),
-      perms.tasksView
-      && taskScope
-        ? prisma.task.count({
-            where: {
-              AND: [
-                taskScope,
-                {
-                  status: { in: [TaskStatus.OPEN, TaskStatus.IN_PROGRESS] },
-                  dueAt: { not: null, lt: now },
-                },
-              ],
-            },
-          })
-        : Promise.resolve(0),
+      teamBlockPromise,
+      staleLeadsCountPromise,
+      overdueTasksCountPromise,
+      submittedHandoffsCountPromise,
     ]);
+
+    const nextActions = await loadNextActions(access, perms, dealWhere, submittedHandoffsCount, {
+      staleLeadsCount,
+      overdueTasksCount,
+      productionAtRiskCount: productionStats.atRiskCount,
+    });
 
     const revWork = num(revenueInWork._sum.value);
     const paidM = num(paidMonth._sum.amount);
@@ -524,7 +613,7 @@ export async function loadExecutiveDashboard(
       kpis.push({
         id: "rev_work",
         title: "Виручка в роботі",
-        hint: "Сума активних угод (OPEN / ON_HOLD) у вашій видимості.",
+        hint: "Сума активних замовлень (OPEN / ON_HOLD) у вашій видимості.",
         value: formatUah(revWork),
         valueNumeric: revWork,
         delta: null,
@@ -555,7 +644,7 @@ export async function loadExecutiveDashboard(
       kpis.push({
         id: "gross_forecast",
         title: "Прогноз валового прибутку",
-        hint: "Оцінка: value − закупівлі − витрати по відкритих угодах (до 150 шт.).",
+        hint: "Оцінка: value − закупівлі − витрати по відкритих замовленнях (до 150 шт.).",
         value: formatUah(grossForecast),
         valueNumeric: grossForecast,
         delta: null,
@@ -615,7 +704,7 @@ export async function loadExecutiveDashboard(
       delayedProduction: productionBlock?.delayed ?? 0,
     });
 
-    return {
+    return cacheAndReturn({
       layout,
       query,
       kpis,
@@ -633,7 +722,7 @@ export async function loadExecutiveDashboard(
       behavior,
       daily,
       legacyAttentionCount: 0,
-    };
+    });
   } catch (e) {
     console.error("loadExecutiveDashboard", e);
     return buildEmptyDashboardPayload(layout, query, {
@@ -959,7 +1048,7 @@ async function loadProductionStats(
     const base = (prodWhere ?? {}) as Record<string, unknown>;
     const issueOrderFilter =
       Object.keys(base).length > 0 ? { order: base } : {};
-    const [queued, inProgress, delayed, ready, issues, delayedOrders] =
+    const [queued, inProgress, delayed, ready, atRiskCount, issues, delayedOrders] =
       await Promise.all([
         (prisma as unknown as { productionOrder: { count: (a: unknown) => Promise<number> } }).productionOrder.count({
           where: { ...base, status: ProductionOrderStatus.QUEUED },
@@ -981,6 +1070,9 @@ async function loadProductionStats(
         }),
         (prisma as unknown as { productionOrder: { count: (a: unknown) => Promise<number> } }).productionOrder.count({
           where: { ...base, status: ProductionOrderStatus.COMPLETED },
+        }),
+        (prisma as unknown as { productionOrder: { count: (a: unknown) => Promise<number> } }).productionOrder.count({
+          where: { ...base, atRisk: true },
         }),
         hasProductionIssue
           ? (prisma as unknown as { productionIssue: { findMany: (a: unknown) => Promise<{ id: string; description: string; orderId: string }[]> } }).productionIssue.findMany({
@@ -1034,6 +1126,7 @@ async function loadProductionStats(
       ready,
       loadPct,
       ringPct,
+      atRiskCount,
       issues: issues.map((i) => ({
         id: i.id,
         title: i.description.slice(0, 80),
@@ -1047,7 +1140,7 @@ async function loadProductionStats(
   const issueFlowFilter =
     Object.keys(wf).length > 0 ? { flow: wf } : {};
 
-  const [queued, inProgress, delayed, ready, risks, delayedFlows] =
+  const [queued, inProgress, delayed, ready, atRiskCount, risks, delayedFlows] =
     await Promise.all([
       prisma.productionFlow.count({
         where: {
@@ -1085,6 +1178,9 @@ async function loadProductionStats(
       }),
       prisma.productionFlow.count({
         where: { ...wf, status: ProductionFlowStatus.DONE },
+      }),
+      prisma.productionFlow.count({
+        where: { ...(prodWhere ?? {}), riskScore: { gte: 70 } },
       }),
       prisma.productionRisk.findMany({
         where: {
@@ -1137,6 +1233,7 @@ async function loadProductionStats(
     ready,
     loadPct,
     ringPct,
+    atRiskCount,
     issues: risks.map((i) => ({
       id: i.id,
       title: (i.title || i.description).slice(0, 80),
@@ -1501,103 +1598,64 @@ async function loadRisks(
 async function loadNextActions(
   access: SessionAccess,
   perms: ExecutiveDashboardPerms,
-  sessionUser: ReturnType<typeof sessionUserFromAccess>,
-  leadWhere: Prisma.LeadWhereInput | undefined,
   dealWhere: Prisma.DealWhereInput | undefined,
-  now: Date,
+  submittedHandoffsCount: number,
+  metrics: {
+    staleLeadsCount: number;
+    overdueTasksCount: number;
+    productionAtRiskCount: number;
+  },
 ): Promise<NextActionItem[]> {
   const actions: NextActionItem[] = [];
-  const h48 = subDays(now, 2);
 
-  if (perms.leadsView && leadWhere) {
-    const stale = await prisma.lead.count({
-      where: {
-        ...leadWhere,
-        stage: { isFinal: false },
-        OR: [
-          { lastActivityAt: null },
-          { lastActivityAt: { lt: h48 } },
-        ],
-      },
+  if (perms.leadsView && metrics.staleLeadsCount > 0) {
+    actions.push({
+      id: "follow-leads",
+      title: "Передзвонити та оновити ліди без руху",
+      reason: `${metrics.staleLeadsCount} активних лідів без активності >48 год`,
+      urgency: "high",
+      ctaLabel: "До лідів",
+      href: "/leads",
+      entityType: "lead",
     });
-    if (stale > 0) {
-      actions.push({
-        id: "follow-leads",
-        title: "Передзвонити та оновити ліди без руху",
-        reason: `${stale} активних лідів без активності >48 год`,
-        urgency: "high",
-        ctaLabel: "До лідів",
-        href: "/leads",
-        entityType: "lead",
-      });
-    }
   }
 
   if (perms.dealsView && dealWhere) {
-    const hand = await prisma.dealHandoff.count({
-      where: {
-        status: HandoffStatus.SUBMITTED,
-        deal: { is: dealWhere },
-      },
-    });
-    if (hand > 0) {
+    if (submittedHandoffsCount > 0) {
       actions.push({
         id: "handoff",
         title: "Підтвердити передачу у виробництво",
-        reason: `${hand} пакет(ів) очікує прийняття`,
+        reason: `${submittedHandoffsCount} пакет(ів) очікує прийняття`,
         urgency: "high",
-        ctaLabel: "Угоди",
+        ctaLabel: "Замовлення",
         href: "/deals",
         entityType: "deal",
       });
     }
   }
 
-  if (perms.tasksView) {
-    const taskScope = await taskListWhereForUser(prisma, sessionUser);
-    const overdue = await prisma.task.count({
-      where: {
-        AND: [
-          taskScope,
-          {
-            status: { in: [TaskStatus.OPEN, TaskStatus.IN_PROGRESS] },
-            dueAt: { not: null, lt: now },
-          },
-        ],
-      },
-    });
-    if (overdue > 0) {
+  if (perms.tasksView && metrics.overdueTasksCount > 0) {
       actions.push({
         id: "tasks",
         title: "Закрити прострочені задачі",
-        reason: `${overdue} задач з простроченим дедлайном`,
+        reason: `${metrics.overdueTasksCount} задач з простроченим дедлайном`,
         urgency: "medium",
         ctaLabel: "Задачі",
         href: "/tasks/overdue",
         entityType: "task",
       });
-    }
   }
 
-  if (perms.productionView) {
-    const atRisk = hasProductionOrder
-      ? await (prisma as unknown as { productionOrder: { count: (a: unknown) => Promise<number> } }).productionOrder.count({
-          where: { atRisk: true },
-        })
-      : await prisma.productionFlow.count({
-          where: { riskScore: { gte: 70 } },
-        });
-    if (atRisk > 0) {
+  if (perms.productionView && metrics.productionAtRiskCount > 0) {
       actions.push({
         id: "prod-risk",
         title: "Перевірити замовлення з позначкою «ризик»",
-        reason: `${atRisk} замовлень позначено AI/оператором як ризикові`,
+        reason: `${metrics.productionAtRiskCount} замовлень позначено AI/оператором як ризикові`,
         urgency: "high",
         ctaLabel: "Виробництво",
         href: "/crm/production",
         entityType: "production",
       });
-    }
   }
 
   return actions.slice(0, 12);
@@ -1608,6 +1666,7 @@ async function loadTeamPerformance(
   sessionUser: ReturnType<typeof sessionUserFromAccess>,
   dealWhere: Prisma.DealWhereInput,
   now: Date,
+  precomputedOverdueTasks?: number,
 ): Promise<TeamPerformanceBlock | null> {
   if (!perms.dealsView) return null;
 
@@ -1685,19 +1744,21 @@ async function loadTeamPerformance(
   );
 
   const dealsInWork = dealGroups.reduce((s, g) => s + g._count._all, 0);
-  const tasksOverdue = taskScope
-    ? await prisma.task.count({
-        where: {
-          AND: [
-            taskScope,
-            {
-              status: { in: [TaskStatus.OPEN, TaskStatus.IN_PROGRESS] },
-              dueAt: { not: null, lt: now },
-            },
-          ],
-        },
-      })
-    : 0;
+  const tasksOverdue =
+    precomputedOverdueTasks ??
+    (taskScope
+      ? await prisma.task.count({
+          where: {
+            AND: [
+              taskScope,
+              {
+                status: { in: [TaskStatus.OPEN, TaskStatus.IN_PROGRESS] },
+                dueAt: { not: null, lt: now },
+              },
+            ],
+          },
+        })
+      : 0);
 
   const totalWon = [...wonBy.values()].reduce((s, n) => s + n, 0);
   const avgConversionPct =
@@ -1756,9 +1817,9 @@ function buildDirectorAi(input: {
   production: ProductionOverview | null;
 }): DirectorAiBlock {
   const lines = [
-    `Операційний зріз: у роботі ≈ ${formatUah(input.revWork)} у відкритих угодах, сплачено цього місяця ≈ ${formatUah(input.paidM)}.`,
+    `Операційний зріз: у роботі ≈ ${formatUah(input.revWork)} у відкритих замовленнях, сплачено цього місяця ≈ ${formatUah(input.paidM)}.`,
     `Активних лідів: ${input.activeLeads}; очікувані надходження по рахунках ≈ ${formatUah(input.expected)}.`,
-    `Грубий прогноз валового по відкритих угодах: ≈ ${formatUah(input.grossForecast)} (залежить від повноти смет і закупівель).`,
+    `Грубий прогноз валового по відкритих замовленнях: ≈ ${formatUah(input.grossForecast)} (залежить від повноти смет і закупівель).`,
   ];
 
   const problems: DirectorAiBlock["problems"] = [];
@@ -1798,7 +1859,7 @@ function buildDirectorAi(input: {
     problems,
     recommendations,
     forecast: {
-      revenue: `Очікуване накопичення по відкритих угодах: ≈ ${formatUah(input.revWork)} (не факт кешу).`,
+      revenue: `Очікуване накопичення по відкритих замовленнях: ≈ ${formatUah(input.revWork)} (не факт кешу).`,
       risks:
         input.risks.length > 0
           ? `Топ-ризик: ${input.risks[0]?.name ?? "—"} (${input.risks[0]?.score ?? 0}/100).`

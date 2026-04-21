@@ -54,7 +54,7 @@ export function DuplicateWarning({ loading, matches }: DuplicateWarningProps) {
           }
           return (
             <li key={`deal-${m.id}`}>
-              Угода:{" "}
+              Замовлення:{" "}
               <a
                 href={`/deals/${m.id}/workspace`}
                 className="font-medium underline"

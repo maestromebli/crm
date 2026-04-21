@@ -19,7 +19,7 @@ export async function requireDealAccess(
     select: { id: true, ownerId: true },
   });
   if (!deal) {
-    return { error: NextResponse.json({ error: "Угоду не знайдено" }, { status: 404 }) };
+    return { error: NextResponse.json({ error: "Замовлення не знайдено" }, { status: 404 }) };
   }
   const denied = await forbidUnlessDealAccess(user, requiredPermission, deal);
   if (denied) return { error: denied };

@@ -68,7 +68,7 @@ export default async function ProductionConstructorsPage() {
       <header>
         <h1 className="text-xl font-semibold text-[var(--enver-text)]">Конструктори</h1>
         <p className="mt-1 text-sm text-slate-600">
-          Угоди після запуску у виробництво: кімната конструктора та посилання для
+          Замовлення після запуску у виробництво: кімната конструктора та посилання для
           віддалених виконавців. На екрані — до 500 останніх за оновленням; повний
           вибірка для експорту «CSV (сервер)» — до 2000 записів.
         </p>
@@ -76,7 +76,7 @@ export default async function ProductionConstructorsPage() {
 
       {deals.length === 0 ? (
         <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-8 text-center text-slate-600">
-          Немає угод із запущеним виробництвом і прийнятою передачею.
+          Немає замовлень із запущеним виробництвом і прийнятою передачею.
         </p>
       ) : (
         <ConstructorsBoardClient initialRows={rows} />

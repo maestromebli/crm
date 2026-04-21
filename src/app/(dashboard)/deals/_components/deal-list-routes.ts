@@ -1,6 +1,6 @@
 import type { DealListViewId } from "../../../../features/deal-workspace/queries";
 
-/** Канонічні маршрути списку угод (бокове меню + горизонтальна навігація модуля). */
+/** Канонічні маршрути списку замовлень (бокове меню + горизонтальна навігація модуля). */
 export const DEAL_LIST_ROUTES: Array<{
   href: string;
   view: DealListViewId;

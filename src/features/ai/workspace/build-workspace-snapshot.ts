@@ -1,4 +1,5 @@
 import { prisma } from "../../../lib/prisma";
+import { redactContextForAi } from "../../../lib/ai/context-denylist";
 import type { AiWorkspacePayload } from "./types";
 
 function hoursBetween(a: Date, b: Date): number {
@@ -136,11 +137,7 @@ async function buildLeadSnapshot(leadId: string): Promise<AiWorkspacePayload | n
       : "Розрахунок у системі відсутній."
   }`;
 
-  const confirmedFacts: string[] = [
-    `Етап воронки: ${stageName}`,
-    `Власник запису (id): ${lead.ownerId}`,
-  ];
-  if (lead.phone) confirmedFacts.push(`Телефон у картці: ${lead.phone}`);
+  const confirmedFacts: string[] = [`Етап воронки: ${stageName}`];
   if (latest?.sentAt)
     confirmedFacts.push(`КП надіслано: ${latest.sentAt.toISOString()}`);
 
@@ -176,7 +173,7 @@ async function buildLeadSnapshot(leadId: string): Promise<AiWorkspacePayload | n
   if (!latestEst && stageName.toLowerCase().includes("розрах"))
     openQuestions.push("Чи готовий розрахунок до узгодження з клієнтом?");
 
-  return {
+  return redactContextForAi({
     entity: "lead",
     entityId: lead.id,
     title: lead.title,
@@ -229,7 +226,7 @@ async function buildLeadSnapshot(leadId: string): Promise<AiWorkspacePayload | n
         sentAt: latest?.sentAt?.toISOString() ?? null,
         hints:
           latest?.status === "APPROVED"
-            ? ["КП узгоджено — можна готувати перехід до угоди."]
+            ? ["КП узгоджено — можна готувати перехід до замовлення."]
             : latest?.status === "SENT"
               ? ["Простежте за відповіддю та зафіксуйте її в діалозі."]
               : ["Підготуйте та надішліть КП після узгодження розрахунку."],
@@ -240,11 +237,11 @@ async function buildLeadSnapshot(leadId: string): Promise<AiWorkspacePayload | n
         blockers: [],
         warnings: [],
         checklistHint: [
-          "Передача у виробництво доступна після конверсії ліда в угоду.",
+          "Передача у виробництво доступна після конверсії ліда в замовлення.",
         ],
       },
     },
-  };
+  }) as AiWorkspacePayload;
 }
 
 async function buildDealSnapshot(
@@ -382,14 +379,14 @@ async function buildDealSnapshot(
     );
   }
 
-  const whatsHappening = `Угода «${deal.title}» для клієнта «${deal.client.name}», етап «${deal.stage.name}». ${
+  const whatsHappening = `Замовлення «${deal.title}» для клієнта «${deal.client.name}», етап «${deal.stage.name}». ${
     deal.contract
       ? `Договір: ${deal.contract.status}.`
       : "Договір ще не створено в системі."
   }`;
 
   let nextStep =
-    "Перевірте робоче місце угоди: файли, оплати та готовність до виробництва.";
+    "Перевірте робоче місце замовлення: файли, оплати та готовність до виробництва.";
   if (rec === "not_ready" || blockers.length)
     nextStep = "Усуньте блокери готовності перед запуском у виробництво.";
   else if (deal.contract?.status === "DRAFT" || !deal.contract)
@@ -433,7 +430,7 @@ async function buildDealSnapshot(
       a.fileAiExtraction?.processingStatus === "PROCESSING",
   ).length;
 
-  return {
+  return redactContextForAi({
     entity: "deal",
     entityId: deal.id,
     title: deal.title,
@@ -477,7 +474,7 @@ async function buildDealSnapshot(
         checklistHint,
       },
     },
-  };
+  }) as AiWorkspacePayload;
 }
 
 export async function buildAiWorkspaceSnapshot(input: {

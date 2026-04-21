@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { RefreshCw } from "lucide-react";
 
 type PulseResponse = {
@@ -8,19 +9,20 @@ type PulseResponse = {
   refreshedAt: string;
 };
 
-const POLL_MS = 20000;
+const POLL_MS = 60000;
 
 export function DashboardRealtimePill() {
+  const router = useRouter();
   const [hasUpdate, setHasUpdate] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const pulseRef = useRef<string | null>(null);
-  const refreshTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     let active = true;
     let timer: ReturnType<typeof setInterval> | null = null;
 
     const tick = async () => {
+      if (document.visibilityState !== "visible") return;
       try {
         const res = await fetch("/api/realtime/pulse", { cache: "no-store" });
         if (!res.ok) return;
@@ -46,30 +48,25 @@ export function DashboardRealtimePill() {
     return () => {
       active = false;
       if (timer) clearInterval(timer);
-      if (refreshTimeoutRef.current) {
-        window.clearTimeout(refreshTimeoutRef.current);
-      }
     };
   }, []);
 
   return (
     <button
       type="button"
-      onClick={() => {
+      onClick={async () => {
         setIsRefreshing(true);
         setHasUpdate(false);
-        if (refreshTimeoutRef.current) {
-          window.clearTimeout(refreshTimeoutRef.current);
-        }
-        refreshTimeoutRef.current = window.setTimeout(() => {
-          refreshTimeoutRef.current = null;
-          /*
-           * Next.js `router.refresh()` can intermittently throw `Failed to fetch`
-           * in the client router reducer. For this explicit user action, do a
-           * hard refresh to avoid noisy runtime errors and guarantee fresh data.
-           */
+        try {
+          router.refresh();
+        } catch {
+          // Fallback лише якщо router refresh зламався у runtime.
           window.location.reload();
-        }, 120);
+          return;
+        }
+        window.setTimeout(() => {
+          setIsRefreshing(false);
+        }, 700);
       }}
       className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium transition ${
         hasUpdate

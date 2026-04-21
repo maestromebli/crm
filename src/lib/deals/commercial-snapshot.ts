@@ -2,7 +2,7 @@ import type { Prisma } from "@prisma/client";
 
 import { parseProposalSnapshot } from "../leads/proposal-snapshot";
 
-/** Незмінний знімок КП на угоді (копія з LeadProposal). */
+/** Незмінний знімок КП на замовленні (копія з LeadProposal). */
 export type DealCommercialSnapshotV1 = {
   schema: "deal_commercial_snapshot_v1";
   frozenAt: string;

@@ -1,34 +1,56 @@
-import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { requireSessionUser, forbidUnlessPermission } from "@/lib/authz/api-guard";
+import { NextRequest, NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
+import { updateContractVariablesSchema } from "@/features/contracts/schemas/contract.schema";
+import { forbidUnlessPermission, requireSessionUser } from "@/lib/authz/api-guard";
 import { P } from "@/lib/authz/permissions";
-import { mapContractDetails, ensureContractUpdateAllowed, extractContentParts } from "@/lib/contracts/service";
-import { patchContractSchema } from "@/lib/contracts/schemas";
-import { apiToDealContractStatus } from "@/lib/contracts/status-map";
+import { mapContractDetails } from "@/lib/contracts/service";
+import { prisma } from "@/lib/prisma";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-export async function GET(_req: Request, ctx: Ctx) {
+function normalizeLegacyContractStatus(status: string): string {
+  if (status === "VIEWED_BY_CUSTOMER") return "VIEWED_BY_CLIENT";
+  if (status === "SENT_TO_CUSTOMER") return "SENT_FOR_SIGNATURE";
+  return status;
+}
+
+export async function GET(_req: NextRequest, ctx: Ctx) {
   const user = await requireSessionUser();
   if (user instanceof NextResponse) return user;
   const denied = forbidUnlessPermission(user, P.CONTRACTS_VIEW);
   if (denied) return denied;
 
   const { id } = await ctx.params;
-  const contract = await prisma.dealContract.findUnique({ where: { id } });
-  if (!contract) {
-    return NextResponse.json({ error: "Контракт не знайдено" }, { status: 404 });
+  const enverContract = await prisma.enverContract.findUnique({
+    where: { id },
+    include: {
+      parties: true,
+      sessions: { orderBy: { createdAt: "desc" } },
+      artifacts: true,
+      auditEvents: { orderBy: { createdAt: "desc" }, take: 100 },
+    },
+  });
+  if (enverContract) {
+    return NextResponse.json(enverContract);
   }
 
-  const attachments = await prisma.attachment.findMany({
+  const legacyContract = await prisma.dealContract.findUnique({
+    where: { id },
+  });
+  if (!legacyContract) {
+    return NextResponse.json({ error: "CONTRACT_NOT_FOUND" }, { status: 404 });
+  }
+
+  const details = mapContractDetails(legacyContract);
+  const documents = await prisma.attachment.findMany({
     where: {
       entityType: "DEAL",
-      entityId: contract.dealId,
+      entityId: legacyContract.dealId,
       deletedAt: null,
       category: { in: ["CONTRACT", "SPEC"] },
     },
     orderBy: { createdAt: "desc" },
-    take: 40,
+    take: 50,
     select: {
       id: true,
       fileName: true,
@@ -37,20 +59,16 @@ export async function GET(_req: Request, ctx: Ctx) {
       createdAt: true,
     },
   });
-
-  const timeline = await prisma.activityLog.findMany({
+  const auditRows = await prisma.activityLog.findMany({
     where: {
       entityType: "DEAL",
-      entityId: contract.dealId,
-      type: { in: ["CONTRACT_STATUS_CHANGED", "CONTRACT_CREATED"] },
+      entityId: legacyContract.dealId,
+      type: "CONTRACT_STATUS_CHANGED",
     },
     orderBy: { createdAt: "desc" },
-    take: 50,
+    take: 100,
     select: {
-      id: true,
       type: true,
-      actorUserId: true,
-      source: true,
       data: true,
       createdAt: true,
     },
@@ -59,97 +77,59 @@ export async function GET(_req: Request, ctx: Ctx) {
   return NextResponse.json({
     ok: true,
     data: {
-      ...mapContractDetails(contract),
-      documents: attachments.map((item) => ({
-        id: item.id,
-        fileName: item.fileName,
-        fileUrl: item.fileUrl,
-        type: item.category,
-        createdAt: item.createdAt.toISOString(),
+      ...details,
+      status: normalizeLegacyContractStatus(details.status),
+      documents: documents.map((doc) => ({
+        id: doc.id,
+        fileName: doc.fileName,
+        fileUrl: doc.fileUrl,
+        type: doc.category,
+        createdAt: doc.createdAt.toISOString(),
       })),
-      audit: timeline.map((row) => ({
-        id: row.id,
+      audit: auditRows.map((row) => ({
         action: row.type,
-        actorUserId: row.actorUserId,
-        source: row.source,
-        payload: row.data,
+        payload:
+          row.data && typeof row.data === "object"
+            ? (row.data as Record<string, unknown>)
+            : {},
         createdAt: row.createdAt.toISOString(),
       })),
     },
   });
 }
 
-export async function PATCH(req: Request, ctx: Ctx) {
+export async function PATCH(req: NextRequest, ctx: Ctx) {
   const user = await requireSessionUser();
   if (user instanceof NextResponse) return user;
   const denied = forbidUnlessPermission(user, P.CONTRACTS_UPDATE);
   if (denied) return denied;
 
   const { id } = await ctx.params;
-  const contract = await prisma.dealContract.findUnique({ where: { id } });
+  const contract = await prisma.enverContract.findUnique({ where: { id } });
   if (!contract) {
-    return NextResponse.json({ error: "Контракт не знайдено" }, { status: 404 });
+    return NextResponse.json({ error: "CONTRACT_NOT_FOUND" }, { status: 404 });
   }
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Некоректний JSON" }, { status: 400 });
-  }
-  const parsed = patchContractSchema.safeParse(body);
+  const body = await req.json();
+  const parsed = updateContractVariablesSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Некоректні дані", details: parsed.error.flatten() }, { status: 400 });
+    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { fields: currentFields, contentJson } = extractContentParts(contract.content);
-  try {
-    ensureContractUpdateAllowed({
-      currentStatus: contract.status,
-      targetStatus: parsed.data.status,
-      updates: parsed.data.fields,
-    });
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : "UPDATE_NOT_ALLOWED";
-    return NextResponse.json({ error: msg }, { status: 409 });
-  }
-
-  const nextFields = {
-    ...currentFields,
-    ...(parsed.data.fields ?? {}),
-  };
-
-  const nextStatus = parsed.data.status ? apiToDealContractStatus(parsed.data.status) : contract.status;
-  const nextContent = {
-    ...(typeof contract.content === "object" && contract.content ? (contract.content as Record<string, unknown>) : {}),
-    contentJson: {
-      ...contentJson,
-      fields: nextFields,
-    },
-  } as object;
-
-  const updated = await prisma.dealContract.update({
+  const updated = await prisma.enverContract.update({
     where: { id },
     data: {
-      status: nextStatus,
-      content: nextContent,
-    },
-  });
-
-  await prisma.activityLog.create({
-    data: {
-      entityType: "DEAL",
-      entityId: contract.dealId,
-      type: "CONTRACT_STATUS_CHANGED",
-      actorUserId: user.id,
-      source: "USER",
-      data: {
-        action: "contracts_patch",
-        status: nextStatus,
-        fields: Object.keys(parsed.data.fields ?? {}),
+      payloadJson: parsed.data.payloadJson as Prisma.InputJsonValue,
+      status: "READY_FOR_REVIEW",
+      auditEvents: {
+        create: {
+          eventType: "CONTRACT_UPDATED",
+          metadataJson: {
+            keys: Object.keys(parsed.data.payloadJson),
+          } as Prisma.InputJsonValue,
+        },
       },
     },
   });
-
-  return NextResponse.json({ ok: true, data: mapContractDetails(updated) });
+  return NextResponse.json(updated);
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { timingSafeEqual } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import type { DealContractStatus } from "@prisma/client";
 import { prisma } from "../../../../../../lib/prisma";
@@ -27,7 +28,19 @@ type DiiaEventLogItem = {
 function verifyWebhookSecret(req: Request): NextResponse | null {
   const configuredSecret = process.env.DIIA_WEBHOOK_SECRET?.trim();
   const incomingSecret = req.headers.get("x-diia-webhook-secret")?.trim() ?? "";
-  if (configuredSecret && incomingSecret !== configuredSecret) {
+  if (!configuredSecret) {
+    return NextResponse.json(
+      { error: "DIIA_WEBHOOK_SECRET не задано" },
+      { status: 503 },
+    );
+  }
+
+  const left = Buffer.from(incomingSecret);
+  const right = Buffer.from(configuredSecret);
+  if (
+    left.length !== right.length ||
+    !timingSafeEqual(left, right)
+  ) {
     return NextResponse.json({ error: "Заборонено" }, { status: 403 });
   }
   return null;

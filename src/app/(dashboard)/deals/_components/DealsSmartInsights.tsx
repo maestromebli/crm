@@ -35,7 +35,7 @@ export function DealsSmartInsights({ rows }: Props) {
     }).length;
     if (overdue > 0) {
       out.push(
-        `${overdue} угод з простроченим запланованим контактом — пріоритезуйте follow-up.`,
+        `${overdue} замовлень з простроченим запланованим контактом — пріоритезуйте follow-up.`,
       );
     }
 
@@ -49,14 +49,14 @@ export function DealsSmartInsights({ rows }: Props) {
     const noContract = open.filter((r) => !r.hasContract).length;
     if (noContract > 0 && rows.some((r) => r.hasContract)) {
       out.push(
-        `${noContract} угод ще без договору в системі — перевірте юридичний блок у робочому місці.`,
+        `${noContract} замовлень ще без договору в системі — перевірте юридичний блок у робочому місці.`,
       );
     }
 
     const critical = rows.filter((r) => r.warningBadge === "critical").length;
     if (critical > 0) {
       out.push(
-        `${critical} угод з критичним ризиком у списку — відкрийте картку та закрийте блокери.`,
+        `${critical} замовлень з критичним ризиком у списку — відкрийте картку та закрийте блокери.`,
       );
     }
 
@@ -68,7 +68,7 @@ export function DealsSmartInsights({ rows }: Props) {
       const top = [...byPipe.entries()].sort((a, b) => b[1] - a[1])[0];
       if (top) {
         out.push(
-          `Найбільший потік зараз: «${top[0]}» (${top[1]} угод) — зосередьте увагу на стадіях цієї воронки.`,
+          `Найбільший потік зараз: «${top[0]}» (${top[1]} замовлень) — зосередьте увагу на стадіях цієї воронки.`,
         );
       }
     }

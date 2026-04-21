@@ -50,7 +50,7 @@ export function evaluateDealStageTransitionGuard(input: StageGuardInput): StageG
   if (input.nextStageSlug === "won" && !input.productionStarted) {
     blockers.push({
       code: "production_started_required",
-      message: "Для завершення угоди потрібно зафіксувати запуск у виробництво.",
+      message: "Для завершення замовлення потрібно зафіксувати запуск у виробництво.",
     });
   }
 

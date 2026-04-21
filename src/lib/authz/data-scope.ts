@@ -26,7 +26,7 @@ export type AccessContext = {
 };
 
 /**
- * Контекст видимості лідів/угод/задач за власником сутності.
+ * Контекст видимості лідів/замовлень/задач за власником сутності.
  */
 export async function resolveAccessContext(
   prisma: PrismaClient,

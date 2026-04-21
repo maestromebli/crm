@@ -59,7 +59,7 @@ export async function POST(req: Request, ctx: Ctx) {
 
       return NextResponse.json(
 
-        { error: "Лід привʼязаний до угоди — прорахунок у картці угоди" },
+        { error: "Лід привʼязаний до замовлення — прорахунок у картці замовлення" },
 
         { status: 409 },
 

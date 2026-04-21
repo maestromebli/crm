@@ -49,7 +49,7 @@ export function pushRecentNav(entry: Omit<RecentNavEntry, "ts">, max: number) {
 export const POPULAR_NAV_PRESETS: Array<{ id: string; label: string; href: string }> = [
   { id: "popular:dashboard", label: "Дашборд CRM", href: "/crm/dashboard" },
   { id: "popular:leads", label: "Ліди", href: "/leads" },
-  { id: "popular:deals", label: "Угоди", href: "/deals" },
+  { id: "popular:deals", label: "Замовлення", href: "/deals" },
   { id: "popular:finance", label: "Фінанси", href: "/crm/finance" },
   { id: "popular:production", label: "Виробництво", href: "/crm/production" },
   { id: "popular:tasks", label: "Задачі", href: "/tasks" },

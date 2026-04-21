@@ -10,7 +10,7 @@ export function DealFinanceCard({ finance }: Props) {
   return (
     <section className="rounded-2xl border border-[var(--enver-border)] bg-[var(--enver-card)] p-4">
       <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--enver-muted)]">
-        Фінанси угоди
+        Фінанси замовлення
       </h3>
       {finance.hasNumeric ? (
         <div className="mt-3 grid grid-cols-3 gap-2 text-center">

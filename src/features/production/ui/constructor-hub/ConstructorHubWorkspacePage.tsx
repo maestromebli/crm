@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { ConstructorActionBar } from "./components/ConstructorActionBar";
 import { ConstructorAIInsights } from "./components/ConstructorAIInsights";
@@ -66,7 +67,8 @@ export function ConstructorHubWorkspacePage({ workspace }: { workspace: Construc
         />
 
         <div className="min-w-0 space-y-3">
-          <div className="flex flex-wrap gap-1 rounded-2xl border border-slate-200 bg-white p-1 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white p-1 shadow-sm">
+            <div className="flex flex-wrap gap-1">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
@@ -79,6 +81,13 @@ export function ConstructorHubWorkspacePage({ workspace }: { workspace: Construc
                 {tab.label}
               </button>
             ))}
+            </div>
+            <Link
+              href={`/deals/${workspace.header.dealId}/workspace?tab=production`}
+              className="rounded-xl border border-slate-200 bg-[var(--enver-card)] px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-[var(--enver-hover)]"
+            >
+              Робоча зона в замовленні
+            </Link>
           </div>
 
           {activeTab === "TECH" ? (

@@ -32,7 +32,7 @@ export async function POST(req: Request, ctx: Ctx) {
     where: { id: payload.dealId },
     select: { id: true, workspaceMeta: true },
   });
-  if (!deal) return NextResponse.json({ error: "Угоду не знайдено" }, { status: 404 });
+  if (!deal) return NextResponse.json({ error: "Замовлення не знайдено" }, { status: 404 });
 
   const meta =
     deal.workspaceMeta && typeof deal.workspaceMeta === "object" && !Array.isArray(deal.workspaceMeta)

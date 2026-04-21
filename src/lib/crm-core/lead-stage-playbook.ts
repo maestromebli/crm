@@ -51,10 +51,10 @@ export const LEAD_STAGE_PLAYBOOK: Record<LeadStageKey, StagePlaybookEntry> = {
     recommendedCtaUa: "Запланувати follow-up",
   },
   APPROVED: {
-    purposeUa: "Фіналізувати суму та перейти в угоду.",
+    purposeUa: "Фіналізувати суму та перейти в замовлення.",
     requiredFieldsUa: ["Погоджене КП", "Сума в сметі"],
-    exitConditionsUa: ["Готовність до конверсії в угоду"],
-    recommendedCtaUa: "Конвертувати в угоду",
+    exitConditionsUa: ["Готовність до конверсії в замовлення"],
+    recommendedCtaUa: "Конвертувати в замовлення",
   },
   CLIENT: {
     purposeUa: "Підтримка клієнта після узгодження умов.",
@@ -69,16 +69,16 @@ export const LEAD_STAGE_PLAYBOOK: Record<LeadStageKey, StagePlaybookEntry> = {
     recommendedCtaUa: "Запланувати контрольний замір",
   },
   CONTRACT: {
-    purposeUa: "Юридичне оформлення в угоді.",
+    purposeUa: "Юридичне оформлення в замовленні.",
     requiredFieldsUa: ["Погоджені комерційні умови"],
-    exitConditionsUa: ["Договір у роботі в картці угоди"],
-    recommendedCtaUa: "Перейти до договору в угоді",
+    exitConditionsUa: ["Договір у роботі в картці замовлення"],
+    recommendedCtaUa: "Перейти до договору в замовленні",
   },
   DEAL: {
     purposeUa: "Операційна робота після конверсії.",
     requiredFieldsUa: [],
-    exitConditionsUa: ["Угода ведеться в окремому робочому просторі"],
-    recommendedCtaUa: "Відкрити угоду",
+    exitConditionsUa: ["Замовлення ведеться в окремому робочому просторі"],
+    recommendedCtaUa: "Відкрити замовлення",
   },
   PRODUCTION_READY: {
     purposeUa: "Пакет для передачі у виробництво.",
@@ -87,7 +87,7 @@ export const LEAD_STAGE_PLAYBOOK: Record<LeadStageKey, StagePlaybookEntry> = {
     recommendedCtaUa: "Підтвердити готовність до виробництва",
   },
   LOST: {
-    purposeUa: "Закриття без угоди.",
+    purposeUa: "Закриття без замовлення.",
     requiredFieldsUa: [],
     exitConditionsUa: [],
     recommendedCtaUa: "Архівувати причину",

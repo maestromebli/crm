@@ -63,7 +63,7 @@ export function forbidUnlessPermission(
 }
 
 /**
- * Перевірка права + scope власника угоди (SALES_MANAGER — свої; HEAD_MANAGER — лінія продажів).
+ * Перевірка права + scope власника замовлення (SALES_MANAGER — свої; HEAD_MANAGER — лінія продажів).
  */
 export async function forbidUnlessDealAccess(
   user: SessionUser,
@@ -79,7 +79,7 @@ export async function forbidUnlessDealAccess(
   if (!canAccessOwner(ctx, deal.ownerId)) {
     // Hide deal existence outside the caller's scope.
     return NextResponse.json(
-      { error: "Угоду не знайдено" },
+      { error: "Замовлення не знайдено" },
       { status: 404 },
     );
   }

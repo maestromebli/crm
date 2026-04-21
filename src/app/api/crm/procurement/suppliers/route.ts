@@ -10,10 +10,7 @@ export async function POST(req: Request) {
   try {
     const user = await requireSessionUser();
     if (user instanceof NextResponse) return user;
-    const canManage =
-      canProcurementAction(user, "procurement.supplier.manage") ||
-      canProcurementAction(user, "procurement.request.create");
-    if (!canManage) {
+    if (!canProcurementAction(user, "procurement.supplier.manage")) {
       return NextResponse.json({ error: "Недостатньо прав" }, { status: 403 });
     }
 
@@ -22,6 +19,19 @@ export async function POST(req: Request) {
     const category = body.category?.trim() || "Загальне";
     if (!name) {
       return NextResponse.json({ error: "Вкажіть назву постачальника" }, { status: 400 });
+    }
+
+    const existing = await prisma.supplier.findFirst({
+      where: {
+        name: {
+          equals: name,
+          mode: "insensitive",
+        },
+      },
+      select: { id: true },
+    });
+    if (existing) {
+      return NextResponse.json({ error: "Постачальник з такою назвою вже існує" }, { status: 409 });
     }
 
     const supplier = await prisma.supplier.create({

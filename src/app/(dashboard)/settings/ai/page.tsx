@@ -154,7 +154,7 @@ export default function SettingsAiPage() {
                 setCfg((c) => ({ ...c, dealSummary: e.target.checked }))
               }
             />{" "}
-            Підсумок угоди
+            Підсумок замовлення
           </label>
           <label className="flex items-center gap-2 text-[11px] text-slate-600">
             <input
@@ -184,7 +184,7 @@ export default function SettingsAiPage() {
                 setCfg((c) => ({ ...c, risks: e.target.checked }))
               }
             />{" "}
-            Ризики по угодах
+            Ризики по замовленнях
           </label>
         </div>
       </SettingsCard>
@@ -199,7 +199,7 @@ export default function SettingsAiPage() {
             наступні кроки у картці.
           </li>
           <li>
-            <span className="font-medium">Угоди</span> — підсумок угоди, ризики,
+            <span className="font-medium">Замовлення</span> — підсумок замовлення, ризики,
             рекомендації за стадією та наступні кроки.
           </li>
           <li>

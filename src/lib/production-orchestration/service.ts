@@ -45,7 +45,7 @@ export async function acceptProductionOrchestration(
   if (existing) {
     return {
       ok: false,
-      error: "Потік виробництва для цієї угоди вже створено",
+      error: "Потік виробництва для цієї замовлення вже створено",
       code: "CONFLICT",
     };
   }
@@ -113,7 +113,7 @@ export async function requestHandoffClarification(
     where: { id: input.dealId },
     select: { id: true },
   });
-  if (!deal) return { ok: false, error: "Угоду не знайдено" };
+  if (!deal) return { ok: false, error: "Замовлення не знайдено" };
 
   const flow = await prisma.productionFlow.findUnique({
     where: { dealId: input.dealId },
@@ -218,7 +218,7 @@ export async function assignProductionConstructor(
   if (!flow) {
     return {
       ok: false,
-      error: "Спочатку прийміть угоду у виробничий потік",
+      error: "Спочатку прийміть замовлення у виробничий потік",
       code: "NOT_FOUND",
     };
   }

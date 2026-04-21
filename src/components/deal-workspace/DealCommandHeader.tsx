@@ -4,7 +4,6 @@ import { MoreHorizontal } from "lucide-react";
 import type { DealWorkspacePayload, DealWorkspaceTabId } from "../../features/deal-workspace/types";
 import type {
   DealHealthStatus,
-  DealPrimaryNextAction,
   DealViewRole,
 } from "../../features/deal-workspace/deal-view-selectors";
 import { DealHealthBadge } from "./DealHealthBadge";
@@ -12,23 +11,23 @@ import { DealHealthBadge } from "./DealHealthBadge";
 type Props = {
   data: DealWorkspacePayload;
   health: DealHealthStatus;
-  primaryAction: DealPrimaryNextAction;
-  onPrimaryAction: () => void;
   onTab: (tab: DealWorkspaceTabId) => void;
   viewRole: DealViewRole;
   canSwitchRole: boolean;
   onRoleChange: (role: DealViewRole) => void;
+  progressLabel: string;
+  focusLabel: string;
 };
 
 export function DealCommandHeader({
   data,
   health,
-  primaryAction,
-  onPrimaryAction,
   onTab,
   viewRole,
   canSwitchRole,
   onRoleChange,
+  progressLabel,
+  focusLabel,
 }: Props) {
   return (
     <header className="rounded-2xl border border-[var(--enver-border)] bg-[var(--enver-card)]/95 px-4 py-3 backdrop-blur">
@@ -38,6 +37,7 @@ export function DealCommandHeader({
             {data.deal.title}
           </h1>
           <p className="truncate text-xs text-[var(--enver-text-muted)]">
+            {data.deal.number ? `№ ${data.deal.number} · ` : ""}
             {data.client.name} · {data.stage.name} · {data.owner.name ?? data.owner.email}
           </p>
           <div className="flex flex-wrap gap-1.5 text-[10px]">
@@ -49,6 +49,9 @@ export function DealCommandHeader({
               {health.reasonLabel}
             </span>
             <span className="rounded-full border border-[var(--enver-border)] bg-[var(--enver-surface)] px-2 py-0.5 text-[var(--enver-text-muted)]">
+              {progressLabel}
+            </span>
+            <span className="rounded-full border border-[var(--enver-border)] bg-[var(--enver-surface)] px-2 py-0.5 text-[var(--enver-text-muted)]">
               Оновлено:{" "}
               {new Date(data.deal.updatedAt).toLocaleString("uk-UA", {
                 dateStyle: "short",
@@ -56,6 +59,9 @@ export function DealCommandHeader({
               })}
             </span>
           </div>
+          <p className="truncate text-[11px] text-[var(--enver-text-muted)]">
+            Фокус етапу: {focusLabel}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           {canSwitchRole ? (
@@ -66,20 +72,13 @@ export function DealCommandHeader({
                 onChange={(e) => onRoleChange(e.target.value as DealViewRole)}
                 className="rounded-xl border border-[var(--enver-border)] bg-[var(--enver-surface)] px-2.5 py-2 text-[11px]"
               >
-                <option value="admin">Admin view</option>
-                <option value="manager">Manager view</option>
-                <option value="constructor">Constructor view</option>
-                <option value="production">Production view</option>
+                <option value="admin">Режим адміністратора</option>
+                <option value="manager">Режим менеджера</option>
+                <option value="constructor">Режим конструктора</option>
+                <option value="production">Режим виробництва</option>
               </select>
             </label>
           ) : null}
-          <button
-            type="button"
-            onClick={onPrimaryAction}
-            className="rounded-xl bg-[var(--enver-accent)] px-3 py-2 text-xs font-semibold text-white hover:opacity-95"
-          >
-            {primaryAction.label}
-          </button>
           <details className="relative">
             <summary className="list-none rounded-xl border border-[var(--enver-border)] bg-[var(--enver-surface)] px-2.5 py-2 text-[var(--enver-text-muted)] hover:bg-[var(--enver-hover)]">
               <MoreHorizontal className="h-4 w-4" aria-hidden />

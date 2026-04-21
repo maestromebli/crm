@@ -10,6 +10,17 @@ import {
 import { AI_CHAT_TOOLS } from "../../../../lib/ai/tools/definitions";
 import { executeAiTool } from "../../../../lib/ai/tools/execute";
 import { requireDatabaseUrl } from "../../../../lib/api/route-guards";
+import { logAiEvent } from "../../../../lib/ai/log-ai-event";
+import { requireAiRateLimit } from "../../../../lib/ai/route-guard";
+import {
+  estimateCostUsd,
+  estimateTokensApproxFromMessages,
+  sanitizeAiPayload,
+  type AiUsage,
+  usageFromProviderResponse,
+} from "../../../../lib/ai/safety";
+import { evaluateAiTextQuality } from "../../../../lib/ai/evals/quality";
+import { requestAiProvider } from "../../../../lib/ai/provider-request";
 
 export const runtime = "nodejs";
 
@@ -48,6 +59,12 @@ type ChatMessage = Record<string, unknown>;
 
 const MAX_TOOL_ROUNDS = 6;
 
+function aiTimeoutMs(): number {
+  const raw = Number.parseInt(process.env.AI_TIMEOUT_MS ?? "", 10);
+  if (!Number.isFinite(raw)) return 25_000;
+  return Math.max(1_000, Math.min(120_000, raw));
+}
+
 async function callChatCompletion(params: {
   apiKey: string;
   baseUrl: string;
@@ -65,7 +82,11 @@ async function callChatCompletion(params: {
         tool_calls?: ApiToolCall[];
       };
     }[];
+    usage?: Record<string, unknown>;
   };
+  usage?: AiUsage | null;
+  tokensApprox?: number;
+  costUsdApprox?: number | null;
   errorText?: string;
 }> {
   const { apiKey, baseUrl, model, messages, toolChoice, includeTools } =
@@ -73,7 +94,7 @@ async function callChatCompletion(params: {
 
   const body: Record<string, unknown> = {
     model,
-    messages,
+    messages: messages.map((msg) => sanitizeAiPayload(msg)),
     temperature: 0.45,
     max_tokens: 2400,
   };
@@ -83,21 +104,24 @@ async function callChatCompletion(params: {
     body.tool_choice = toolChoice;
   }
 
-  const response = await fetch(`${baseUrl}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify(body),
+  const providerResult = await requestAiProvider({
+    url: `${baseUrl}/chat/completions`,
+    apiKey,
+    timeoutMs: aiTimeoutMs(),
+    maxRetries: 2,
+    retryBaseDelayMs: 350,
+    body,
   });
 
-  if (!response.ok) {
-    const text = await response.text();
-    return { ok: false, status: response.status, errorText: text };
+  if (!providerResult.ok) {
+    return {
+      ok: false,
+      status: providerResult.status,
+      errorText: providerResult.errorText,
+    };
   }
 
-  const data = (await response.json()) as {
+  const data = (await providerResult.response.json()) as {
     choices?: {
       message?: {
         content?: string | null;
@@ -105,7 +129,23 @@ async function callChatCompletion(params: {
       };
     }[];
   };
-  return { ok: true, status: response.status, data };
+  const usage = usageFromProviderResponse(data);
+  const tokensApprox =
+    usage?.totalTokens ??
+    estimateTokensApproxFromMessages(
+      (body.messages as ChatMessage[]).map((m) => ({
+        content: (m as { content?: unknown }).content,
+      })),
+    );
+  const costUsdApprox = estimateCostUsd(model, usage);
+  return {
+    ok: true,
+    status: providerResult.response.status,
+    data,
+    usage,
+    tokensApprox,
+    costUsdApprox,
+  };
 }
 
 function lastMessageIsTool(messages: ChatMessage[]): boolean {
@@ -141,6 +181,14 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
+
+  const limited = await requireAiRateLimit({
+    userId: user.id,
+    action: "ai_chat_dialogue",
+    maxRequests: 30,
+    windowMinutes: 10,
+  });
+  if (limited) return limited;
 
   const apiKey = process.env.AI_API_KEY;
   const baseUrl = process.env.AI_BASE_URL ?? "https://api.openai.com/v1";
@@ -181,6 +229,14 @@ export async function POST(request: Request) {
   try {
     let lastAssistantText = "";
     let rounds = 0;
+    const usageTotal: AiUsage = {
+      promptTokens: 0,
+      completionTokens: 0,
+      totalTokens: 0,
+    };
+    let tokensApproxTotal = 0;
+    let costUsdTotal = 0;
+    let hasCostData = false;
 
     while (rounds < MAX_TOOL_ROUNDS) {
       rounds += 1;
@@ -195,6 +251,20 @@ export async function POST(request: Request) {
       });
 
       if (!result.ok || !result.data) {
+        await logAiEvent({
+          userId: user.id,
+          action: "ai_chat_dialogue",
+          model,
+          ok: false,
+          errorMessage:
+            result.errorText?.slice(0, 500) ?? `Помилка AI (${result.status})`,
+          metadata: {
+            phase: "chat_completion",
+            rounds,
+            status: result.status,
+            toolsUsed: [...new Set(toolsUsed)],
+          },
+        });
         return NextResponse.json(
           {
             error: `Помилка AI (${result.status})`,
@@ -202,6 +272,15 @@ export async function POST(request: Request) {
           },
           { status: 502 },
         );
+      }
+
+      usageTotal.promptTokens += result.usage?.promptTokens ?? 0;
+      usageTotal.completionTokens += result.usage?.completionTokens ?? 0;
+      usageTotal.totalTokens += result.usage?.totalTokens ?? 0;
+      tokensApproxTotal += result.tokensApprox ?? 0;
+      if (typeof result.costUsdApprox === "number") {
+        costUsdTotal += result.costUsdApprox;
+        hasCostData = true;
       }
 
       const message = result.data.choices?.[0]?.message;
@@ -252,6 +331,14 @@ export async function POST(request: Request) {
       });
 
       if (finalized.ok && finalized.data) {
+        usageTotal.promptTokens += finalized.usage?.promptTokens ?? 0;
+        usageTotal.completionTokens += finalized.usage?.completionTokens ?? 0;
+        usageTotal.totalTokens += finalized.usage?.totalTokens ?? 0;
+        tokensApproxTotal += finalized.tokensApprox ?? 0;
+        if (typeof finalized.costUsdApprox === "number") {
+          costUsdTotal += finalized.costUsdApprox;
+          hasCostData = true;
+        }
         const msg = finalized.data.choices?.[0]?.message;
         lastAssistantText =
           msg?.content?.trim() ??
@@ -274,14 +361,65 @@ export async function POST(request: Request) {
         rounds,
         toolsUsed: [...new Set(toolsUsed)],
         usedLearningMemory: Boolean(memory),
+        promptTokens: usageTotal.promptTokens,
+        completionTokens: usageTotal.completionTokens,
+        totalTokens: usageTotal.totalTokens,
+        tokensApprox: tokensApproxTotal,
+        costUsdApprox: hasCostData ? Number(costUsdTotal.toFixed(6)) : null,
+        qualityScore: evaluateAiTextQuality({
+          text: lastAssistantText,
+          maxSentences: 8,
+          minChars: 12,
+          requireUkrainian: true,
+          allowMarkdown: false,
+        }).score,
+      },
+    });
+
+    const quality = evaluateAiTextQuality({
+      text: lastAssistantText,
+      maxSentences: 8,
+      minChars: 12,
+      requireUkrainian: true,
+      allowMarkdown: false,
+    });
+
+    await logAiEvent({
+      userId: user.id,
+      action: "ai_chat_dialogue",
+      model,
+      ok: true,
+      tokensApprox:
+        usageTotal.totalTokens > 0 ? usageTotal.totalTokens : tokensApproxTotal,
+      metadata: {
+        rounds,
+        toolsUsed: [...new Set(toolsUsed)],
+        promptTokens: usageTotal.promptTokens,
+        completionTokens: usageTotal.completionTokens,
+        totalTokens: usageTotal.totalTokens,
+        tokensApprox: tokensApproxTotal,
+        costUsdApprox: hasCostData ? Number(costUsdTotal.toFixed(6)) : null,
+        qualityScore: quality.score,
+        qualityViolations: quality.violations,
       },
     });
 
     return NextResponse.json({
       text: lastAssistantText,
       toolsUsed: [...new Set(toolsUsed)],
+      quality,
     });
   } catch (error) {
+    await logAiEvent({
+      userId: user.id,
+      action: "ai_chat_dialogue",
+      model,
+      ok: false,
+      errorMessage: (error as Error).message,
+      metadata: {
+        usedLearningMemory: Boolean(memory),
+      },
+    });
     await recordContinuousLearningEvent({
       userId: user.id,
       action: "ai_chat_dialogue",

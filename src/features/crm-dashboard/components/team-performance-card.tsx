@@ -16,7 +16,7 @@ export function TeamPerformanceCard({ data }: TeamPerformanceCardProps) {
       </h2>
       <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
         <div className="rounded-xl border border-[var(--enver-border)] bg-[var(--enver-surface)] px-3 py-2">
-          <p className="text-[11px] text-[var(--enver-muted)]">Угоди в роботі</p>
+          <p className="text-[11px] text-[var(--enver-muted)]">Замовлення в роботі</p>
           <p className="text-lg font-semibold tabular-nums">{data.dealsInWork}</p>
         </div>
         <div className="rounded-xl border border-[var(--enver-border)] bg-[var(--enver-surface)] px-3 py-2">
@@ -57,7 +57,7 @@ export function TeamPerformanceCard({ data }: TeamPerformanceCardProps) {
           ))}
         </ul>
         <p className="mt-2 text-[10px] text-[var(--enver-muted)]">
-          Формат: угоди / задачі / виграші за 30 днів
+          Формат: замовлення / задачі / виграші за 30 днів
         </p>
       </div>
     </div>

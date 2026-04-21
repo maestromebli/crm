@@ -3,7 +3,7 @@ import type { JWT } from "next-auth/jwt";
 import type { Role } from "@prisma/client";
 
 import { findUserRowWithMenuAccessFallback } from "../users/user-row-with-menu-access";
-
+import { SALES_MANAGER_PERMISSION_KEYS } from "../authz/role-access-policy";
 import { sanitizeMenuAccess } from "../navigation-access";
 
 
@@ -66,7 +66,12 @@ export async function refreshEffectiveUserFields(token: JWT): Promise<JWT> {
 
 
 
-  if (loginRole === "SUPER_ADMIN" && !impersonateId) {
+  if (
+    (loginRole === "SUPER_ADMIN" ||
+      loginRole === "ADMIN" ||
+      loginRole === "DIRECTOR") &&
+    !impersonateId
+  ) {
 
     token.effectivePermissionKeys = [];
 
@@ -80,7 +85,13 @@ export async function refreshEffectiveUserFields(token: JWT): Promise<JWT> {
 
 
 
-  const keys = row.permissions.map((p) => p.permission.key as string);
+  const rawKeys = row.permissions.map((p) => p.permission.key as string);
+  const keys =
+    row.role === "MANAGER" || row.role === "USER"
+      ? rawKeys.filter((k) =>
+          (SALES_MANAGER_PERMISSION_KEYS as readonly string[]).includes(k),
+        )
+      : rawKeys;
 
   token.effectivePermissionKeys = keys;
 

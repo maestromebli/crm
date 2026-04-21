@@ -6,6 +6,7 @@ import {
   mapLeadDetailRowToCoreInput,
   readinessBlockerMessages,
 } from "../../../lib/crm-core";
+import { redactContextForAi } from "../../../lib/ai/context-denylist";
 
 /**
  * Стислий нормалізований контекст для промптів (без сирих великих об'єктів).
@@ -64,5 +65,5 @@ export function serializeLeadForAi(lead: LeadDetailRow): string {
     linkedDeal: lead.linkedDeal,
   };
 
-  return JSON.stringify(payload, null, 0);
+  return JSON.stringify(redactContextForAi(payload), null, 0);
 }

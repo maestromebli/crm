@@ -13,12 +13,12 @@ import type {
 export function ContactDealsTab({ deals }: { deals: ContactDetailDeal[] }) {
   return (
     <section className="rounded-2xl border border-slate-200 bg-[var(--enver-card)] p-4 shadow-sm md:p-5">
-      <h2 className="text-sm font-semibold text-[var(--enver-text)]">Угоди</h2>
+      <h2 className="text-sm font-semibold text-[var(--enver-text)]">Замовлення</h2>
       <p className="mt-1 text-xs text-slate-600">
-        Угоди, де цей контакт вказаний як основний.
+        Замовлення, де цей контакт вказаний як основний.
       </p>
       {deals.length === 0 ? (
-        <p className="mt-4 text-sm text-slate-500">Немає угод.</p>
+        <p className="mt-4 text-sm text-slate-500">Немає замовлень.</p>
       ) : (
         <div className="mt-4 overflow-hidden rounded-xl border border-slate-100">
           <table className="w-full text-left text-sm">
@@ -50,7 +50,7 @@ export function ContactDealsTab({ deals }: { deals: ContactDetailDeal[] }) {
                     <Link
                       href={`/deals/${d.id}/workspace`}
                       className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-800"
-                      aria-label="Відкрити угоду"
+                      aria-label="Відкрити замовлення"
                     >
                       <ExternalLink className="h-4 w-4" />
                     </Link>
@@ -125,7 +125,7 @@ export function ContactTasksTab({ tasks }: { tasks: ContactTaskRow[] }) {
     <section className="rounded-2xl border border-slate-200 bg-[var(--enver-card)] p-4 shadow-sm md:p-5">
       <h2 className="text-sm font-semibold text-[var(--enver-text)]">Задачі</h2>
       <p className="mt-1 text-xs text-slate-600">
-        Задачі з повʼязаних лідів та угод (агреговано).
+        Задачі з повʼязаних лідів та замовлень (агреговано).
       </p>
       {tasks.length === 0 ? (
         <p className="mt-4 text-sm text-slate-500">Немає задач.</p>

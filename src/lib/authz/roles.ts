@@ -44,7 +44,7 @@ export function normalizeRole(role: string): EffectiveRole {
   }
 }
 
-/** Повний доступ до даних по компанії (ліди/угоди без фільтра власника). */
+/** Повний доступ до даних по компанії (ліди/замовлення без фільтра власника). */
 export function hasUnrestrictedDataScope(role: EffectiveRole): boolean {
   return role === "SUPER_ADMIN" || role === "DIRECTOR" || role === "DIRECTOR_PRODUCTION";
 }
@@ -74,7 +74,7 @@ export function isSalesPipelineRole(role: EffectiveRole): boolean {
   );
 }
 
-/** Виробництво / закупівлі — загальний операційний зріз (не лише «свої» угоди). */
+/** Виробництво / закупівлі — загальний операційний зріз (не лише «свої» замовлення). */
 export function hasCompanyOperationsScope(role: EffectiveRole): boolean {
   return (
     role === "SUPER_ADMIN" ||

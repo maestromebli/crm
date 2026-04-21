@@ -168,7 +168,7 @@ export function PostCreateActions({
           <span className="text-lg" aria-hidden>
             🔄
           </span>
-          <span className="text-xs font-semibold">В угоду</span>
+          <span className="text-xs font-semibold">В замовлення</span>
           <span className="text-[10px] text-slate-500">Конверсія</span>
         </Link>
       </div>

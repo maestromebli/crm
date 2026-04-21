@@ -21,7 +21,7 @@ type Line = {
 export type ProcurementRequestDrawerProps = {
   /** Відкрити панель (наприклад `?newRequest=1` у URL). */
   defaultOpen?: boolean;
-  /** Попередньо обрати угоду (`?dealId=` з робочого місця угоди). */
+  /** Попередньо обрати замовлення (`?dealId=` з робочого місця замовлення). */
   initialDealId?: string;
 };
 
@@ -90,7 +90,7 @@ export function ProcurementRequestDrawer({
   async function submit() {
     setError(null);
     if (!dealId.trim()) {
-      setError("Оберіть угоду (проєкт).");
+      setError("Оберіть замовлення (проєкт).");
       return;
     }
     const payloadLines = lines
@@ -143,13 +143,13 @@ export function ProcurementRequestDrawer({
               </div>
             ) : null}
 
-            <label className="block text-[11px] font-medium text-slate-600">Угода (проєкт)</label>
+            <label className="block text-[11px] font-medium text-slate-600">Замовлення (проєкт)</label>
             <select
               className="mt-1 w-full rounded-md border border-slate-200 bg-white px-2 py-2 text-xs"
               value={dealId}
               onChange={(e) => setDealId(e.target.value)}
             >
-              <option value="">— Оберіть угоду —</option>
+              <option value="">— Оберіть замовлення —</option>
               {deals.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.title}
@@ -158,7 +158,7 @@ export function ProcurementRequestDrawer({
             </select>
             {deals.length === 0 ? (
               <p className="mt-1 text-[11px] text-amber-800">
-                Список угод порожній або БД недоступна. Перевірте підключення та наявність угод у CRM.
+                Список замовлень порожній або БД недоступна. Перевірте підключення та наявність замовлень у CRM.
               </p>
             ) : null}
 

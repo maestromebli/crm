@@ -1,6 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 
-/** Для запису Attachment від імені компанії: керівник виробництва або власник угоди. */
+/** Для запису Attachment від імені компанії: керівник виробництва або власник замовлення. */
 export async function resolveDealUploaderUserId(
   prisma: PrismaClient,
   dealId: string,

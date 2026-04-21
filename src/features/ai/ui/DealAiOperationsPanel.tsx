@@ -60,10 +60,10 @@ export function DealAiOperationsPanel({ dealId, className }: Props) {
         <div className="min-w-0 flex-1 space-y-2">
           <div>
             <h3 className="text-xs font-semibold uppercase tracking-wide text-sky-950">
-              ШІ угоди
+              ШІ замовлення
             </h3>
             <p className="mt-0.5 text-[11px] leading-snug text-sky-900/85">
-              Підсумок та готовність на основі робочого місця угоди. Без
+              Підсумок та готовність на основі робочого місця замовлення. Без
               автоматичних змін у БД.
             </p>
           </div>
@@ -74,7 +74,7 @@ export function DealAiOperationsPanel({ dealId, className }: Props) {
               disabled={loading !== null}
               onClick={() => void run("deal_summary")}
             >
-              Підсумок угоди
+              Підсумок замовлення
             </button>
             <button
               type="button"

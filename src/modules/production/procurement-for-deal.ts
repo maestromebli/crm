@@ -7,7 +7,7 @@ export type ProcurementGateSummary = {
 };
 
 /**
- * Закупівлі по угоді: без окремих таблиць у схемі повертаємо нульові лічильники;
+ * Закупівлі по замовленні: без окремих таблиць у схемі повертаємо нульові лічильники;
  * деталі — через `ProductionFlow` / майбутні PO.
  */
 export async function getProcurementSummaryForDeal(

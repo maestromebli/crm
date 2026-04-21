@@ -240,7 +240,7 @@ export function LeadHubHeader({
           </button>
           {lead.linkedDeal ? (
             <Link href={`/deals/${lead.linkedDeal.id}/workspace`} className={btnGreen}>
-              Відкрити угоду
+              Відкрити замовлення
             </Link>
           ) : canConvertToDeal ? (
             <button
@@ -248,9 +248,9 @@ export function LeadHubHeader({
               disabled={converting}
               onClick={() => onConvertClick()}
               className={btnGreen}
-              title="Конвертувати лід в угоду (одна дія)"
+              title="Конвертувати лід у замовлення (одна дія)"
             >
-              {converting ? "…" : "Угоду"}
+              {converting ? "…" : "Замовлення"}
             </button>
           ) : null}
         </div>

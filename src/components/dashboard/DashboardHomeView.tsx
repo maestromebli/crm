@@ -223,13 +223,13 @@ export function DashboardHomeView({
     kpiItems.push(
       <KpiCard
         key="deals"
-        label="Активні угоди"
+        label="Активні замовлення"
         value={String(snapshot.kpiOpenDeals)}
         trendLabel="в роботі"
         trendValue={
           snapshot.kpiDealsInContractStage > 0
             ? `${snapshot.kpiDealsInContractStage} на етапі договору`
-            : "без угод на етапі договору"
+            : "без замовлень на етапі договору"
         }
         tone="neutral"
         icon={TrendingUp}
@@ -287,7 +287,7 @@ export function DashboardHomeView({
             </h1>
             <p className="max-w-xl text-sm text-slate-600">
               Показники та списки враховують вашу роль і права доступу. Дані
-              обмежені видимістю лідів, угод, календаря та задач за правилами
+              обмежені видимістю лідів, замовлень, календаря та задач за правилами
               CRM.
             </p>
           </div>
@@ -306,7 +306,7 @@ export function DashboardHomeView({
               ) : null}
               {perms.dealsView ? (
                 <Link href="/deals" className={quickBtnClass}>
-                  {perms.dealsCreate ? "Нова угода" : "Угоди"}
+                  {perms.dealsCreate ? "Нова замовлення" : "Замовлення"}
                 </Link>
               ) : null}
               {perms.calendarView ? (
@@ -380,7 +380,7 @@ export function DashboardHomeView({
                       Що потребує уваги
                     </h2>
                     <p className="text-xs text-slate-500">
-                      За вашими правами доступу: ліди, угоди та задачі в межах
+                      За вашими правами доступу: ліди, замовлення та задачі в межах
                       видимості.
                     </p>
                   </div>
@@ -496,22 +496,22 @@ export function DashboardHomeView({
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <h2 className="text-sm font-semibold text-[var(--enver-text)]">
-                      Активні угоди
+                      Активні замовлення
                     </h2>
                     <p className="text-xs text-slate-500">
-                      Останні оновлені відкриті угоди у вашій видимості.
+                      Останні оновлені відкриті замовлення у вашій видимості.
                     </p>
                   </div>
                   <Link
                     href="/deals"
                     className="text-[11px] font-medium text-sky-700 underline-offset-2 hover:underline"
                   >
-                    Усі угоди
+                    Усі замовлення
                   </Link>
                 </div>
                 {snapshot.deals.length === 0 ? (
                   <p className="text-xs text-slate-500">
-                    Немає відкритих угод або немає доступу до списку.
+                    Немає відкритих замовлень або немає доступу до списку.
                   </p>
                 ) : (
                   <div className="space-y-2">
@@ -615,7 +615,7 @@ export function DashboardHomeView({
                       Передача / виробництво
                     </h2>
                     <p className="text-xs text-slate-500">
-                      Лічильники за угодами у вашій видимості та календарем
+                      Лічильники за замовленнями у вашій видимості та календарем
                       монтажів.
                     </p>
                   </div>
@@ -749,7 +749,7 @@ export function DashboardHomeView({
                       Навантаження команди
                     </h2>
                     <p className="text-xs text-slate-500">
-                      Топ менеджерів за відкритими угодами та активними задачами
+                      Топ менеджерів за відкритими замовленнями та активними задачами
                       у межах вашої видимості (не для ролі «лише свої»).
                     </p>
                   </div>
@@ -768,7 +768,7 @@ export function DashboardHomeView({
                           {member.name}
                         </p>
                         <p className="text-[11px] text-slate-500">
-                          Угоди: {member.dealsOpen} · Задачі:{" "}
+                          Замовлення: {member.dealsOpen} · Задачі:{" "}
                           {member.tasksOpen}
                         </p>
                       </div>

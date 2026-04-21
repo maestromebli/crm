@@ -16,7 +16,7 @@ type Props = {
   className?: string;
   /** На світлому фоні (наприклад попередження про суму). */
   tone?: "dark" | "amber";
-  /** Короткий підпис для шапки угоди. */
+  /** Короткий підпис для шапки замовлення. */
   label?: "full" | "short";
 };
 
@@ -67,7 +67,7 @@ export function SyncDealValueFromEstimateButton({
           ? "Оновлення…"
           : label === "short"
             ? `Сума з смети v${est.version}`
-            : `Підставити суму угоди з смети v${est.version} (${est.totalPrice!.toLocaleString("uk-UA")} грн)`}
+            : `Підставити суму замовлення з смети v${est.version} (${est.totalPrice!.toLocaleString("uk-UA")} грн)`}
       </button>
       {err ? <p className="text-xs text-rose-700">{err}</p> : null}
     </div>
