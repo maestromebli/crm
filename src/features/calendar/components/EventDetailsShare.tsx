@@ -3,7 +3,7 @@
 import { useCallback, useState } from "react";
 import { format } from "date-fns";
 import { uk } from "date-fns/locale";
-import { Copy, Download, Share2 } from "lucide-react";
+import { Copy, Download as Завантажити, Share2 } from "lucide-react";
 import type { CalendarEvent } from "../types";
 import { buildCalendarIcs, suggestedIcsFileName } from "../ics";
 import { cn } from "../../../lib/utils";
@@ -148,7 +148,7 @@ export function EventDetailsShare({ event }: Props) {
           onClick={downloadIcs}
           className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] font-medium text-slate-800 hover:bg-slate-100"
         >
-          <Download className="h-3.5 w-3.5" />
+          <Завантажити className="h-3.5 w-3.5" />
           .ics
         </button>
         <button

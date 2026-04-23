@@ -22,7 +22,7 @@ export async function GET(_req: Request, ctx: Ctx) {
     data: {
       pricing: overview.pricing,
       finance: overview.finance,
-      health: overview.health,
+      стан: overview.стан,
     },
   });
 }

@@ -12,6 +12,7 @@ import { requireAiRateLimit } from "../../../../../lib/ai/route-guard";
 import { logAiEvent } from "../../../../../lib/ai/log-ai-event";
 import { openAiChatCompletionText } from "../../../../../features/ai/core/openai-client";
 import { evaluateAiTextQuality } from "../../../../../lib/ai/evals/quality";
+import { listTemplateChangeProposals } from "../../../../../lib/ai/template-change-workflow";
 
 export const runtime = "nodejs";
 
@@ -26,9 +27,15 @@ const bodySchema = z.object({
 
 type ChatMessage = Record<string, unknown>;
 
+function percent(part: number, total: number): number {
+  if (!Number.isFinite(part) || !Number.isFinite(total) || total <= 0) return 0;
+  return Math.round((part / total) * 1000) / 10;
+}
+
 async function buildAdminSystemSnapshot(): Promise<string> {
   const now = new Date();
   const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
   const [
     leadsAll,
@@ -36,11 +43,18 @@ async function buildAdminSystemSnapshot(): Promise<string> {
     dealsOpen,
     tasksOpen,
     tasksOverdue,
+    dealsWon30d,
+    dealsLost30d,
     aiErrors7d,
     aiCalls7d,
     proposalsDraft,
     estimatesDraft,
     productionBlocked,
+    productionFlowsAll,
+    invoicesOverdue,
+    invoicesUnpaid,
+    procurementRequestsOpen,
+    procurementRequestsOverdue,
     unreadInboxThreads,
     materialCatalogItems,
     topFurnitureLines,
@@ -55,6 +69,12 @@ async function buildAdminSystemSnapshot(): Promise<string> {
         dueAt: { lt: now },
       },
     }),
+    prisma.deal.count({
+      where: { status: "WON", updatedAt: { gte: monthAgo } },
+    }),
+    prisma.deal.count({
+      where: { status: "LOST", updatedAt: { gte: monthAgo } },
+    }),
     prisma.aiAssistantLog.count({
       where: { ok: false, createdAt: { gte: weekAgo } },
     }),
@@ -65,6 +85,43 @@ async function buildAdminSystemSnapshot(): Promise<string> {
     prisma.estimate.count({ where: { status: "DRAFT" } }),
     prisma.productionFlow.count({
       where: { status: { in: ["BLOCKED", "ON_HOLD"] } },
+    }),
+    prisma.productionFlow.count(),
+    prisma.invoice.count({
+      where: {
+        status: { not: "PAID" },
+        dueDate: { lt: now },
+      },
+    }),
+    prisma.invoice.count({ where: { status: { not: "PAID" } } }),
+    prisma.procurementRequest.count({
+      where: {
+        workflowStatus: {
+          in: [
+            "new_request",
+            "review",
+            "approval",
+            "procurement",
+            "payment",
+            "delivery",
+          ],
+        },
+      },
+    }),
+    prisma.procurementRequest.count({
+      where: {
+        workflowStatus: {
+          in: [
+            "new_request",
+            "review",
+            "approval",
+            "procurement",
+            "payment",
+            "delivery",
+          ],
+        },
+        neededByDate: { lt: now },
+      },
     }),
     prisma.commThread.count({ where: { unreadCount: { gt: 0 } } }),
     prisma.materialCatalogItem.count(),
@@ -103,21 +160,95 @@ async function buildAdminSystemSnapshot(): Promise<string> {
     .map((x) => `${x.name} (~${x.avg}, n=${x.count})`)
     .join("; ");
 
+  const taskOverdueRate = percent(tasksOverdue, tasksOpen);
+  const aiErrorRate = percent(aiErrors7d, aiCalls7d);
+  const productionBlockedRate = percent(productionBlocked, productionFlowsAll);
+  const winRate30d = percent(dealsWon30d, dealsWon30d + dealsLost30d);
+  const invoicesOverdueRate = percent(invoicesOverdue, invoicesUnpaid);
+  const procurementOverdueRate = percent(
+    procurementRequestsOverdue,
+    procurementRequestsOpen,
+  );
+
+  const riskAlerts: string[] = [];
+  if (taskOverdueRate >= 30) {
+    riskAlerts.push(
+      `Критичний операційний ризик: прострочені задачі ${taskOverdueRate}% від відкритих.`,
+    );
+  }
+  if (invoicesOverdueRate >= 20) {
+    riskAlerts.push(
+      `Фінансовий ризик: прострочені неоплачені рахунки ${invoicesOverdueRate}%.`,
+    );
+  }
+  if (productionBlockedRate >= 20) {
+    riskAlerts.push(
+      `Ризик виробництва: блоковані/на паузі потоки ${productionBlockedRate}%.`,
+    );
+  }
+  if (procurementOverdueRate >= 25) {
+    riskAlerts.push(
+      `Ризик постачання: прострочені закупівельні заявки ${procurementOverdueRate}%.`,
+    );
+  }
+  if (aiErrorRate >= 5) {
+    riskAlerts.push(`Ризик якості AI-автоматизації: помилки AI за 7 днів ${aiErrorRate}%.`);
+  }
+
+  const riskBlock =
+    riskAlerts.length > 0
+      ? riskAlerts.map((line) => `- ${line}`).join("\n")
+      : "- Наразі критичних тригерів за базовими порогами не виявлено.";
+
+  const proposals = await listTemplateChangeProposals(50).catch(() => []);
+  const templateProposalsDraft = proposals.filter((p) => p.status === "DRAFT").length;
+  const templateProposalsApproved = proposals.filter((p) => p.status === "APPROVED").length;
+  const templateProposalsApplied = proposals.filter((p) => p.status === "APPLIED").length;
+  const recentProposalsText = proposals
+    .slice(0, 5)
+    .map(
+      (p) =>
+        `- ${p.title} [${p.templateKey}] status=${p.status} created_at=${p.createdAt}`,
+    )
+    .join("\n");
+
   return [
-    "CRM health snapshot:",
+    "CRM стан snapshot:",
     `- leads_all: ${leadsAll}`,
     `- leads_without_deal: ${leadsNoDeal}`,
     `- deals_open: ${dealsOpen}`,
     `- tasks_open: ${tasksOpen}`,
     `- tasks_overdue: ${tasksOverdue}`,
+    `- tasks_overdue_rate_pct: ${taskOverdueRate}`,
+    `- deals_won_30d: ${dealsWon30d}`,
+    `- deals_lost_30d: ${dealsLost30d}`,
+    `- win_rate_30d_pct: ${winRate30d}`,
     `- proposals_draft: ${proposalsDraft}`,
     `- estimates_draft: ${estimatesDraft}`,
     `- production_blocked_or_on_hold: ${productionBlocked}`,
+    `- production_flows_all: ${productionFlowsAll}`,
+    `- production_blocked_rate_pct: ${productionBlockedRate}`,
+    `- invoices_unpaid: ${invoicesUnpaid}`,
+    `- invoices_overdue_unpaid: ${invoicesOverdue}`,
+    `- invoices_overdue_rate_pct: ${invoicesOverdueRate}`,
+    `- procurement_requests_open: ${procurementRequestsOpen}`,
+    `- procurement_requests_overdue: ${procurementRequestsOverdue}`,
+    `- procurement_overdue_rate_pct: ${procurementOverdueRate}`,
     `- inbox_threads_unread: ${unreadInboxThreads}`,
     `- material_catalog_items: ${materialCatalogItems}`,
     `- ai_calls_7d: ${aiCalls7d}`,
     `- ai_errors_7d: ${aiErrors7d}`,
+    `- ai_error_rate_7d_pct: ${aiErrorRate}`,
+    `- template_change_proposals_draft: ${templateProposalsDraft}`,
+    `- template_change_proposals_approved: ${templateProposalsApproved}`,
+    `- template_change_proposals_applied: ${templateProposalsApplied}`,
     `- top_furniture_positions_recent: ${topFurniture || "n/a"}`,
+    "",
+    "Template change workflow snapshot:",
+    recentProposalsText || "- Немає пропозицій змін шаблонів.",
+    "",
+    "Risk alerts:",
+    riskBlock,
   ].join("\n");
 }
 
@@ -190,10 +321,16 @@ export async function POST(request: Request) {
 
   const systemPrompt = [
     "You are ENVER CRM Admin AI Architect.",
-    "Answer in Ukrainian or Russian according to user language.",
-    "Your role: propose practical CRM improvements with priorities, expected impact, risks, and implementation steps.",
-    "Always give concrete actions, recommended prompts, and process/system changes.",
-    "When relevant, structure response as: 1) diagnosis, 2) quick wins, 3) 30/60/90 plan, 4) prompts/templates for team.",
+    "Ти є операційним ядром (душею) CRM: постійно тримаєш фокус на системності, ризиках і управлінських рішеннях.",
+    "Відповідай українською мовою.",
+    "Ти радник директора/адміна з управління підприємством у CRM.",
+    "Твоя роль: повністю аналізувати роботу підприємства за наданим знімком, виявляти ризики, пропонувати управлінські рішення та покращення процесів.",
+    "У кожній змістовній відповіді, де є управлінський запит, використовуй формат: 1) що бачу в даних, 2) ключові ризики, 3) рекомендації по управлінню (пріоритет P1/P2/P3), 4) очікуваний ефект і KPI.",
+    "Якщо користувач питає про зміну шаблонів/регламентів: надай чернетку змін, план впровадження і ОБОВ'ЯЗКОВО вимагай підтвердження директора або адміністратора перед застосуванням.",
+    "Для змін шаблонів завжди додавай окремий блок 'Підтвердження': хто затверджує, що саме змінюється, ризики відкату, критерії успіху.",
+    "Для ризиків додавай ранні сигнали, кого попередити (директор/адмін), і яку дію запустити протягом 24 годин.",
+    "Коли користувач просить змінити шаблон — завжди запропонуй створити proposal у workflow підтверджень і вкажи кроки: створити → погодити (директор/адмін) → застосувати.",
+    "Не вигадуй факти. Спирайся тільки на наданий контекст та дані знімка.",
     "Do not expose secrets. Use only provided context.",
     "",
     snapshot,

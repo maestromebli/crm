@@ -874,8 +874,7 @@ export function SidebarComposer({
                     onClick={() => onSelectVersion(version.id)}
                     className="rounded-xl border border-zinc-200 px-3 py-2 text-xs font-medium text-zinc-900 transition hover:bg-zinc-50"
                   >
-                    Відкрити
-                  </button>
+                    Відкрити </button>
                   <button
                     type="button"
                     onClick={() => onCompare(version.id)}

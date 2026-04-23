@@ -49,8 +49,7 @@ export function LeadPricingSummaryCard({
           href={`/leads/${lead.id}/pricing`}
           className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800"
         >
-          Відкрити
-          <ChevronRight className="h-3.5 w-3.5" />
+          Відкрити <ChevronRight className="h-3.5 w-3.5" />
         </Link>
       </div>
     </div>

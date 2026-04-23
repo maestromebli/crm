@@ -5,7 +5,7 @@
  * Список — портал (fixed), щоб не обрізався overflow таблиці.
  * Відкривається лише для зфокусованого поля (не для кожного рядка з тим самим текстом).
  */
-import { Loader2, Search } from "lucide-react";
+import { Loader2, Search as Пошук } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -320,7 +320,7 @@ export function MaterialCatalogCombobox({
           className="pointer-events-none absolute left-1.5 top-1/2 z-[1] -translate-y-1/2 text-slate-400"
           aria-hidden
         >
-          <Search className="h-3.5 w-3.5" />
+          <Пошук className="h-3.5 w-3.5" />
         </span>
         <input
           type="text"

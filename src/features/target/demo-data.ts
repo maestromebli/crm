@@ -230,7 +230,7 @@ export const DEMO_AD_LEADS: DemoAdLead[] = [
     campaignName: "Кухні · лід-форми · Київ",
     formName: "Каталог PDF",
     receivedAt: "2026-03-30",
-    crmLeadTitle: "Лід · офіс Open Space",
+    crmLeadTitle: "Лід · офіс Відкрити Space",
   },
 ];
 

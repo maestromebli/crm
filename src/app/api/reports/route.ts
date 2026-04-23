@@ -17,6 +17,51 @@ import {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+type ReportCacheEntry = {
+  expiresAt: number;
+  value: ReportPayload;
+};
+
+const REPORTS_CACHE_TTL_MS = 30_000;
+const REPORTS_CACHE_MAX_ENTRIES = 200;
+const reportsCache = new Map<string, ReportCacheEntry>();
+
+function reportCacheKey(args: {
+  userId: string;
+  section: ReportSection;
+  range: ReportRange;
+}): string {
+  return `${args.userId}:${args.section}:${args.range}`;
+}
+
+function readReportCache(key: string): ReportPayload | null {
+  const hit = reportsCache.get(key);
+  if (!hit) return null;
+  if (hit.expiresAt <= Date.now()) {
+    reportsCache.delete(key);
+    return null;
+  }
+  return hit.value;
+}
+
+function writeReportCache(key: string, value: ReportPayload): void {
+  if (reportsCache.size >= REPORTS_CACHE_MAX_ENTRIES) {
+    let oldestKey: string | null = null;
+    let oldestExpiresAt = Number.POSITIVE_INFINITY;
+    for (const [existingKey, existing] of reportsCache.entries()) {
+      if (existing.expiresAt < oldestExpiresAt) {
+        oldestExpiresAt = existing.expiresAt;
+        oldestKey = existingKey;
+      }
+    }
+    if (oldestKey) reportsCache.delete(oldestKey);
+  }
+  reportsCache.set(key, {
+    value,
+    expiresAt: Date.now() + REPORTS_CACHE_TTL_MS,
+  });
+}
+
 function isReportSection(value: string): value is ReportSection {
   return REPORT_SECTIONS.includes(value as ReportSection);
 }
@@ -132,7 +177,7 @@ async function buildSalesReport(since: Date, range: ReportRange): Promise<Report
     highlights: [
       `Win rate за період: ${winRate}%.`,
       `Сума виграних замовлень: ${fmtMoney(wonValue)}.`,
-      `Open pipeline зараз: ${fmtMoney(openValue)}.`,
+      `Відкрити pipeline зараз: ${fmtMoney(openValue)}.`,
     ],
   };
 }
@@ -622,9 +667,13 @@ export async function GET(request: Request) {
     const rawRange = searchParams.get("range") ?? "30d";
     const section = isReportSection(rawSection) ? rawSection : "sales";
     const range = isReportRange(rawRange) ? rawRange : "30d";
+    const cacheKey = reportCacheKey({ userId: user.id, section, range });
+    const cached = readReportCache(cacheKey);
+    if (cached) return NextResponse.json(cached);
     const since = resolveRangeStart(range);
 
     const payload = await buildReport(section, since, range);
+    writeReportCache(cacheKey, payload);
     return NextResponse.json(payload);
   } catch (error) {
     console.error("[api/reports]", error);

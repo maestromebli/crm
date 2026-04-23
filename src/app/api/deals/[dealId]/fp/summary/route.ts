@@ -10,6 +10,16 @@ import { loadDealFinancialBreakdown } from "@/lib/finance/deal-financial-summary
 
 type Ctx = { params: Promise<{ dealId: string }> };
 
+function canViewCompensationDetails(realRole: string): boolean {
+  return (
+    realRole === "SUPER_ADMIN" ||
+    realRole === "ADMIN" ||
+    realRole === "DIRECTOR" ||
+    realRole === "DIRECTOR_PRODUCTION" ||
+    realRole === "ACCOUNTANT"
+  );
+}
+
 export async function GET(_req: Request, ctx: Ctx) {
   if (!process.env.DATABASE_URL?.trim()) {
     return NextResponse.json({ error: "DATABASE_URL не задано" }, { status: 503 });
@@ -27,6 +37,7 @@ export async function GET(_req: Request, ctx: Ctx) {
   }
   const denied = await forbidUnlessDealAccess(user, P.DEALS_VIEW, deal);
   if (denied) return denied;
+  const canViewCompensation = canViewCompensationDetails(user.realRole);
 
   const [plan, invoices, txs, purchaseOrders, estimate, controlTower] = await Promise.all([
     prisma.dealPaymentPlan.findUnique({ where: { dealId } }),
@@ -101,14 +112,22 @@ export async function GET(_req: Request, ctx: Ctx) {
       actualPurchase,
       lineCount: estimate?.lineItems?.length ?? 0,
     },
-    dealFinancialSummary: controlTower?.summary ?? null,
+    dealFinancialSummary: controlTower?.summary
+      ? {
+          ...controlTower.summary,
+          payrollTotal: canViewCompensation ? controlTower.summary.payrollTotal : 0,
+          commissionsTotal: canViewCompensation
+            ? controlTower.summary.commissionsTotal
+            : 0,
+        }
+      : null,
     dealFinancialTabs: controlTower
       ? {
           payments: controlTower.payments,
           expenses: controlTower.expenses,
           procurement: controlTower.procurement,
-          payroll: controlTower.payroll,
-          commissions: controlTower.commissions,
+          payroll: canViewCompensation ? controlTower.payroll : [],
+          commissions: canViewCompensation ? controlTower.commissions : [],
           profitability: controlTower.summary,
         }
       : {

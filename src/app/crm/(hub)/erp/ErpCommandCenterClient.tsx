@@ -182,8 +182,6 @@ export function ErpCommandCenterClient() {
 
           <section className="grid gap-2">
             <QuickLink href="/crm/production" title="Штаб виробництва" subtitle="операції та статуси замовлень" />
-            <QuickLink href="/crm/procurement" title="Контур закупівель" subtitle="заявки, PO, постачальники" />
-            <QuickLink href="/crm/finance" title="Фінансовий контур" subtitle="грошовий потік і документи" />
           </section>
         </div>
       </section>

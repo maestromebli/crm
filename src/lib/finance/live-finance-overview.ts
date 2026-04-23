@@ -119,6 +119,19 @@ function normalizePoStatus(s: string): UiPurchaseOrder["status"] {
   return "CONFIRMED";
 }
 
+function deriveProjectCodeFromDeal(deal: {
+  title: string;
+  id: string;
+  projects: Array<{ code: string | null }>;
+}): string {
+  const explicit = deal.projects[0]?.code?.trim();
+  if (explicit) return explicit;
+  const title = deal.title.trim();
+  const m = /^([A-ZА-ЯІЇЄҐ]{1,4}-\d{1,4}(?:\.\d{1,2})?)/u.exec(title);
+  if (m) return m[1];
+  return deal.id.slice(0, 8);
+}
+
 function buildProjectsFromDeals(
   deals: Array<{
     id: string;
@@ -132,7 +145,7 @@ function buildProjectsFromDeals(
 ): Project[] {
   return deals.map((d) => ({
     id: d.id,
-    code: d.projects[0]?.code?.trim() || d.id.slice(0, 8),
+    code: deriveProjectCodeFromDeal(d),
     title: d.title,
     clientId: d.clientId,
     managerId: d.ownerId,
@@ -866,7 +879,7 @@ export async function loadFinanceProjectDetail(dealId: string) {
 
   const project: Project = {
     id: deal.id,
-    code: deal.projects[0]?.code?.trim() || deal.id.slice(0, 8),
+    code: deriveProjectCodeFromDeal(deal),
     title: deal.title,
     clientId: deal.clientId,
     managerId: deal.ownerId,

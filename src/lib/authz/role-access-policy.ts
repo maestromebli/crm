@@ -173,6 +173,57 @@ export const PRODUCTION_WORKER_PERMISSION_KEYS: readonly PermissionKey[] = [
   "AI_USE",
 ];
 
+const WORKSHOP_BASE_PERMISSION_KEYS: readonly PermissionKey[] = [
+  "DASHBOARD_VIEW",
+  "DEALS_VIEW",
+  "DEAL_WORKSPACE_VIEW",
+  "TASKS_VIEW",
+  "TASKS_UPDATE",
+  "PRODUCTION_ORDERS_VIEW",
+  "NOTIFICATIONS_VIEW",
+  "AI_USE",
+];
+
+export const CUTTING_PERMISSION_KEYS: readonly PermissionKey[] = [
+  ...WORKSHOP_BASE_PERMISSION_KEYS,
+  "FILES_VIEW",
+];
+
+export const EDGING_PERMISSION_KEYS: readonly PermissionKey[] = [
+  ...WORKSHOP_BASE_PERMISSION_KEYS,
+  "FILES_VIEW",
+];
+
+export const DRILLING_PERMISSION_KEYS: readonly PermissionKey[] = [
+  ...WORKSHOP_BASE_PERMISSION_KEYS,
+  "FILES_VIEW",
+];
+
+export const ASSEMBLY_PERMISSION_KEYS: readonly PermissionKey[] = [
+  ...WORKSHOP_BASE_PERMISSION_KEYS,
+  "FILES_VIEW",
+  "FILES_UPLOAD",
+  "HANDOFF_ACCEPT",
+];
+
+export const CONSTRUCTOR_PERMISSION_KEYS: readonly PermissionKey[] = [
+  "DASHBOARD_VIEW",
+  "DEALS_VIEW",
+  "DEAL_WORKSPACE_VIEW",
+  "FILES_VIEW",
+  "FILES_UPLOAD",
+  "FILES_DELETE",
+  "FILE_UPLOAD",
+  "FILE_DELETE",
+  "TASKS_VIEW",
+  "TASKS_UPDATE",
+  "PRODUCTION_ORDERS_VIEW",
+  "PRODUCTION_ORCHESTRATION_VIEW",
+  "PRODUCTION_ORCHESTRATION_MANAGE",
+  "NOTIFICATIONS_VIEW",
+  "AI_USE",
+];
+
 const headExcludedSet = new Set(HEAD_MANAGER_EXCLUDED_KEYS);
 const adminExcludedSet = new Set(OPERATIONAL_ADMIN_EXCLUDED_KEYS);
 
@@ -198,6 +249,16 @@ export function getDefaultPermissionKeysForRole(role: Role): DefaultPermissionMo
       return [...MEASURER_PERMISSION_KEYS];
     case "PRODUCTION_WORKER":
       return [...PRODUCTION_WORKER_PERMISSION_KEYS];
+    case "CUTTING":
+      return [...CUTTING_PERMISSION_KEYS];
+    case "EDGING":
+      return [...EDGING_PERMISSION_KEYS];
+    case "DRILLING":
+      return [...DRILLING_PERMISSION_KEYS];
+    case "ASSEMBLY":
+      return [...ASSEMBLY_PERMISSION_KEYS];
+    case "CONSTRUCTOR":
+      return [...CONSTRUCTOR_PERMISSION_KEYS];
     case "ACCOUNTANT":
       return [
         ...ALL_PERMISSION_KEYS.filter(
@@ -245,4 +306,26 @@ export const ROLE_POLICY_SUMMARY_UK: Record<string, string> = {
   ACCOUNTANT: "Бухгалтерія: фінансові модулі та звітність; обмеження на операції продажів за політикою.",
   PROCUREMENT_MANAGER:
     "Закупівлі / виробництво: розширений доступ до замовлень і постачання без керування ролями.",
+  PRODUCTION_WORKER:
+    "Працівник виробництва: перегляд задач/файлів і робота з призначеними виробничими операціями.",
+  CUTTING:
+    "Дільниця порізки: перегляд креслень/файлів і виконання своїх задач без оркестрації та передачі.",
+  EDGING:
+    "Дільниця крайкування: перегляд файлів і виконання своїх задач без оркестрації та передачі.",
+  DRILLING:
+    "Дільниця присадки: перегляд файлів і виконання своїх задач без оркестрації та передачі.",
+  ASSEMBLY:
+    "Дільниця збірки: задачі + завантаження фото/файлів по виконанню та підтвердження приймання handoff.",
+  CONSTRUCTOR:
+    "Конструктор: робота з техдоками/файлами та оркестрацією виробництва (перегляд і керування в межах конструкторського потоку).",
+};
+
+/** Короткий ярлик профілю доступу для UI в налаштуваннях користувачів. */
+export const ROLE_ACCESS_PROFILE_UK: Partial<Record<Role, string>> = {
+  CUTTING: "Цеховий профіль: Порізка",
+  EDGING: "Цеховий профіль: Крайкування",
+  DRILLING: "Цеховий профіль: Присадка",
+  ASSEMBLY: "Цеховий профіль: Збірка",
+  CONSTRUCTOR: "Конструкторський профіль",
+  PRODUCTION_WORKER: "Цеховий профіль: Універсальний",
 };

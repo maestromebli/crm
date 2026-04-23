@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
   const html = String(body.bodyHtml ?? "");
   const payload = body.payloadJson ?? {};
   if (!html) {
-    return NextResponse.json({ error: "bodyHtml is required" }, { status: 400 });
+    return NextResponse.json({ error: "Поле bodyHtml є обов'язковим" }, { status: 400 });
   }
   return NextResponse.json(renderContractHtml(html, payload));
 }

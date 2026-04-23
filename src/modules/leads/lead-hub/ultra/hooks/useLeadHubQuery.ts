@@ -8,7 +8,7 @@ export function useLeadHubQuery(id: string) {
     queryKey: ["lead-hub", id],
     queryFn: async () => {
       const res = await fetch(`/api/lead-hub/${id}`, { cache: "no-store" });
-      if (!res.ok) throw new Error("Failed to load lead hub session");
+      if (!res.ok) throw new Error("Не вдалося завантажити lead hub session");
       return (await res.json()) as LeadHubSessionDto;
     },
   });

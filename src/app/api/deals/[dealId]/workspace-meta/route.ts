@@ -111,7 +111,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
           entityId: dealId,
           dealId,
           userId: sessionUserId,
-          dedupeKey: `follow-up:${dealId}:${dayKey}`,
+          dedupeKey: `наступний контакт:${dealId}:${dayKey}`,
         },
       );
     }

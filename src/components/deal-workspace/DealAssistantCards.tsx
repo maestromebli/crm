@@ -53,7 +53,7 @@ export function DealAssistantCards({
                   else onRequestEditHeader?.();
                 }}
               >
-                {c.ctaLabel ?? "Відкрити"}
+                {c.ctaLabel ?? "Open"}
               </button>
             ) : null}
           </li>

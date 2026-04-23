@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { CurrencyCell } from "@/components/shared/CurrencyCell";
 import { DataTableShell } from "@/components/shared/DataTableShell";
 import type { FinanceTransaction } from "../types/models";
@@ -67,12 +66,9 @@ export function FinanceTransactionsTable({
           >
             <td className="whitespace-nowrap px-3 py-2.5 text-slate-600">{new Date(r.transactionDate).toLocaleDateString("uk-UA")}</td>
             <td className="px-3 py-2.5 text-slate-800">
-              <Link
-                href={`/crm/finance/${r.projectId}`}
-                className="font-medium text-blue-700 underline-offset-2 hover:underline"
-              >
+              <span className="font-medium text-slate-800">
                 {projectNameById[r.projectId] ?? r.projectId}
-              </Link>
+              </span>
             </td>
             {objectNameById ? (
               <td className="max-w-[min(180px,28vw)] truncate px-3 py-2.5 text-slate-600" title={r.objectId ? objectNameById[r.objectId] : undefined}>

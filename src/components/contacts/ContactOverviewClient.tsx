@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ExternalLink, KanbanSquare, Loader2, Save } from "lucide-react";
+import { ExternalLink, KanbanSquare, Loader2, Save as Зберегти } from "lucide-react";
 import { patchJson } from "../../lib/api/patch-json";
 import {
   CONTACT_CATEGORY_LABEL,
@@ -164,7 +164,7 @@ export function ContactOverviewClient({
               {saving ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
-                <Save className="h-3.5 w-3.5" />
+                <Зберегти className="h-3.5 w-3.5" />
               )}
               Зберегти
             </button>

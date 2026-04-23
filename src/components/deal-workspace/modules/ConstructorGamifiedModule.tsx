@@ -15,13 +15,6 @@ import {
 } from "../DealTransferHub";
 import { ConstructorRoomPanel } from "../ConstructorRoomPanel";
 
-const LEVELS = [
-  "Новачок",
-  "Виконавець",
-  "Майстер",
-  "Архітектор пакета",
-] as const;
-
 type Props = {
   dealId: string;
   constructorState: ConstructorWorkspaceState;
@@ -75,40 +68,37 @@ export function ConstructorGamifiedModule({
   constructorRoom,
   btnGhostClassName,
 }: Props) {
-  const quests = [
+  const checklistItems = [
     { id: "tech", label: "Технічні дані", done: constructorState.technicalReady },
     { id: "materials", label: "Комерційний пакет", done: constructorState.materialsReady },
     { id: "spec", label: "Специфікація", done: constructorState.specificationReady },
     { id: "drawings", label: "Креслення", done: constructorState.drawingsReady },
     { id: "files", label: "Файли передачі", done: constructorState.filesReady },
   ];
-  const doneCount = quests.filter((item) => item.done).length;
-  const progressPct = Math.round((doneCount / quests.length) * 100);
-  const xp = doneCount * 120 + constructorState.commentsCount * 8;
-  const level = LEVELS[Math.min(LEVELS.length - 1, Math.floor(doneCount / 2))];
-  const nextQuest = quests.find((item) => !item.done)?.label ?? "Усі ключові квести виконано";
+  const doneCount = checklistItems.filter((item) => item.done).length;
+  const totalCount = checklistItems.length;
+  const progressPct = Math.round((doneCount / totalCount) * 100);
+  const nextPendingItem =
+    checklistItems.find((item) => !item.done)?.label ?? "Усі ключові пункти підготовки виконано";
 
   return (
     <ConstructorWorkspace state={constructorState}>
-      <section className="mt-3 rounded-xl border border-violet-200 bg-gradient-to-r from-violet-50 to-sky-50 p-3">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-violet-700">
-          Constructor XP
+      <section className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-700">
+          Стан підготовки конструктора
         </p>
         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
-          <span className="rounded-full bg-violet-700 px-2 py-0.5 font-medium text-white">
-            Рівень: {level}
-          </span>
-          <span className="rounded-full border border-violet-200 bg-white px-2 py-0.5 text-violet-800">
-            XP: {xp}
+          <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-slate-700">
+            Виконано: {doneCount}/{totalCount}
           </span>
           <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-slate-700">
-            Прогрес: {doneCount}/{quests.length}
+            Прогрес: {progressPct}%
           </span>
         </div>
-        <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/80">
-          <div className="h-full rounded-full bg-violet-600 transition-all" style={{ width: `${progressPct}%` }} />
+        <div className="mt-2 h-2 overflow-hidden rounded-full bg-white">
+          <div className="h-full rounded-full bg-slate-700 transition-all" style={{ width: `${progressPct}%` }} />
         </div>
-        <p className="mt-2 text-[11px] text-violet-900">Наступний квест: {nextQuest}</p>
+        <p className="mt-2 text-[11px] text-slate-700">Наступний крок: {nextPendingItem}</p>
       </section>
 
       <ConstructorWorkspaceTabs value={constructorTab} onChange={onConstructorTabChange} />

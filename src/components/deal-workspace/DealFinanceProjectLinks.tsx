@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { dealQueryKeys } from "../../features/deal-workspace/deal-query-keys";
@@ -140,12 +139,9 @@ export function DealFinanceProjectLinks({ data }: Props) {
               className="flex flex-wrap items-center justify-between gap-2 border-b border-indigo-200/40 pb-1.5 last:border-0 last:pb-0"
             >
               <div className="min-w-0 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                <Link
-                  href={`/crm/finance/${p.id}`}
-                  className="font-medium text-indigo-950 underline decoration-indigo-300 underline-offset-2 hover:text-indigo-900"
-                >
+                <span className="font-medium text-indigo-950">
                   {p.code} · {p.title}
-                </Link>
+                </span>
                 <span className="text-[11px] text-indigo-700/80">{p.status}</span>
               </div>
               {canManage ? (

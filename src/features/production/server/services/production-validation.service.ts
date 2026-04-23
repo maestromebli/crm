@@ -58,7 +58,7 @@ export async function validateLatestFilePackage(flowId: string, actorName: strin
     blockers.push({
       code: "CRITICAL_QUESTIONS_OPEN",
       title: "Є критичні відкриті питання",
-      description: `Відкритих критичних питань: ${criticalQuestions}.`,
+      description: `Openх критичних питань: ${criticalQuestions}.`,
       severity: "HIGH",
     });
   }

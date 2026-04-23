@@ -3,7 +3,6 @@ import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { getDealWorkspacePayload } from "../../../../../features/deal-workspace/queries";
 import { DealWorkspaceShell } from "../../../../../components/deal-workspace/DealWorkspaceShell";
-import { DealWorkspaceDemoPage } from "../../../../../features/deal-workspace/demo/DealWorkspaceDemoPage";
 import { getSessionAccess } from "../../../../../lib/authz/session-access";
 
 type Props = {
@@ -12,9 +11,6 @@ type Props = {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { dealId } = await params;
-  if (dealId === "demo") {
-    return { title: "Демо воркспейс замовлення · ENVER CRM" };
-  }
   const access = await getSessionAccess();
   const data = access
     ? await getDealWorkspacePayload(dealId, access.ctx)
@@ -35,9 +31,6 @@ function WorkspaceFallback() {
 
 export default async function DealWorkspacePage({ params }: Props) {
   const { dealId } = await params;
-  if (dealId === "demo") {
-    return <DealWorkspaceDemoPage />;
-  }
   const access = await getSessionAccess();
   if (!access) redirect("/login");
   const data = await getDealWorkspacePayload(dealId, access.ctx);

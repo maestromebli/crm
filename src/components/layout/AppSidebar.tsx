@@ -246,6 +246,7 @@ export function AppSidebar({
           const Icon = section.icon;
           const hasSubmenu = Boolean(section.subItems?.length);
           const accordionOpen = !compact && hasSubmenu && openSectionId === section.id;
+          const compactPopoverOpen = compact && hoveredSectionId === section.id;
 
           return (
             <motion.div
@@ -319,6 +320,7 @@ export function AppSidebar({
                     isActive &&
                       "bg-[var(--enver-accent-soft)] font-semibold text-[var(--enver-text)] ring-1 ring-[var(--enver-accent-ring)]/80",
                   )}
+                  title={compact ? section.label : undefined}
                 >
                   <span
                     className={cn(
@@ -377,12 +379,12 @@ export function AppSidebar({
                   aria-labelledby={linkId}
                   className={cn(
                     "absolute left-[calc(100%+8px)] top-0 z-40 min-w-56 rounded-lg border border-[var(--enver-border)] bg-[var(--enver-card)] p-2 text-[var(--enver-text)] shadow-xl transition-[opacity,transform,visibility] duration-200 ease-out",
-                    hoveredSectionId === section.id
+                    compactPopoverOpen
                       ? "pointer-events-auto visible translate-x-0 scale-100 opacity-100"
                       : "pointer-events-none invisible -translate-x-1 scale-[0.98] opacity-0",
                   )}
                 >
-                  <div className="px-2 pb-1 text-xs font-semibold text-[var(--enver-text)]">
+                  <div className="mb-1 rounded-md bg-[var(--enver-accent-soft)] px-2 py-1 text-xs font-semibold text-[var(--enver-text)] ring-1 ring-[var(--enver-accent-ring)]/70">
                     {section.label}
                   </div>
                   <div className="space-y-0.5">
@@ -403,6 +405,19 @@ export function AppSidebar({
                       );
                     })}
                   </div>
+                </div>
+              ) : null}
+              {compact && !hasSubmenu ? (
+                <div
+                  role="tooltip"
+                  className={cn(
+                    "absolute left-[calc(100%+8px)] top-1/2 z-40 -translate-y-1/2 rounded-lg border border-[var(--enver-border)] bg-[var(--enver-card)] px-3 py-1.5 text-xs font-semibold text-[var(--enver-text)] shadow-xl ring-1 ring-[var(--enver-accent-ring)]/60 transition-[opacity,transform,visibility] duration-200 ease-out",
+                    compactPopoverOpen
+                      ? "pointer-events-auto visible translate-x-0 opacity-100"
+                      : "pointer-events-none invisible -translate-x-1 opacity-0",
+                  )}
+                >
+                  {section.label}
                 </div>
               ) : null}
               {!compact && hasSubmenu && accordionOpen ? (

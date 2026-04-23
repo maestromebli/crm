@@ -270,7 +270,7 @@ export type WeeklyDigestRow = {
 };
 
 export function buildWeeklyDigest(args: {
-  health: HealthStore;
+  стан: HealthStore;
   policy: HealthPolicy;
   users: Array<{ id: string; name: string | null; email: string }>;
 }): WeeklyDigestRow[] {
@@ -278,7 +278,7 @@ export function buildWeeklyDigest(args: {
     args.users.map((u) => [u.id, u.name?.trim() || u.email]),
   );
   const rows: WeeklyDigestRow[] = [];
-  for (const [uid, channels] of Object.entries(args.health)) {
+  for (const [uid, channels] of Object.entries(args.стан)) {
     for (const [channel, h] of Object.entries(channels)) {
       const sent = h.outboundSentCount ?? 0;
       const outboundFailed = h.outboundFailedCount ?? 0;

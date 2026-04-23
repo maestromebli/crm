@@ -7,10 +7,15 @@ import type {
   DealViewRole,
 } from "../../features/deal-workspace/deal-view-selectors";
 import { DealHealthBadge } from "./DealHealthBadge";
+import {
+  evaluateCloseOrderGate,
+  evaluateReadyForHandoffGate,
+  evaluateReleaseToProductionGate,
+} from "../../lib/enver/order-execution-policy";
 
 type Props = {
   data: DealWorkspacePayload;
-  health: DealHealthStatus;
+  стан: DealHealthStatus;
   onTab: (tab: DealWorkspaceTabId) => void;
   viewRole: DealViewRole;
   canSwitchRole: boolean;
@@ -21,7 +26,7 @@ type Props = {
 
 export function DealCommandHeader({
   data,
-  health,
+  стан,
   onTab,
   viewRole,
   canSwitchRole,
@@ -29,6 +34,26 @@ export function DealCommandHeader({
   progressLabel,
   focusLabel,
 }: Props) {
+  const hasHandoffFiles =
+    data.handoff.manifest.selectedAttachmentIds.length > 0 ||
+    data.handoff.manifest.selectedFileAssetIds.length > 0;
+  const gateReadyForHandoff = evaluateReadyForHandoffGate({
+    contractSigned: data.contract?.status === "FULLY_SIGNED",
+    hasExecutionSpec: data.enverExecution.projectSpec.currentVersionApprovedForExecution,
+    hasRequiredHandoffFiles: hasHandoffFiles,
+  });
+  const gateReleaseToProduction = evaluateReleaseToProductionGate({
+    handoffAccepted: data.handoff.status === "ACCEPTED",
+    handoffChecklistCompleted: data.enverExecution.handoffChecklist.complete,
+    bomApproved: data.meta.executionControl?.bomApproved === true,
+    criticalMaterialsReady: data.meta.executionControl?.criticalMaterialsReady === true,
+  });
+  const gateCloseOrder = evaluateCloseOrderGate({
+    deliveryAccepted: data.meta.executionControl?.deliveryAccepted === true,
+    financeActualsPosted: data.meta.executionControl?.financeActualsPosted === true,
+    productionDone: data.meta.executionControl?.productionOrderDone === true,
+  });
+
   return (
     <header className="rounded-2xl border border-[var(--enver-border)] bg-[var(--enver-card)]/95 px-4 py-3 backdrop-blur">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -44,9 +69,9 @@ export function DealCommandHeader({
             <span className="rounded-full border border-[var(--enver-border)] bg-[var(--enver-surface)] px-2 py-0.5 font-medium text-[var(--enver-text-muted)]">
               Сума: {data.deal.value?.toLocaleString("uk-UA") ?? "—"} {data.deal.currency ?? ""}
             </span>
-            <DealHealthBadge health={health} />
+            <DealHealthBadge стан={стан} />
             <span className="rounded-full border border-[var(--enver-border)] bg-[var(--enver-surface)] px-2 py-0.5 text-[var(--enver-text-muted)]">
-              {health.reasonLabel}
+              {стан.reasonLabel}
             </span>
             <span className="rounded-full border border-[var(--enver-border)] bg-[var(--enver-surface)] px-2 py-0.5 text-[var(--enver-text-muted)]">
               {progressLabel}
@@ -62,6 +87,56 @@ export function DealCommandHeader({
           <p className="truncate text-[11px] text-[var(--enver-text-muted)]">
             Фокус етапу: {focusLabel}
           </p>
+          <div className="flex flex-wrap gap-1.5 pt-0.5 text-[10px]">
+            <button
+              type="button"
+              onClick={() => onTab("handoff")}
+              className={`rounded-full border px-2 py-0.5 font-medium ${
+                gateReadyForHandoff.length === 0
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                  : "border-rose-200 bg-rose-50 text-rose-800"
+              }`}
+              title={
+                gateReadyForHandoff.length === 0
+                  ? "Гейт ready_for_handoff пройдено"
+                  : gateReadyForHandoff[0].message
+              }
+            >
+              RH {gateReadyForHandoff.length === 0 ? "OK" : "BLOCKED"}
+            </button>
+            <button
+              type="button"
+              onClick={() => onTab("production")}
+              className={`rounded-full border px-2 py-0.5 font-medium ${
+                gateReleaseToProduction.length === 0
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                  : "border-rose-200 bg-rose-50 text-rose-800"
+              }`}
+              title={
+                gateReleaseToProduction.length === 0
+                  ? "Гейт release_to_production пройдено"
+                  : gateReleaseToProduction[0].message
+              }
+            >
+              RTP {gateReleaseToProduction.length === 0 ? "OK" : "BLOCKED"}
+            </button>
+            <button
+              type="button"
+              onClick={() => onTab("finance")}
+              className={`rounded-full border px-2 py-0.5 font-medium ${
+                gateCloseOrder.length === 0
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                  : "border-rose-200 bg-rose-50 text-rose-800"
+              }`}
+              title={
+                gateCloseOrder.length === 0
+                  ? "Гейт close_order пройдено"
+                  : gateCloseOrder[0].message
+              }
+            >
+              CO {gateCloseOrder.length === 0 ? "OK" : "BLOCKED"}
+            </button>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {canSwitchRole ? (

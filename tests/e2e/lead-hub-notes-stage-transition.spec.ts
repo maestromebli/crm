@@ -12,6 +12,7 @@ test("lead hub notes: manager advances lead stage", async ({ page }) => {
   const password = process.env.SCREENSHOT_PASSWORD!;
   const stamp = Date.now();
   const leadTitle = `Demo Notes Stage ${stamp}`;
+  const orderNumber = `ЕМ-${(stamp % 200) + 1}`;
 
   await page.goto("/login");
   await page.locator('input[name="email"]').fill(email);
@@ -26,6 +27,7 @@ test("lead hub notes: manager advances lead stage", async ({ page }) => {
       title: leadTitle,
       contactName: "Тест Нотатки",
       phone: `+38067${String(stamp).slice(-7)}`,
+      orderNumber,
       source: "demo-notes-stage-flow",
       priority: "high",
       note: "E2E: перевірка переходу між етапами у вкладці Нотатки",

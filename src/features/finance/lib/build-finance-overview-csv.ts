@@ -13,7 +13,7 @@ function m(v: number, fd: 0 | 2 = 0): string {
 
 export type FinanceOverviewCsvPayload = {
   referenceDay: string;
-  dataSource: "mock" | "database";
+  dataSource: "database";
   executiveKpi: FinanceExecutiveKpi;
   transactions: FinanceTransaction[];
   paymentPlan: ProjectPaymentPlan[];
@@ -58,7 +58,7 @@ export function buildFinanceOverviewCsvString(
 
   lines.push("# МЕТА");
   lines.push(csvRow(["Референсна дата (прострочення)", "Джерело даних"]));
-  lines.push(csvRow([p.referenceDay, p.dataSource === "database" ? "PostgreSQL" : "Демо (mock)"]));
+  lines.push(csvRow([p.referenceDay, "PostgreSQL"]));
   lines.push(csvRow(["Транзакцій у файлі", String(txSlice.length)]));
   if (cap !== null && totalTx > txSlice.length) {
     lines.push(

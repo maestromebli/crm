@@ -15,7 +15,7 @@ export function useDealHub(dealId: string, initialData?: DealHubOverview | null)
         response,
       );
       if (!response.ok || !json.data) {
-        throw new Error(json.error ?? "Failed to load deal hub overview");
+        throw new Error(json.error ?? "Не вдалося завантажити deal hub overview");
       }
       return json.data;
     },

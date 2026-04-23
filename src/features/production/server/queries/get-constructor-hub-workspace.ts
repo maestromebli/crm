@@ -2,7 +2,6 @@ import type { Session } from "next-auth";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { canEnterConstructorHub, mustBeAssignedForScope, resolveConstructorHubRole } from "@/features/production/ui/constructor-hub/constructor-hub.access";
-import { getMockConstructorWorkspace } from "@/features/production/ui/constructor-hub/constructor-hub.mock";
 import { mapFlowToConstructorWorkspace } from "@/features/production/ui/constructor-hub/constructor-hub.mapper";
 import type { ConstructorWorkspace } from "@/features/production/ui/constructor-hub/constructor-hub.types";
 
@@ -10,11 +9,19 @@ type ConstructorHubResult =
   | { ok: true; workspace: ConstructorWorkspace }
   | { ok: false; reason: "access_denied" | "not_found" };
 
+const MANAGER_OWNER_ROLES = new Set(["SALES_MANAGER", "MANAGER", "HEAD_MANAGER"]);
+
+function isOwnerManager(user: Session["user"], ownerId: string): boolean {
+  const role = user.realRole ?? user.role;
+  return MANAGER_OWNER_ROLES.has(role) && ownerId === user.id;
+}
+
 type DomainWorkspaceRow = Prisma.ConstructorWorkspaceGetPayload<{
   include: {
     deal: {
       select: {
         id: true;
+        ownerId: true;
         title: true;
         owner: { select: { name: true; email: true } };
         client: { select: { name: true } };
@@ -215,7 +222,7 @@ function mapDomainWorkspaceToUi(
           id: "snapshot",
           label: "Снимок согласованных данных",
           state: row.techSpec?.approvedDataSnapshotJson ? "APPROVED" : "MISSING",
-          summary: row.techSpec?.approvedDataSnapshotJson ? "Данные зафиксированы в snapshot." : "Snapshot отсутствует.",
+          summary: row.techSpec?.approvedDataSnapshotJson ? "Данные зафиксированы в snapshot." : "Знімок отсутствует.",
         },
       ],
     },
@@ -260,6 +267,7 @@ export async function getConstructorHubWorkspace(input: {
       deal: {
         select: {
           id: true,
+          ownerId: true,
           title: true,
           owner: { select: { name: true, email: true } },
           client: { select: { name: true } },
@@ -313,7 +321,12 @@ export async function getConstructorHubWorkspace(input: {
   });
 
   if (domainWorkspace) {
-    if (mustBeAssignedForScope(user) && domainWorkspace.assignedConstructorUserId !== user.id) {
+    const managerOwnsDeal = isOwnerManager(user, domainWorkspace.deal.ownerId);
+    if (
+      mustBeAssignedForScope(user) &&
+      domainWorkspace.assignedConstructorUserId !== user.id &&
+      !managerOwnsDeal
+    ) {
       return { ok: false, reason: "access_denied" };
     }
     const role = resolveConstructorHubRole(user);
@@ -329,6 +342,7 @@ export async function getConstructorHubWorkspace(input: {
       deal: {
         select: {
           id: true,
+          ownerId: true,
           title: true,
           owner: { select: { name: true, email: true } },
           productionManager: { select: { name: true, email: true } },
@@ -370,11 +384,12 @@ export async function getConstructorHubWorkspace(input: {
   }
 
   if (mustBeAssignedForScope(user)) {
+    const managerOwnsDeal = isOwnerManager(user, flow.deal.ownerId);
     const assignedByTask = flow.tasks.some(
       (task) => task.type === "CONSTRUCTOR" && task.assigneeUserId === user.id,
     );
     const assignedByRoom = flow.deal.constructorRoom?.assignedUserId === user.id;
-    if (!assignedByTask && !assignedByRoom) {
+    if (!assignedByTask && !assignedByRoom && !managerOwnsDeal) {
       return { ok: false, reason: "access_denied" };
     }
   }
@@ -386,6 +401,3 @@ export async function getConstructorHubWorkspace(input: {
   };
 }
 
-export function getConstructorHubWorkspaceDemo(input: { id: string; session: Session }): ConstructorWorkspace {
-  return getMockConstructorWorkspace(input.id, resolveConstructorHubRole(input.session.user));
-}

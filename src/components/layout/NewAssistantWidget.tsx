@@ -151,7 +151,7 @@ export function NewAssistantWidget() {
           {
             id: "default-greeting",
             role: "assistant",
-            text: "Привіт! Я динамічний ENVER Assistant. Поставте запитання щодо лідів, замовлень або задач.",
+            text: "Привіт! Я динамічний помічник ENVER. Поставте запитання щодо лідів, замовлень або задач.",
           },
         ];
 
@@ -169,7 +169,7 @@ export function NewAssistantWidget() {
             <div className="flex items-center justify-between border-b border-slate-700 bg-slate-900 px-3 py-2 text-slate-100">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-100">
-                  ENVER Assistant PRO
+                  ENVER Помічник PRO
                 </p>
                 <p className="text-[11px] text-slate-300">
                   CRM-помічник
@@ -237,7 +237,7 @@ export function NewAssistantWidget() {
                   type="button"
                   onClick={() => {
                     triggerEmotion("thinking", 1000, "loading");
-                    quickActionPrompt("Які замовлення зараз без next step?");
+                    quickActionPrompt("Які замовлення зараз без наступного кроку?");
                   }}
                   className="rounded-full border border-slate-300 bg-white px-2 py-1 text-[10px] text-slate-700 hover:bg-slate-50"
                 >
@@ -303,7 +303,7 @@ export function NewAssistantWidget() {
           <span className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.22),transparent_60%)]" />
           <Image
             src={EMOTION_TEXTURES[emotion]}
-            alt="assistant face"
+            alt="Обличчя асистента"
             width={34}
             height={34}
             className="relative h-8.5 w-8.5 rounded-full object-cover"

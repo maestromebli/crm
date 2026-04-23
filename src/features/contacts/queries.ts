@@ -7,6 +7,7 @@ import {
   logPrismaError,
   userFacingPrismaMessage,
 } from "../../lib/prisma-errors";
+import { sanitizePipelineStageName } from "../../lib/crm-core/pipeline-stage-name";
 
 export type ContactListRow = {
   id: string;
@@ -229,7 +230,7 @@ const detailInclude = {
     select: {
       id: true,
       title: true,
-      stage: { select: { name: true } },
+      stage: { select: { name: true, slug: true } },
       owner: { select: { name: true, email: true } },
     },
   },
@@ -240,7 +241,7 @@ const detailInclude = {
       id: true,
       title: true,
       status: true,
-      stage: { select: { name: true } },
+      stage: { select: { name: true, slug: true } },
       client: { select: { name: true } },
     },
   },
@@ -306,14 +307,26 @@ export async function getContactById(
       leads: row.leads.map((l) => ({
         id: l.id,
         title: l.title,
-        stage: l.stage,
+        stage: {
+          name: sanitizePipelineStageName({
+            name: l.stage.name,
+            slug: l.stage.slug,
+            entityType: "LEAD",
+          }),
+        },
         owner: l.owner,
       })),
       deals: row.deals.map((d) => ({
         id: d.id,
         title: d.title,
         status: d.status,
-        stage: d.stage,
+        stage: {
+          name: sanitizePipelineStageName({
+            name: d.stage.name,
+            slug: d.stage.slug,
+            entityType: "DEAL",
+          }),
+        },
         client: d.client,
       })),
       linkedLeads,

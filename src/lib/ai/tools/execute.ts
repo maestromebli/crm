@@ -62,6 +62,8 @@ export async function executeAiTool(
     const toToolJson = (value: unknown) =>
       JSON.stringify(redactContextForAi(value));
     switch (name) {
+      case "crm_full_context":
+        return toToolJson(await toolFullContext(user, args));
       case "crm_list_leads":
         return toToolJson(await toolListLeads(user, args));
       case "crm_list_deals":
@@ -89,6 +91,429 @@ export async function executeAiTool(
       message: (e as Error).message,
     });
   }
+}
+
+async function toolFullContext(
+  user: SessionUser,
+  args: Record<string, unknown>,
+) {
+  const limit = clampLimit(args.limit, 8, 20);
+  const ctx = await resolveAccessContext(prisma, user);
+  const ownerFilter = ownerIdWhere(ctx);
+  const dealScope: Prisma.DealWhereInput = ownerFilter
+    ? { ownerId: ownerFilter }
+    : {};
+
+  const canLeads = can(user, P.LEADS_VIEW);
+  const canDeals = can(user, P.DEALS_VIEW);
+  const canTasks = can(user, P.TASKS_VIEW);
+  const canCalendar = can(user, P.CALENDAR_VIEW);
+  const canContacts = can(user, P.CONTACTS_VIEW);
+  const canFinance = can(user, P.PAYMENTS_VIEW) || can(user, P.COST_VIEW);
+  const canProduction =
+    can(user, P.PRODUCTION_ORDERS_VIEW) ||
+    can(user, P.PRODUCTION_ORCHESTRATION_VIEW) ||
+    canDeals;
+
+  const taskScope = canTasks ? await taskListWhereForUser(prisma, user) : null;
+  const calendarScope = canCalendar ? calendarEventWhere(ctx) : null;
+
+  const [
+    leadsCount,
+    recentLeads,
+    dealsCount,
+    recentDeals,
+    openTasksCount,
+    recentTasks,
+    contactsCount,
+    recentContacts,
+    upcomingCalendarCount,
+    upcomingCalendarEvents,
+    invoicesCount,
+    recentInvoices,
+    financeTxCount,
+    recentFinanceTx,
+    procurementCount,
+    recentProcurement,
+    purchaseOrdersCount,
+    recentPurchaseOrders,
+    productionFlowsCount,
+    recentProductionFlows,
+  ] = await Promise.all([
+    canLeads ? prisma.lead.count({ where: ownerFilter ? { ownerId: ownerFilter } : {} }) : Promise.resolve(null),
+    canLeads
+      ? prisma.lead.findMany({
+          where: ownerFilter ? { ownerId: ownerFilter } : {},
+          orderBy: { updatedAt: "desc" },
+          take: limit,
+          select: {
+            id: true,
+            title: true,
+            priority: true,
+            updatedAt: true,
+            stage: { select: { name: true } },
+            owner: { select: { name: true, email: true } },
+          },
+        })
+      : Promise.resolve([]),
+    canDeals ? prisma.deal.count({ where: dealScope }) : Promise.resolve(null),
+    canDeals
+      ? prisma.deal.findMany({
+          where: dealScope,
+          orderBy: { updatedAt: "desc" },
+          take: limit,
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            value: true,
+            currency: true,
+            updatedAt: true,
+            stage: { select: { name: true } },
+            client: { select: { name: true } },
+            owner: { select: { name: true, email: true } },
+          },
+        })
+      : Promise.resolve([]),
+    canTasks && taskScope
+      ? prisma.task.count({
+          where: {
+            AND: [taskScope, { status: { in: ["OPEN", "IN_PROGRESS"] } }],
+          },
+        })
+      : Promise.resolve(null),
+    canTasks && taskScope
+      ? prisma.task.findMany({
+          where: {
+            AND: [taskScope, { status: { in: ["OPEN", "IN_PROGRESS"] } }],
+          },
+          orderBy: [{ dueAt: "asc" }, { updatedAt: "desc" }],
+          take: limit,
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            priority: true,
+            taskType: true,
+            entityType: true,
+            entityId: true,
+            dueAt: true,
+            assignee: { select: { name: true, email: true } },
+          },
+        })
+      : Promise.resolve([]),
+    canContacts
+      ? prisma.contact.count({
+          where: ownerFilter
+            ? {
+                OR: [
+                  { leads: { some: { ownerId: ownerFilter } } },
+                  { deals: { some: { ownerId: ownerFilter } } },
+                ],
+              }
+            : undefined,
+        })
+      : Promise.resolve(null),
+    canContacts
+      ? prisma.contact.findMany({
+          orderBy: { updatedAt: "desc" },
+          take: limit,
+          select: {
+            id: true,
+            fullName: true,
+            phone: true,
+            email: true,
+            updatedAt: true,
+          },
+          where: ownerFilter
+            ? {
+                OR: [
+                  { leads: { some: { ownerId: ownerFilter } } },
+                  { deals: { some: { ownerId: ownerFilter } } },
+                ],
+              }
+            : undefined,
+        })
+      : Promise.resolve([]),
+    canCalendar
+      ? prisma.calendarEvent.count({
+          where: {
+            AND: [
+              ...(calendarScope ? [calendarScope] : []),
+              { startAt: { gte: new Date() } },
+              { status: { not: "CANCELED" } },
+            ],
+          },
+        })
+      : Promise.resolve(null),
+    canCalendar
+      ? prisma.calendarEvent.findMany({
+          where: {
+            AND: [
+              ...(calendarScope ? [calendarScope] : []),
+              { startAt: { gte: new Date() } },
+              { status: { not: "CANCELED" } },
+            ],
+          },
+          orderBy: { startAt: "asc" },
+          take: limit,
+          select: {
+            id: true,
+            title: true,
+            type: true,
+            status: true,
+            startAt: true,
+            endAt: true,
+            assignedTo: { select: { name: true, email: true } },
+          },
+        })
+      : Promise.resolve([]),
+    canFinance
+      ? prisma.invoice.count({ where: { deal: dealScope } })
+      : Promise.resolve(null),
+    canFinance
+      ? prisma.invoice.findMany({
+          where: { deal: dealScope },
+          orderBy: { updatedAt: "desc" },
+          take: limit,
+          select: {
+            id: true,
+            type: true,
+            status: true,
+            amount: true,
+            issueDate: true,
+            dueDate: true,
+            updatedAt: true,
+            deal: { select: { id: true, title: true } },
+          },
+        })
+      : Promise.resolve([]),
+    canFinance
+      ? prisma.financeTransaction.count({ where: { deal: dealScope } })
+      : Promise.resolve(null),
+    canFinance
+      ? prisma.financeTransaction.findMany({
+          where: { deal: dealScope },
+          orderBy: { date: "desc" },
+          take: limit,
+          select: {
+            id: true,
+            type: true,
+            status: true,
+            category: true,
+            amount: true,
+            currency: true,
+            date: true,
+            deal: { select: { id: true, title: true } },
+          },
+        })
+      : Promise.resolve([]),
+    canDeals
+      ? prisma.procurementRequest.count({ where: { deal: dealScope } })
+      : Promise.resolve(null),
+    canDeals
+      ? prisma.procurementRequest.findMany({
+          where: { deal: dealScope },
+          orderBy: { updatedAt: "desc" },
+          take: limit,
+          select: {
+            id: true,
+            number: true,
+            status: true,
+            workflowStatus: true,
+            priority: true,
+            plannedTotal: true,
+            currency: true,
+            neededByDate: true,
+            updatedAt: true,
+            supplier: { select: { name: true } },
+            deal: { select: { id: true, title: true } },
+          },
+        })
+      : Promise.resolve([]),
+    canDeals
+      ? prisma.purchaseOrder.count({ where: { deal: dealScope } })
+      : Promise.resolve(null),
+    canDeals
+      ? prisma.purchaseOrder.findMany({
+          where: { deal: dealScope },
+          orderBy: { updatedAt: "desc" },
+          take: limit,
+          select: {
+            id: true,
+            status: true,
+            totalAmount: true,
+            expectedDate: true,
+            updatedAt: true,
+            deal: { select: { id: true, title: true } },
+          },
+        })
+      : Promise.resolve([]),
+    canProduction
+      ? prisma.productionFlow.count({ where: { deal: dealScope } })
+      : Promise.resolve(null),
+    canProduction
+      ? prisma.productionFlow.findMany({
+          where: { deal: dealScope },
+          orderBy: { updatedAt: "desc" },
+          take: limit,
+          select: {
+            id: true,
+            number: true,
+            title: true,
+            status: true,
+            currentStepKey: true,
+            readinessPercent: true,
+            blockersCount: true,
+            updatedAt: true,
+            deal: { select: { id: true, title: true } },
+          },
+        })
+      : Promise.resolve([]),
+  ]);
+
+  return {
+    generated_at: new Date().toISOString(),
+    scope: ownerFilter ? "team_or_self" : "organization",
+    limit_per_section: limit,
+    permissions: {
+      leads: canLeads,
+      deals: canDeals,
+      tasks: canTasks,
+      contacts: canContacts,
+      calendar: canCalendar,
+      finance: canFinance,
+      production: canProduction,
+    },
+    sales: {
+      leads_count: leadsCount,
+      deals_count: dealsCount,
+      recent_leads: recentLeads.map((r) => ({
+        id: r.id,
+        title: r.title,
+        stage: r.stage.name,
+        priority: r.priority,
+        owner: r.owner.name ?? r.owner.email,
+        updated_at: r.updatedAt.toISOString(),
+      })),
+      recent_deals: recentDeals.map((r) => ({
+        id: r.id,
+        title: r.title,
+        status: r.status,
+        stage: r.stage.name,
+        client: r.client.name,
+        owner: r.owner.name ?? r.owner.email,
+        value: r.value != null ? Number(r.value) : null,
+        currency: r.currency,
+        updated_at: r.updatedAt.toISOString(),
+      })),
+    },
+    tasks: {
+      open_count: openTasksCount,
+      recent_open: recentTasks.map((r) => ({
+        id: r.id,
+        title: r.title,
+        status: r.status,
+        priority: r.priority,
+        task_type: r.taskType,
+        entity: `${r.entityType}:${r.entityId}`,
+        due_at: r.dueAt?.toISOString() ?? null,
+        assignee: r.assignee.name ?? r.assignee.email,
+      })),
+    },
+    contacts: {
+      count: contactsCount,
+      recent: recentContacts.map((r) => ({
+        id: r.id,
+        full_name: r.fullName,
+        phone: r.phone,
+        email: r.email,
+        updated_at: r.updatedAt.toISOString(),
+      })),
+    },
+    calendar: {
+      upcoming_count: upcomingCalendarCount,
+      upcoming: upcomingCalendarEvents.map((r) => ({
+        id: r.id,
+        title: r.title,
+        type: r.type,
+        status: r.status,
+        start_at: r.startAt.toISOString(),
+        end_at: r.endAt.toISOString(),
+        assignee: r.assignedTo?.name ?? r.assignedTo?.email ?? null,
+      })),
+    },
+    finance: {
+      invoices_count: invoicesCount,
+      finance_transactions_count: financeTxCount,
+      recent_invoices: recentInvoices.map((r) => ({
+        id: r.id,
+        deal_id: r.deal.id,
+        deal_title: r.deal.title,
+        type: r.type,
+        status: r.status,
+        amount: Number(r.amount),
+        issue_date: r.issueDate?.toISOString() ?? null,
+        due_date: r.dueDate?.toISOString() ?? null,
+        updated_at: r.updatedAt.toISOString(),
+      })),
+      recent_transactions: recentFinanceTx.map((r) => ({
+        id: r.id,
+        deal_id: r.deal.id,
+        deal_title: r.deal.title,
+        type: r.type,
+        status: r.status,
+        category: r.category,
+        amount: Number(r.amount),
+        currency: r.currency,
+        date: r.date.toISOString(),
+      })),
+    },
+    procurement: {
+      requests_count: procurementCount,
+      purchase_orders_count: purchaseOrdersCount,
+      recent_requests: recentProcurement.map((r) => ({
+        id: r.id,
+        number: r.number,
+        deal_id: r.deal.id,
+        deal_title: r.deal.title,
+        supplier: r.supplier?.name ?? null,
+        status: r.status,
+        workflow_status: r.workflowStatus,
+        priority: r.priority,
+        planned_total: r.plannedTotal != null ? Number(r.plannedTotal) : null,
+        currency: r.currency,
+        needed_by: r.neededByDate?.toISOString() ?? null,
+        updated_at: r.updatedAt.toISOString(),
+      })),
+      recent_purchase_orders: recentPurchaseOrders.map((r) => ({
+        id: r.id,
+        deal_id: r.deal.id,
+        deal_title: r.deal.title,
+        status: r.status,
+        total_amount: Number(r.totalAmount),
+        expected_date: r.expectedDate?.toISOString() ?? null,
+        updated_at: r.updatedAt.toISOString(),
+      })),
+    },
+    production: {
+      flows_count: productionFlowsCount,
+      recent_flows: recentProductionFlows.map((r) => ({
+        id: r.id,
+        number: r.number,
+        title: r.title,
+        deal_id: r.deal.id,
+        deal_title: r.deal.title,
+        status: r.status,
+        current_step: r.currentStepKey,
+        readiness_percent: r.readinessPercent,
+        blockers_count: r.blockersCount,
+        updated_at: r.updatedAt.toISOString(),
+      })),
+    },
+    note:
+      "Це не сире «навчання» моделі, а актуальний retrieval-контекст з БД у межах дозволів користувача.",
+  };
 }
 
 async function toolListLeads(

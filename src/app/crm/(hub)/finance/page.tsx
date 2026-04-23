@@ -17,10 +17,26 @@ import { FinanceOperationsScopePanel } from "../../../../features/finance/compon
 import { FinancePayrollEntryDrawer } from "../../../../features/finance/components/FinancePayrollEntryDrawer";
 import { FinanceDirectorIntakePanel } from "../../../../features/finance/components/FinanceDirectorIntakePanel";
 import { AiV2InsightCard } from "../../../../features/ai-v2";
+import { getCachedServerSession } from "@/lib/authz/server-session";
+import { hasUnrestrictedPermissionScope } from "@/lib/authz/permissions";
+import { redirect } from "next/navigation";
 
 type Props = { searchParams?: Promise<{ role?: string; view?: string; tab?: string }> };
 
 export default async function FinanceOverviewPage({ searchParams }: Props) {
+  const session = await getCachedServerSession();
+  const hasUnrestricted = hasUnrestrictedPermissionScope({
+    realRole: session?.user?.realRole,
+    impersonatorId: session?.user?.impersonatorId,
+  });
+  if (
+    !hasUnrestricted &&
+    session?.user?.realRole !== "ACCOUNTANT" &&
+    session?.user?.realRole !== "PROCUREMENT_MANAGER"
+  ) {
+    redirect("/access-denied");
+  }
+
   const params = await searchParams;
   const role = resolveRole(params?.role);
   const viewMode = params?.view === "hub" ? "hub" : "overview";
@@ -59,9 +75,6 @@ export default async function FinanceOverviewPage({ searchParams }: Props) {
           <Link href="/crm/production/workshop" className="text-sky-700 underline-offset-2 hover:underline">
             Канбан цеху
           </Link>
-          <Link href="/crm/procurement" className="text-sky-700 underline-offset-2 hover:underline">
-            закупівлі
-          </Link>
         </p>
         <AiV2InsightCard context="finance" />
         <FinanceHubClient />
@@ -84,6 +97,16 @@ export default async function FinanceOverviewPage({ searchParams }: Props) {
     projectId: p.id,
     label: p.label,
   }));
+  const payrollTransactions = data.transactions
+    .filter((tx) => tx.type === "PAYROLL")
+    .sort((a, b) => b.transactionDate.localeCompare(a.transactionDate));
+  const payrollTotalAmount = payrollTransactions.reduce((sum, tx) => sum + tx.amount, 0);
+  const payrollPaidAmount = payrollTransactions
+    .filter((tx) => tx.status === "CONFIRMED")
+    .reduce((sum, tx) => sum + tx.amount, 0);
+  const payrollPlannedAmount = payrollTransactions
+    .filter((tx) => tx.status === "DRAFT")
+    .reduce((sum, tx) => sum + tx.amount, 0);
 
   return (
     <main className="mx-auto max-w-[min(100%,1680px)] space-y-6 px-4 py-5 sm:px-6 sm:py-6">
@@ -123,9 +146,6 @@ export default async function FinanceOverviewPage({ searchParams }: Props) {
         </Link>
         <Link href="/crm/production/workshop" className="text-sky-700 underline-offset-2 hover:underline">
           Канбан цеху
-        </Link>
-        <Link href="/crm/procurement" className="text-sky-700 underline-offset-2 hover:underline">
-          закупівлі
         </Link>
         <Link href="/crm/finance/journal" className="text-emerald-800 underline-offset-2 hover:underline">
           журнал проводок
@@ -182,19 +202,12 @@ export default async function FinanceOverviewPage({ searchParams }: Props) {
             <span className="inline-block h-2 w-2 rounded-full bg-blue-500" aria-hidden />
             Замовлення CRM
           </Link>
-          <Link
-            href="/crm/procurement"
-            className="inline-flex items-center gap-2 rounded-xl border border-amber-200/90 bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-950 shadow-sm transition hover:bg-amber-100"
-          >
-            <span className="inline-block h-2 w-2 rounded-full bg-amber-500" aria-hidden />
-            Закупівлі та PO
-          </Link>
         </div>
         <FinanceDirectorIntakePanel projects={projectOptions} />
       </SectionCard>
 
       <SectionCard
-        title="Матриця об'єктів і замовлень"
+        title="Матриця замовлень"
         subtitle="Показники по кожній адресі окремо; внизу рядок — усі об'єкти разом. Закупівлі з позицій, cash — з проводок."
       >
         <FinanceObjectFinanceMatrix
@@ -221,6 +234,74 @@ export default async function FinanceOverviewPage({ searchParams }: Props) {
           <EmptyState
             title="Немає доступу"
             description="Потрібні права FINANCE_SUMMARY або FINANCE_FULL."
+          />
+        )}
+      </SectionCard>
+
+      <SectionCard
+        title="Виплати ЗП"
+        subtitle="Окремий контур нарахувань і виплат зарплати по поточному портфелю."
+      >
+        {payrollTransactions.length ? (
+          <div className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+                <p className="text-xs font-medium text-slate-500">Всього нараховано</p>
+                <p className="mt-1 text-lg font-semibold text-slate-900">
+                  {formatMoneyUa(payrollTotalAmount)} грн
+                </p>
+              </div>
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3">
+                <p className="text-xs font-medium text-emerald-700">Виплачено</p>
+                <p className="mt-1 text-lg font-semibold text-emerald-900">
+                  {formatMoneyUa(payrollPaidAmount)} грн
+                </p>
+              </div>
+              <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-3">
+                <p className="text-xs font-medium text-amber-700">Очікує виплати</p>
+                <p className="mt-1 text-lg font-semibold text-amber-900">
+                  {formatMoneyUa(payrollPlannedAmount)} грн
+                </p>
+              </div>
+            </div>
+            <div className="overflow-x-auto rounded-xl border border-slate-200">
+              <table className="min-w-full text-left text-sm">
+                <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                  <tr>
+                    <th className="px-3 py-2">Дата</th>
+                    <th className="px-3 py-2">Проєкт</th>
+                    <th className="px-3 py-2">Роль/коментар</th>
+                    <th className="px-3 py-2 text-right">Сума</th>
+                    <th className="px-3 py-2 text-right">Статус</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {payrollTransactions.slice(0, 8).map((tx) => (
+                    <tr key={tx.id} className="border-t border-slate-100">
+                      <td className="px-3 py-2 text-slate-700">{tx.transactionDate}</td>
+                      <td className="px-3 py-2 text-slate-700">
+                        {projectNameById[tx.projectId] ?? "—"}
+                      </td>
+                      <td className="px-3 py-2 text-slate-600">{tx.comment || "—"}</td>
+                      <td className="px-3 py-2 text-right font-medium text-slate-900">
+                        {formatMoneyUa(tx.amount)} грн
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <StatusBadge
+                          label={tx.status === "CONFIRMED" ? "Виплачено" : "Чернетка"}
+                          tone={tx.status === "CONFIRMED" ? "success" : "warning"}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <EmptyState
+            title="Нарахувань ЗП ще немає"
+            description="Додайте нарахування через кнопку «Нарахування ЗП», щоб сформувати блок виплат."
           />
         )}
       </SectionCard>

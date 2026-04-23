@@ -129,6 +129,70 @@ export function DealExecutionPanel({ data, onTab }: Props) {
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-[var(--enver-card)] p-4 shadow-sm">
+        <h2 className="text-sm font-semibold text-[var(--enver-text)]">
+          ENVER execution truth
+        </h2>
+        <div className="mt-2 space-y-1 text-[11px] text-slate-700">
+          <p>
+            Project spec version:{" "}
+            <span className="font-medium text-slate-900">
+              {data.enverExecution.projectSpec.currentVersionNo != null
+                ? `v${data.enverExecution.projectSpec.currentVersionNo}`
+                : "не задано"}
+            </span>
+          </p>
+          <p>
+            Approved for execution:{" "}
+            <span
+              className={
+                data.enverExecution.projectSpec.currentVersionApprovedForExecution
+                  ? "font-medium text-emerald-700"
+                  : "font-medium text-rose-700"
+              }
+            >
+              {data.enverExecution.projectSpec.currentVersionApprovedForExecution
+                ? "так"
+                : "ні"}
+            </span>
+          </p>
+          <p>
+            Handoff checklist:{" "}
+            <span className="font-medium text-slate-900">
+              {data.enverExecution.handoffChecklist.checkedRequiredCount}/
+              {data.enverExecution.handoffChecklist.requiredCount} required
+            </span>
+          </p>
+        </div>
+        {data.enverExecution.orderFinancialSnapshots[0] ? (
+          <div className="mt-3 rounded-lg border border-slate-100 bg-slate-50/80 p-2 text-[11px] text-slate-700">
+            <p className="font-medium text-slate-900">
+              Latest financial snapshot
+            </p>
+            <p className="mt-1">
+              Revenue plan/fact:{" "}
+              {Math.round(
+                data.enverExecution.orderFinancialSnapshots[0].plannedRevenue,
+              )}{" "}
+              /{" "}
+              {Math.round(
+                data.enverExecution.orderFinancialSnapshots[0].actualRevenue,
+              )}
+            </p>
+            <p>
+              Cost plan/fact:{" "}
+              {Math.round(
+                data.enverExecution.orderFinancialSnapshots[0].plannedCost,
+              )}{" "}
+              /{" "}
+              {Math.round(
+                data.enverExecution.orderFinancialSnapshots[0].actualCost,
+              )}
+            </p>
+          </div>
+        ) : null}
+      </section>
+
+      <section className="rounded-2xl border border-slate-200 bg-[var(--enver-card)] p-4 shadow-sm">
         <h2 className="text-sm font-semibold text-[var(--enver-text)]">Оплата</h2>
         <p className={cn("mt-1 text-xs", pay.variant === "complete" ? "text-emerald-800" : "text-slate-600")}>
           {pay.label}

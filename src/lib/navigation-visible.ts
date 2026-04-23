@@ -2,6 +2,7 @@ import { NAV_SECTIONS, type NavSection } from "../config/navigation";
 import {
   hasEffectiveAnyPermission,
   hasEffectivePermission,
+  hasUnrestrictedPermissionScope,
   P,
 } from "./authz/permissions";
 import {
@@ -28,6 +29,21 @@ const MANAGER_VISIBLE_SECTIONS = new Set([
   "reports",
 ]);
 
+const CONSTRUCTOR_MODULE_VISIBLE_ROLES = new Set([
+  "SUPER_ADMIN",
+  "ADMIN",
+  "DIRECTOR",
+  "DIRECTOR_PRODUCTION",
+  "TEAM_LEAD",
+  "PROCUREMENT_MANAGER",
+  "CONSTRUCTOR",
+  "PRODUCTION_WORKER",
+  "CUTTING",
+  "EDGING",
+  "DRILLING",
+  "ASSEMBLY",
+]);
+
 function canSeeSection(
   section: NavSection,
   ctx: Omit<NavVisibilityContext, "menuAccess">,
@@ -45,11 +61,9 @@ function canSeeSection(
   };
 
   if (section.id === "finance") {
-    return hasEffectiveAnyPermission(
-      ctx.permissionKeys,
-      [P.REPORTS_VIEW, P.MARGIN_VIEW, P.COST_VIEW, P.PAYMENTS_VIEW],
-      permissionCtx,
-    );
+    if (hasUnrestrictedPermissionScope(permissionCtx)) return true;
+    if (ctx.realRole !== "ACCOUNTANT" && ctx.realRole !== "PROCUREMENT_MANAGER") return false;
+    return hasEffectiveAnyPermission(ctx.permissionKeys, [P.PAYMENTS_VIEW], permissionCtx);
   }
 
   if (section.id === "production") {
@@ -65,12 +79,17 @@ function canSeeSection(
     );
   }
 
+  if (section.id === "constructor") {
+    if (hasUnrestrictedPermissionScope(permissionCtx)) return true;
+    const role = ctx.realRole ?? "";
+    if (CONSTRUCTOR_MODULE_VISIBLE_ROLES.has(role)) return true;
+    return false;
+  }
+
   if (section.id === "procurement") {
-    return hasEffectiveAnyPermission(
-      ctx.permissionKeys,
-      [P.COST_VIEW, P.MARGIN_VIEW, P.PAYMENTS_VIEW, P.REPORTS_VIEW],
-      permissionCtx,
-    );
+    if (hasUnrestrictedPermissionScope(permissionCtx)) return true;
+    if (ctx.realRole !== "ACCOUNTANT" && ctx.realRole !== "PROCUREMENT_MANAGER") return false;
+    return hasEffectiveAnyPermission(ctx.permissionKeys, [P.COST_VIEW], permissionCtx);
   }
 
   if (section.id === "handoff") {

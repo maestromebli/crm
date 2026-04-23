@@ -33,8 +33,7 @@ export function CalendarFilters({
             onClick={onClose}
             className="text-[11px] text-slate-500 hover:text-[var(--enver-text)]"
           >
-            Закрити
-          </button>
+            Закрити </button>
         </div>
 
         <div className="space-y-3">

@@ -49,7 +49,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, summary });
   } catch (e) {
     return NextResponse.json(
-      { error: e instanceof Error ? e.message : "Supplier sync failed" },
+      { error: e instanceof Error ? e.message : "Не вдалося синхронізувати постачальників" },
       { status: 400 },
     );
   }

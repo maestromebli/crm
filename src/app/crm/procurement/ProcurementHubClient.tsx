@@ -63,6 +63,7 @@ type Dash = {
     dealId: string;
     dealTitle: string | null;
     status: string;
+    workflowStatus?: string;
     priority: string | null;
     neededByDate: string | null;
   }>;
@@ -228,7 +229,72 @@ type ProcurementHubClientProps = {
   initialDealId?: string;
 };
 
-type ProcurementHubTab = "overview" | "operations" | "suppliers";
+type ProcurementHubTab = "overview" | "operations" | "suppliers" | "reconcile";
+type RequestSourceContext = "procurement_hub" | "constructor_workspace";
+type DispatchChannel = "telegram" | "whatsapp" | "viber";
+
+type InvoiceReconcileData = {
+  request: {
+    id: string;
+    number: string | null;
+    dealTitle: string;
+    supplierName: string | null;
+    workflowStatus: string;
+    invoiceAmount: number;
+    aiMatchedAt: string | null;
+  };
+  summary: {
+    matchedItems: number;
+    totalRequestItems: number;
+    totalSupplierLines: number;
+    plannedTotal: number;
+    supplierTotal: number;
+    totalDelta: number;
+    warnings: number;
+    missing: number;
+  };
+  lines: Array<{
+    itemId: string;
+    itemName: string;
+    plannedQty: number;
+    plannedUnitPrice: number;
+    plannedTotal: number;
+    supplierLineName: string | null;
+    supplierQty: number;
+    supplierUnitPrice: number;
+    supplierTotal: number;
+    qtyDelta: number;
+    priceDelta: number;
+    totalDelta: number;
+    confidencePct: number;
+    status: "ok" | "warning" | "missing";
+  }>;
+  canConfirmForApproval: boolean;
+};
+
+const WORKFLOW_STATUS_LABELS: Record<string, string> = {
+  new_request: "Нова заявка",
+  in_progress_by_purchaser: "В роботі закупівельника",
+  ai_grouping: "AI-групування",
+  grouped_by_supplier_or_category: "Розгруповано по постачальниках/категоріях",
+  sent_to_supplier: "Надіслано постачальнику",
+  supplier_response_received: "Відповідь від постачальника",
+  supplier_invoice_uploaded: "Файл постачальника завантажено",
+  invoice_ai_matched: "AI розподілив рахунок по замовленнях",
+  invoice_verification: "Звірка рахунку закупівельником",
+  approval_pending: "На погодженні",
+  sent_to_payment: "Передано в бухгалтерію",
+  payment_method_selected: "Метод оплати обрано",
+  paid: "Оплачено",
+  receipt_verification_pending: "Очікує перевірки надходження",
+  awaiting_delivery: "Очікується поставка",
+  goods_received: "Товар отримано",
+  stock_posted: "Оприбутковано на склад",
+  reserved_for_order: "Зарезервовано під замовлення",
+  issued_to_production: "Передано у виробництво",
+  returned_for_revision: "Повернено на корекцію",
+  rejected: "Відхилено",
+};
 
 export function ProcurementHubClient({
   initialOpenNewRequest = false,
@@ -243,11 +309,27 @@ export function ProcurementHubClient({
   const [requestForm, setRequestForm] = useState<PurchaseRequest>(EMPTY_REQUEST);
   const [supplierForm, setSupplierForm] = useState<SupplierOnboarding>(EMPTY_SUPPLIER);
   const [dealId, setDealId] = useState("");
+  const [requestSourceContext, setRequestSourceContext] =
+    useState<RequestSourceContext>("procurement_hub");
   const [deals, setDeals] = useState<Array<{ id: string; title: string }>>([]);
   const [supplierSaving, setSupplierSaving] = useState(false);
   const [dbRequestSaving, setDbRequestSaving] = useState(false);
+  const [supplierFileRequestId, setSupplierFileRequestId] = useState("");
+  const [supplierFile, setSupplierFile] = useState<File | null>(null);
+  const [supplierFileUploading, setSupplierFileUploading] = useState(false);
+  const [dispatchRequestId, setDispatchRequestId] = useState("");
+  const [dispatchChannel, setDispatchChannel] = useState<DispatchChannel>("telegram");
+  const [dispatchTarget, setDispatchTarget] = useState("");
+  const [dispatchMessage, setDispatchMessage] = useState("");
+  const [generatedDispatchMessage, setGeneratedDispatchMessage] = useState("");
+  const [dispatching, setDispatching] = useState(false);
+  const [reconcileRequestId, setReconcileRequestId] = useState("");
+  const [reconcileLoading, setReconcileLoading] = useState(false);
+  const [reconcileError, setReconcileError] = useState<string | null>(null);
+  const [reconcileData, setReconcileData] = useState<InvoiceReconcileData | null>(null);
   const [showAllBridge, setShowAllBridge] = useState(false);
   const [applyingPriorityRequestId, setApplyingPriorityRequestId] = useState<string | null>(null);
+  const [transitioningRequestId, setTransitioningRequestId] = useState<string | null>(null);
   const [opsFeed, setOpsFeed] = useState<string[]>([]);
   const [riskConfig, setRiskConfig] = useState(DEFAULT_RISK);
   const skipFirstRiskPersist = useRef(true);
@@ -341,6 +423,10 @@ export function ProcurementHubClient({
     const fromUrl = parseProcurementQuickActionFromSearchParams(searchParams);
     const shouldOpenNewRequest = fromUrl.openNewRequest || initialOpenNewRequest;
     const linkedDealId = fromUrl.dealId || initialDealId.trim();
+    const sourceContext =
+      fromUrl.source === "constructor_workspace"
+        ? "constructor_workspace"
+        : "procurement_hub";
     const hasQuickActionParams = Boolean(fromUrl.openNewRequest || fromUrl.dealId);
     if (!shouldOpenNewRequest && !linkedDealId && !hasQuickActionParams) return;
 
@@ -349,11 +435,14 @@ export function ProcurementHubClient({
     if (linkedDealId) {
       setDealId(linkedDealId);
     }
+    setRequestSourceContext(sourceContext);
 
     if (shouldOpenNewRequest) {
       setActiveTab("overview");
       setOpsFeed((prev) => [
-        `Швидка дія → форма нової заявки готова${linkedDealId ? ` (замовлення ${linkedDealId})` : ""}`,
+        `Швидка дія → форма нової заявки готова${linkedDealId ? ` (замовлення ${linkedDealId})` : ""}${
+          sourceContext === "constructor_workspace" ? " · джерело: воркспейс конструктора" : ""
+        }`,
         ...prev,
       ]);
       window.requestAnimationFrame(() => {
@@ -466,6 +555,12 @@ export function ProcurementHubClient({
     if (!data?.procurementRequests?.length) return [];
     return sortProcurementRequests(data.procurementRequests);
   }, [data?.procurementRequests]);
+
+  useEffect(() => {
+    if (!sortedCrmRequests.length) return;
+    if (reconcileRequestId) return;
+    setReconcileRequestId(sortedCrmRequests[0]!.id);
+  }, [reconcileRequestId, sortedCrmRequests]);
 
   const nowMsForDueHints = clock;
   const criticalDueSoonCount = useMemo(() => {
@@ -602,9 +697,12 @@ export function ProcurementHubClient({
           neededByDate: requestForm.requiredDate || null,
           priority: requestForm.priority,
           comment: requestForm.comment || null,
+          sourceContext: requestSourceContext,
         });
         setOpsFeed((prev) => [
-          `CRM → заявка збережена для замовлення, матеріал ${requestForm.materialCode}`,
+          `CRM → заявка збережена для замовлення, матеріал ${requestForm.materialCode}${
+            requestSourceContext === "constructor_workspace" ? " (після погодження конструктора)" : ""
+          }`,
           ...prev,
         ]);
         void load(q);
@@ -693,6 +791,175 @@ export function ProcurementHubClient({
     }
   }
 
+  async function transitionWorkflowStatus(requestId: string, toStatus: string, reason?: string) {
+    if (!requestId || !toStatus) return;
+    setTransitioningRequestId(requestId);
+    try {
+      const response = await patchJson<{
+        request?: { id: string; workflowStatus: string; status: string };
+        details?: string[];
+      }>(`/api/crm/procurement/requests/${requestId}/status`, {
+        toStatus,
+        reason: reason ?? null,
+      });
+      setOpsFeed((prev) => [
+        `Процес → ${requestId.slice(0, 8)}… → ${response.request?.workflowStatus ?? toStatus}`,
+        ...prev,
+      ]);
+      await load(q);
+    } catch (error) {
+      setOpsFeed((prev) => [
+        `ПОМИЛКА workflow → ${error instanceof Error ? error.message : "невідомо"}`,
+        ...prev,
+      ]);
+    } finally {
+      setTransitioningRequestId(null);
+    }
+  }
+
+  async function uploadSupplierFileAndRunAi() {
+    if (!supplierFileRequestId || !supplierFile) return;
+    setSupplierFileUploading(true);
+    try {
+      const form = new FormData();
+      form.append("file", supplierFile);
+      const r = await fetch(
+        `/api/crm/procurement/requests/${encodeURIComponent(supplierFileRequestId)}/supplier-file`,
+        {
+          method: "POST",
+          body: form,
+        },
+      );
+      const j = await tryReadResponseJson<{
+        error?: string;
+        aiMatch?: { parsedItems: number; matchedItems: number; unmatchedRequestItems: number };
+      }>(r);
+      if (!r.ok) {
+        throw new Error(j?.error ?? "Не вдалося обробити файл постачальника");
+      }
+      setOpsFeed((prev) => [
+        `AI-файл → розбір ${supplierFile.name}: співпало ${j?.aiMatch?.matchedItems ?? 0}/${j?.aiMatch?.parsedItems ?? 0}`,
+        ...prev,
+      ]);
+      setSupplierFile(null);
+      setReconcileRequestId(supplierFileRequestId);
+      await load(q);
+    } catch (error) {
+      setOpsFeed((prev) => [
+        `ПОМИЛКА AI-файлу → ${error instanceof Error ? error.message : "невідомо"}`,
+        ...prev,
+      ]);
+    } finally {
+      setSupplierFileUploading(false);
+    }
+  }
+
+  async function loadInvoiceReconcile(requestId: string) {
+    if (!requestId) return;
+    setReconcileLoading(true);
+    setReconcileError(null);
+    try {
+      const response = await fetch(
+        `/api/crm/procurement/requests/${encodeURIComponent(requestId)}/invoice-reconcile`,
+        { cache: "no-store" },
+      );
+      const json = await tryReadResponseJson<InvoiceReconcileData & { error?: string }>(response);
+      if (!response.ok || !json) {
+        throw new Error(json?.error ?? "Не вдалося завантажити звірку");
+      }
+      setReconcileData(json);
+    } catch (error) {
+      setReconcileData(null);
+      setReconcileError(error instanceof Error ? error.message : "Помилка звірки");
+    } finally {
+      setReconcileLoading(false);
+    }
+  }
+
+  async function dispatchGroupedRequestToSupplier() {
+    if (!dispatchRequestId) return;
+    setDispatching(true);
+    try {
+      const payload = {
+        channel: dispatchChannel,
+        target: dispatchTarget.trim() || null,
+        message: dispatchMessage.trim() || null,
+      };
+      const response = await postJson<{
+        providerMessageId?: string | null;
+        generatedMessage?: string;
+        channel?: string;
+      }>(
+        `/api/crm/procurement/requests/${encodeURIComponent(dispatchRequestId)}/dispatch`,
+        payload,
+      );
+      if (response.generatedMessage) {
+        setGeneratedDispatchMessage(response.generatedMessage);
+      }
+      setOpsFeed((prev) => [
+        `Месенджер ${response.channel ?? dispatchChannel} → пакет відправлено (msg id: ${response.providerMessageId ?? "—"})`,
+        ...prev,
+      ]);
+      await load(q);
+    } catch (error) {
+      setOpsFeed((prev) => [
+        `ПОМИЛКА месенджера → ${error instanceof Error ? error.message : "невідомо"}`,
+        ...prev,
+      ]);
+    } finally {
+      setDispatching(false);
+    }
+  }
+
+  function dispatchTargetHint(channel: DispatchChannel): string {
+    if (channel === "telegram") return "Telegram chat id (напр. @supplier_chat або -100...)";
+    if (channel === "whatsapp") return "Номер WhatsApp (напр. +380...)";
+    return "Viber receiver id";
+  }
+
+  function getWorkflowQuickActions(status?: string): Array<{ id: string; label: string }> {
+    switch (status) {
+      case "new_request":
+        return [{ id: "in_progress_by_purchaser", label: "Взяти в роботу" }];
+      case "in_progress_by_purchaser":
+        return [{ id: "ai_grouping", label: "AI-групування позицій" }];
+      case "ai_grouping":
+        return [{ id: "grouped_by_supplier_or_category", label: "Розгруповано по постачальниках/категоріях" }];
+      case "grouped_by_supplier_or_category":
+        return [{ id: "sent_to_supplier", label: "Надіслано постачальнику" }];
+      case "sent_to_supplier":
+        return [{ id: "supplier_response_received", label: "Отримано відповідь постачальника" }];
+      case "supplier_response_received":
+        return [{ id: "supplier_invoice_uploaded", label: "Завантажено PDF/XLSX рахунку" }];
+      case "supplier_invoice_uploaded":
+        return [{ id: "invoice_ai_matched", label: "AI розподілив на замовлення" }];
+      case "invoice_ai_matched":
+        return [{ id: "invoice_verification", label: "Звірка рахунку закупівельником" }];
+      case "invoice_verification":
+        return [{ id: "approval_pending", label: "На погодження" }];
+      case "approval_pending":
+        return [{ id: "sent_to_payment", label: "Передати на оплату" }];
+      case "sent_to_payment":
+        return [{ id: "payment_method_selected", label: "Обрано метод оплати" }];
+      case "payment_method_selected":
+        return [{ id: "paid", label: "Позначити оплаченим" }];
+      case "paid":
+        return [{ id: "receipt_verification_pending", label: "Запит на перевірку надходження" }];
+      case "receipt_verification_pending":
+        return [{ id: "awaiting_delivery", label: "Очікується поставка" }];
+      case "awaiting_delivery":
+        return [{ id: "goods_received", label: "Товар отримано" }];
+      case "goods_received":
+        return [{ id: "stock_posted", label: "Оприбутковано на склад" }];
+      case "stock_posted":
+        return [{ id: "reserved_for_order", label: "Зарезервувати під замовлення" }];
+      case "reserved_for_order":
+        return [{ id: "issued_to_production", label: "Передано у виробництво" }];
+      default:
+        return [];
+    }
+  }
+
   return (
     <div className="space-y-6 px-4 py-6 sm:px-6">
       <header className="rounded-3xl border border-slate-200 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-800 p-5 text-slate-100 shadow-xl">
@@ -716,10 +983,6 @@ export function ProcurementHubClient({
                 className="text-cyan-200/95 underline-offset-2 hover:text-white hover:underline"
               >
                 Аналітика закупівель
-              </Link>
-              <span className="text-slate-600">·</span>
-              <Link href="/crm/finance" className="text-cyan-200/95 underline-offset-2 hover:text-white hover:underline">
-                Фінанси
               </Link>
               <span className="text-slate-600">·</span>
               <Link
@@ -814,6 +1077,7 @@ export function ProcurementHubClient({
           {(
             [
               ["overview", "Огляд закупівель"],
+              ["reconcile", "Звірка AI vs рахунок"],
               ["operations", "Операційний журнал"],
               ["suppliers", "Склад і постачальники"],
             ] as const
@@ -1019,6 +1283,8 @@ export function ProcurementHubClient({
               <ul className="mt-2 max-h-52 space-y-1.5 overflow-auto text-xs text-slate-700">
                 {sortedCrmRequests.slice(0, 14).map((r) => {
                   const d = dueHint(r.neededByDate ?? null, nowMsForDueHints);
+                  const workflowStatus = r.workflowStatus ?? "new_request";
+                  const quickActions = getWorkflowQuickActions(workflowStatus);
                   return (
                     <li
                       key={r.id}
@@ -1043,6 +1309,7 @@ export function ProcurementHubClient({
                       <p className="mt-0.5 font-medium text-slate-800">{r.dealTitle ?? "Замовлення"}</p>
                       <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-slate-500">
                         <span>{r.status}</span>
+                        <span>· workflow {WORKFLOW_STATUS_LABELS[workflowStatus] ?? workflowStatus}</span>
                         {r.priority ? <span>· пріоритет {r.priority}</span> : null}
                         {r.dealId ? (
                           <Link
@@ -1054,6 +1321,30 @@ export function ProcurementHubClient({
                           </Link>
                         ) : null}
                       </div>
+                      {quickActions.length > 0 ? (
+                        <div className="mt-1.5 flex flex-wrap gap-1">
+                          {quickActions.map((action) => {
+                            const isBusy = transitioningRequestId === r.id;
+                            return (
+                              <button
+                                key={`${r.id}-${action.id}`}
+                                type="button"
+                                disabled={isBusy}
+                                onClick={() =>
+                                  void transitionWorkflowStatus(
+                                    r.id,
+                                    action.id,
+                                    `Quick action from hub: ${action.label}`,
+                                  )
+                                }
+                                className="rounded border border-slate-300 bg-white px-2 py-0.5 text-[10px] font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-60"
+                              >
+                                {isBusy ? "Оновлення…" : action.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : null}
                     </li>
                   );
                 })}
@@ -1238,6 +1529,12 @@ export function ProcurementHubClient({
             }}
           >
             <p className="text-xs font-semibold text-slate-700">Нова заявка від виробництва</p>
+            {requestSourceContext === "constructor_workspace" ? (
+              <p className="rounded-md border border-sky-200 bg-sky-50 px-2 py-1 text-[11px] text-sky-900">
+                Створення з воркспейсу конструктора: доступно тільки після погодження начальником виробництва або
+                головним конструктором.
+              </p>
+            ) : null}
             <label className="text-[11px] text-slate-600">Замовлення в CRM (опційно — збере заявку в БД)</label>
             <select
               className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
@@ -1347,9 +1644,237 @@ export function ProcurementHubClient({
               {supplierSaving ? "Збереження…" : "Додати в реєстр"}
             </button>
           </form>
+
+          <form
+            className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void uploadSupplierFileAndRunAi();
+            }}
+          >
+            <p className="text-xs font-semibold text-slate-700">Файл постачальника (PDF/XLSX) → AI-розподіл</p>
+            <label className="text-[11px] text-slate-600">Заявка CRM</label>
+            <select
+              className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+              value={supplierFileRequestId}
+              onChange={(event) => setSupplierFileRequestId(event.target.value)}
+            >
+              <option value="">— Оберіть заявку —</option>
+              {sortedCrmRequests.map((r) => (
+                <option key={`sf-${r.id}`} value={r.id}>
+                  {(r.dealTitle ?? "Замовлення").slice(0, 40)} · {r.id.slice(0, 8)}…
+                </option>
+              ))}
+            </select>
+            <input
+              type="file"
+              accept=".xlsx,.xls,.pdf"
+              className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm"
+              onChange={(event) => setSupplierFile(event.target.files?.[0] ?? null)}
+            />
+            <button
+              type="submit"
+              disabled={!supplierFileRequestId || !supplierFile || supplierFileUploading}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-60"
+            >
+              {supplierFileUploading ? "Обробка…" : "Завантажити та розподілити AI"}
+            </button>
+          </form>
+
+          <form
+            className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void dispatchGroupedRequestToSupplier();
+            }}
+          >
+            <p className="text-xs font-semibold text-slate-700">
+              Відправка розгрупованого пакета в Telegram / WhatsApp / Viber
+            </p>
+            <label className="text-[11px] text-slate-600">Заявка CRM</label>
+            <select
+              className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+              value={dispatchRequestId}
+              onChange={(event) => setDispatchRequestId(event.target.value)}
+            >
+              <option value="">— Оберіть заявку —</option>
+              {sortedCrmRequests.map((r) => (
+                <option key={`dispatch-${r.id}`} value={r.id}>
+                  {(r.dealTitle ?? "Замовлення").slice(0, 40)} · {r.id.slice(0, 8)}…
+                </option>
+              ))}
+            </select>
+            <label className="text-[11px] text-slate-600">Канал</label>
+            <select
+              className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+              value={dispatchChannel}
+              onChange={(event) => setDispatchChannel(event.target.value as DispatchChannel)}
+            >
+              <option value="telegram">Telegram</option>
+              <option value="whatsapp">WhatsApp</option>
+              <option value="viber">Viber</option>
+            </select>
+            <input
+              className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+              placeholder={dispatchTargetHint(dispatchChannel)}
+              value={dispatchTarget}
+              onChange={(event) => setDispatchTarget(event.target.value)}
+            />
+            <textarea
+              className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+              rows={3}
+              placeholder="Кастомний текст (залиште порожнім для автогенерації з розбивкою по постачальнику/категорії)"
+              value={dispatchMessage}
+              onChange={(event) => setDispatchMessage(event.target.value)}
+            />
+            <button
+              type="submit"
+              disabled={!dispatchRequestId || dispatching}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-60"
+            >
+              {dispatching ? "Відправка…" : "Відправити постачальнику"}
+            </button>
+            {generatedDispatchMessage ? (
+              <div className="rounded-lg border border-slate-200 bg-white p-2">
+                <p className="text-[11px] font-medium text-slate-700">Згенерований текст повідомлення:</p>
+                <pre className="mt-1 whitespace-pre-wrap text-[11px] text-slate-600">{generatedDispatchMessage}</pre>
+              </div>
+            ) : null}
+          </form>
         </div>
           </section>
         </>
+      ) : null}
+
+      {activeTab === "reconcile" ? (
+        <section className="space-y-4">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <h2 className="text-sm font-semibold text-slate-900">Екран звірки AI vs рахунок постачальника</h2>
+            <p className="mt-1 text-xs text-slate-600">
+              Перед підтвердженням рахунку та передачею в оплату перевірте збіг позицій, кількості та ціни.
+            </p>
+            <div className="mt-3 grid gap-2 md:grid-cols-[1fr_auto]">
+              <select
+                className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+                value={reconcileRequestId}
+                onChange={(event) => setReconcileRequestId(event.target.value)}
+              >
+                <option value="">— Оберіть заявку —</option>
+                {sortedCrmRequests.map((r) => (
+                  <option key={`reconcile-${r.id}`} value={r.id}>
+                    {(r.dealTitle ?? "Замовлення").slice(0, 44)} · {r.id.slice(0, 8)}…
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                disabled={!reconcileRequestId || reconcileLoading}
+                onClick={() => void loadInvoiceReconcile(reconcileRequestId)}
+                className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-60"
+              >
+                {reconcileLoading ? "Завантаження…" : "Оновити звірку"}
+              </button>
+            </div>
+            {reconcileError ? (
+              <p className="mt-2 rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-xs text-rose-800">
+                {reconcileError}
+              </p>
+            ) : null}
+          </div>
+
+          {reconcileData ? (
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="grid gap-2 text-xs text-slate-700 md:grid-cols-3">
+                <p>Заявка: {reconcileData.request.number ?? reconcileData.request.id.slice(0, 8)}</p>
+                <p>Процес: {WORKFLOW_STATUS_LABELS[reconcileData.request.workflowStatus] ?? reconcileData.request.workflowStatus}</p>
+                <p>Постачальник: {reconcileData.request.supplierName ?? "—"}</p>
+                <p>Співпало: {reconcileData.summary.matchedItems}/{reconcileData.summary.totalRequestItems}</p>
+                <p>Попереджень: {reconcileData.summary.warnings}</p>
+                <p>Відсутніх: {reconcileData.summary.missing}</p>
+              </div>
+              <div className="mt-3 overflow-x-auto rounded-xl border border-slate-100">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 text-slate-500">
+                    <tr>
+                      <th className="px-2 py-1.5">Позиція</th>
+                      <th className="px-2 py-1.5">План (qty × ціна)</th>
+                      <th className="px-2 py-1.5">Рахунок постачальника</th>
+                      <th className="px-2 py-1.5">Δ qty</th>
+                      <th className="px-2 py-1.5">Δ ціни</th>
+                      <th className="px-2 py-1.5">Статус</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reconcileData.lines.map((line) => (
+                      <tr key={`rec-line-${line.itemId}`} className="border-t border-slate-50">
+                        <td className="px-2 py-1.5">
+                          <p className="font-medium text-slate-800">{line.itemName}</p>
+                          <p className="text-[10px] text-slate-500">{line.supplierLineName ?? "не знайдено у файлі"}</p>
+                        </td>
+                        <td className="px-2 py-1.5">
+                          {line.plannedQty} × {line.plannedUnitPrice.toFixed(2)} грн
+                        </td>
+                        <td className="px-2 py-1.5">
+                          {line.supplierQty} × {line.supplierUnitPrice.toFixed(2)} грн
+                        </td>
+                        <td className="px-2 py-1.5 tabular-nums">{line.qtyDelta.toFixed(2)}</td>
+                        <td className="px-2 py-1.5 tabular-nums">{line.priceDelta.toFixed(2)} грн</td>
+                        <td className="px-2 py-1.5">
+                          <span
+                            className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+                              line.status === "ok"
+                                ? "bg-emerald-100 text-emerald-900"
+                                : line.status === "warning"
+                                  ? "bg-amber-100 text-amber-900"
+                                  : "bg-rose-100 text-rose-900"
+                            }`}
+                          >
+                            {line.status === "ok" ? "OK" : line.status === "warning" ? "Увага" : "Немає збігу"} · {line.confidencePct}%
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                {reconcileData.request.workflowStatus === "invoice_ai_matched" ? (
+                  <button
+                    type="button"
+                    disabled={transitioningRequestId === reconcileData.request.id}
+                    onClick={() =>
+                      void transitionWorkflowStatus(
+                        reconcileData.request.id,
+                        "invoice_verification",
+                        "Підтверджено перевірку рахунку на екрані звірки",
+                      )
+                    }
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-60"
+                  >
+                    Позначити: звірку завершено
+                  </button>
+                ) : null}
+                {reconcileData.canConfirmForApproval ? (
+                  <button
+                    type="button"
+                    disabled={transitioningRequestId === reconcileData.request.id}
+                    onClick={() =>
+                      void transitionWorkflowStatus(
+                        reconcileData.request.id,
+                        "approval_pending",
+                        "Рахунок підтверджено закупівельником після звірки AI vs постачальник",
+                      )
+                    }
+                    className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
+                  >
+                    Підтвердити рахунок і передати на погодження
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+        </section>
       ) : null}
 
       {activeTab === "suppliers" ? (
@@ -1513,7 +2038,6 @@ export function ProcurementHubClient({
           <div className="grid gap-2">
           <QuickLink href="/crm/production" title="Виробничий командний пункт" subtitle="замовлення, конструктори, погодження" />
           <QuickLink href="/warehouse" title="Склад WMS" subtitle="залишки, резерви, рух із PO" />
-          <QuickLink href="/crm/finance" title="Фінансовий центр ERP" subtitle="cash-flow, P&L, оплати постачальникам" />
           <QuickLink href="/crm/erp" title="Глобальний ERP-командний центр" subtitle="ланцюжок погоджень і наскрізна стрічка подій" />
           </div>
         </div>

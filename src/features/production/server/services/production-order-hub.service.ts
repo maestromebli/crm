@@ -11,7 +11,6 @@ import type {
   ProductionTaskStatus,
   ProductionTaskType,
 } from "../../types/production";
-import { getDemoOrderHubView } from "../demo/production-demo";
 
 export async function getProductionOrderHubView(flowId: string): Promise<ProductionOrderHubView | null> {
   const flow = await prisma.productionFlow.findUnique({
@@ -31,7 +30,7 @@ export async function getProductionOrderHubView(flowId: string): Promise<Product
       events: { orderBy: { createdAt: "desc" }, take: 50 },
     },
   });
-  if (!flow) return getDemoOrderHubView(flowId);
+  if (!flow) return null;
 
   const blockedKeys = flow.steps
     .filter((step) => step.state === "BLOCKED")

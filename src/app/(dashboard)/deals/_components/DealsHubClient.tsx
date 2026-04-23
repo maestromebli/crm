@@ -8,6 +8,7 @@ import {
   Download,
   GripVertical,
   LayoutGrid,
+  Plus,
   Rows3,
   Search,
   Sparkles,
@@ -45,7 +46,7 @@ const DealsSmartInsights = dynamic(
 const VIEWS: Array<{ id: SavedViewChipId; label: string }> = [
   { id: "all_open", label: "Мої активні" },
   { id: "no_next", label: "Без наступного кроку" },
-  { id: "overdue_next", label: "Прострочений follow-up" },
+  { id: "overdue_next", label: "Прострочений наступний контакт" },
   { id: "wait_pay", label: "Очікуємо оплату" },
   { id: "no_est", label: "Без смети" },
   { id: "no_contract", label: "Без договору" },
@@ -238,6 +239,12 @@ export function DealsHubClient({
   const [visibleBoardRows, setVisibleBoardRows] = useState<
     Record<string, number>
   >({});
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [createTitle, setCreateTitle] = useState("");
+  const [createClientName, setCreateClientName] = useState("");
+  const [createDescription, setCreateDescription] = useState("");
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
   const boardScrollByStageRef = useRef<Record<string, number>>({});
 
   const persistBoardScrollSnapshot = useCallback(() => {
@@ -414,6 +421,56 @@ export function DealsHubClient({
     const stamp = format(new Date(), "yyyy-MM-dd_HH-mm");
     downloadDealsCsv(displayRows, `enver-deals_${stamp}.csv`);
   }, [displayRows]);
+
+  const resetCreateForm = useCallback(() => {
+    setCreateTitle("");
+    setCreateClientName("");
+    setCreateDescription("");
+    setCreateError(null);
+    setShowCreateForm(false);
+  }, []);
+
+  const handleCreateDeal = useCallback(async () => {
+    if (isCreating) return;
+    setIsCreating(true);
+    setCreateError(null);
+    try {
+      const response = await fetch("/api/deals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: createTitle.trim() || undefined,
+          clientName: createClientName.trim() || undefined,
+          description: createDescription.trim() || undefined,
+        }),
+      });
+      const json = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        dealId?: string;
+      };
+      if (!response.ok || !json.dealId) {
+        throw new Error(json.error ?? "Не вдалося створити замовлення");
+      }
+      resetCreateForm();
+      router.push(`/deals/${json.dealId}/workspace`);
+      router.refresh();
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Не вдалося створити замовлення";
+      setCreateError(message);
+    } finally {
+      setIsCreating(false);
+    }
+  }, [
+    createClientName,
+    createDescription,
+    createTitle,
+    isCreating,
+    resetCreateForm,
+    router,
+  ]);
 
   const cellY = density === "compact" ? "py-1.5" : "py-2.5";
   const headY = density === "compact" ? "py-2" : "py-2.5";
@@ -701,8 +758,86 @@ export function DealsHubClient({
               </TooltipTrigger>
               <TooltipContent side="bottom">Експорт поточного списку у CSV (UTF‑8)</TooltipContent>
             </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCreateForm((prev) => !prev);
+                    setCreateError(null);
+                  }}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-[11px] font-semibold shadow-sm transition",
+                    showCreateForm
+                      ? "border-[var(--enver-accent)] bg-[var(--enver-accent-soft)] text-[var(--enver-accent)]"
+                      : "border-[var(--enver-border)] bg-[var(--enver-card)] text-[var(--enver-text)] hover:border-[var(--enver-border-strong)] hover:bg-[var(--enver-hover)]",
+                  )}
+                >
+                  <Plus className="h-3.5 w-3.5" aria-hidden />
+                  Нове замовлення
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                Створити замовлення напряму, без Lead Hub
+              </TooltipContent>
+            </Tooltip>
           </div>
         </div>
+        {showCreateForm ? (
+          <div className="space-y-2 rounded-xl border border-[var(--enver-border)] bg-[var(--enver-surface)] p-3">
+            <div className="grid gap-2 md:grid-cols-2">
+              <label className="text-[11px] text-[var(--enver-text-muted)]">
+                Назва замовлення
+                <input
+                  value={createTitle}
+                  onChange={(event) => setCreateTitle(event.target.value)}
+                  placeholder="Напр., Кухня ЖК Лісовий квартал"
+                  className="mt-1 w-full rounded-lg border border-[var(--enver-border)] bg-[var(--enver-input-bg)] px-2.5 py-2 text-xs text-[var(--enver-text)] outline-none focus:border-[var(--enver-accent)] focus:ring-2 focus:ring-[var(--enver-accent-ring)]"
+                />
+              </label>
+              <label className="text-[11px] text-[var(--enver-text-muted)]">
+                Клієнт
+                <input
+                  value={createClientName}
+                  onChange={(event) => setCreateClientName(event.target.value)}
+                  placeholder="ПІБ або назва компанії"
+                  className="mt-1 w-full rounded-lg border border-[var(--enver-border)] bg-[var(--enver-input-bg)] px-2.5 py-2 text-xs text-[var(--enver-text)] outline-none focus:border-[var(--enver-accent)] focus:ring-2 focus:ring-[var(--enver-accent-ring)]"
+                />
+              </label>
+            </div>
+            <label className="block text-[11px] text-[var(--enver-text-muted)]">
+              Коментар (опційно)
+              <textarea
+                value={createDescription}
+                onChange={(event) => setCreateDescription(event.target.value)}
+                rows={2}
+                placeholder="Короткий опис замовлення або стартові деталі"
+                className="mt-1 w-full rounded-lg border border-[var(--enver-border)] bg-[var(--enver-input-bg)] px-2.5 py-2 text-xs text-[var(--enver-text)] outline-none focus:border-[var(--enver-accent)] focus:ring-2 focus:ring-[var(--enver-accent-ring)]"
+              />
+            </label>
+            {createError ? (
+              <p className="text-[11px] text-[var(--enver-danger)]">{createError}</p>
+            ) : null}
+            <div className="flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={resetCreateForm}
+                disabled={isCreating}
+                className="rounded-lg border border-[var(--enver-border)] bg-[var(--enver-card)] px-3 py-1.5 text-[11px] font-medium text-[var(--enver-text)] hover:bg-[var(--enver-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Скасувати
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleCreateDeal()}
+                disabled={isCreating}
+                className="rounded-lg border border-[var(--enver-accent)] bg-[var(--enver-accent)] px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-[var(--enver-accent-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isCreating ? "Створення..." : "Створити замовлення"}
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {savedViewsEnabled && !serverFiltered ? (
@@ -751,7 +886,7 @@ export function DealsHubClient({
             }}
           >
             <table className="w-full min-w-[920px] text-left text-xs">
-              <thead className="sticky top-0 z-10 border-b border-[var(--enver-border)] bg-[var(--enver-surface)]/95 text-[10px] font-semibold uppercase tracking-wide text-[var(--enver-muted)] backdrop-blur-sm">
+              <thead className="sticky top-0 z-10 border-b border-[var(--enver-border)] bg-[var(--enver-surface)]/95 text-[10px] font-semibold uppercase tracking-wide text-[var(--enver-muted)] backdrop-blur-sm [&_th]:whitespace-nowrap [&_th]:[overflow-wrap:normal] [&_th]:[word-break:normal]">
                 <tr>
                   {showPipelineColumn ? (
                     <th className={cn("px-3", headY)}>Воронка</th>
@@ -839,11 +974,11 @@ export function DealsHubClient({
                     </td>
                     <td className={cn("px-3", cellY)}>
                       {r.warningBadge === "critical" ? (
-                        <span className="rounded-full border border-[var(--enver-danger)]/30 bg-[var(--enver-danger-soft)]/80 px-2 py-0.5 text-[10px] font-medium text-[var(--enver-danger)]">
+                        <span className="whitespace-nowrap rounded-full border border-[var(--enver-danger)]/30 bg-[var(--enver-danger-soft)]/80 px-2 py-0.5 text-[10px] font-medium text-[var(--enver-danger)] [overflow-wrap:normal] [word-break:normal]">
                           Критично
                         </span>
                       ) : r.warningBadge === "warning" ? (
-                        <span className="rounded-full border border-[var(--enver-warning)]/30 bg-[var(--enver-warning-soft)]/80 px-2 py-0.5 text-[10px] font-medium text-[var(--enver-warning)]">
+                        <span className="whitespace-nowrap rounded-full border border-[var(--enver-warning)]/30 bg-[var(--enver-warning-soft)]/80 px-2 py-0.5 text-[10px] font-medium text-[var(--enver-warning)] [overflow-wrap:normal] [word-break:normal]">
                           Увага
                         </span>
                       ) : (
@@ -857,14 +992,13 @@ export function DealsHubClient({
                       <div className="flex flex-wrap justify-end gap-1">
                         <Link
                           href={`/deals/${r.id}/workspace`}
-                          className="enver-cta enver-cta-xs enver-cta-primary enver-cta-pill"
+                          className="enver-cta enver-cta-xs enver-cta-primary enver-cta-pill whitespace-nowrap [overflow-wrap:normal] [word-break:normal]"
                         >
-                          Відкрити
-                        </Link>
+                          Відкрити </Link>
                         {r.nextActionAt ? (
                           <Link
                             href={`/deals/${r.id}/workspace`}
-                            className="rounded-full border border-[var(--enver-border)] bg-[var(--enver-surface)] px-2 py-1 text-[10px] font-medium text-[var(--enver-text-muted)] hover:bg-[var(--enver-hover)]"
+                            className="whitespace-nowrap rounded-full border border-[var(--enver-border)] bg-[var(--enver-surface)] px-2 py-1 text-[10px] font-medium text-[var(--enver-text-muted)] hover:bg-[var(--enver-hover)] [overflow-wrap:normal] [word-break:normal]"
                             title="Перенести крок у робочому місці"
                           >
                             Крок

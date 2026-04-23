@@ -1018,7 +1018,7 @@ export default function LeadEstimatePageSingleFileFull() {
           onNewVersion={startNewVersionFromCurrent}
           onCreateProposal={() =>
             alert(
-              `Create proposal from ${currentVersion ? `v${currentVersion.versionNumber}` : "v1"}`,
+              `Створити proposal from ${currentVersion ? `v${currentVersion.versionNumber}` : "v1"}`,
             )
           }
         />
@@ -1082,7 +1082,7 @@ export default function LeadEstimatePageSingleFileFull() {
                 <SectionTitle
                   icon={<ClipboardList className="h-4 w-4" />}
                   title={`Позиції версії v${selectedVersion.versionNumber}`}
-                  description="Поточна або архівна версія відкривається в read-only. Для змін завжди створюється нова версія."
+                  description="Поточна або архівна версія відкривається в лише для перегляду. Для змін завжди створюється нова версія."
                 />
                 <div className="mt-5 space-y-4">
                   {selectedVersion.items.map((item) => (
@@ -1118,7 +1118,7 @@ export default function LeadEstimatePageSingleFileFull() {
                   title={workspace.estimate ? "Нова версія estimate" : "Перший estimate"}
                   description={
                     workspace.estimate
-                      ? "Редагується тільки чернетка. Після publish система створить нову immutable version."
+                      ? "Редагується тільки чернетка. Після публікації система створить нову незмінну версію."
                       : "Швидко створіть перший комерційний розрахунок."
                   }
                   action={
@@ -1250,8 +1250,8 @@ export default function LeadEstimatePageSingleFileFull() {
                   currency={draft?.currency ?? "UAH"}
                   title={
                     workspace.estimate
-                      ? `Preview змін перед створенням v${(currentVersion?.versionNumber || 0) + 1}`
-                      : "Preview першого estimate"
+                      ? `Попередній перегляд змін перед створенням v${(currentVersion?.versionNumber || 0) + 1}`
+                      : "Попередній перегляд першого estimate"
                   }
                 />
               </div>
@@ -1460,7 +1460,7 @@ function PageHeader({
               disabled={!currentVersion}
               className="rounded-2xl border border-zinc-200 bg-[var(--enver-card)] px-4 py-2 text-sm font-medium text-zinc-900 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Create proposal
+              Створити proposal
             </button>
             <button
               type="button"
@@ -1499,7 +1499,7 @@ function DraftBanner({
       <div>
         <div className="text-sm font-semibold text-amber-900">Нова версія ще не створена</div>
         <div className="mt-1 text-sm text-amber-800">
-          Чернетка на базі {baseVersion}. Після publish: {nextVersion}.
+          Чернетка на базі {baseVersion}. Після публікації: {nextVersion}.
         </div>
       </div>
       <div className="flex flex-wrap gap-2">
@@ -1508,7 +1508,7 @@ function DraftBanner({
           onClick={onPreview}
           className="rounded-2xl border border-amber-200 bg-[var(--enver-card)] px-4 py-2 text-sm font-medium text-zinc-900 transition hover:bg-zinc-50"
         >
-          Preview changes
+          Попередній перегляд changes
         </button>
         <button
           type="button"
@@ -1526,7 +1526,7 @@ function DraftBanner({
             disabled ? "cursor-not-allowed bg-zinc-300" : "bg-zinc-950 hover:bg-zinc-800",
           )}
         >
-          {saving ? "Зберігаємо..." : `Create ${nextVersion}`}
+          {saving ? "Зберігаємо..." : `Створити ${nextVersion}`}
         </button>
       </div>
     </div>
@@ -1635,7 +1635,7 @@ function ReadonlyItemCard({
           <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-zinc-600">
             {item.supplierMaterialCode ? <span>Код: {item.supplierMaterialCode}</span> : null}
             {item.supplierPriceSnapshot ? (
-              <span>Snapshot: {formatDate(item.supplierPriceSnapshot.capturedAt)}</span>
+              <span>Знімок: {formatDate(item.supplierPriceSnapshot.capturedAt)}</span>
             ) : null}
           </div>
           {item.note ? <div className="mt-2 text-sm text-zinc-500">{item.note}</div> : null}
@@ -1805,8 +1805,7 @@ function EditableItemCard({
                     onClick={() => setDropdownOpen(false)}
                     className="rounded-xl px-2 py-1 text-xs text-zinc-500 hover:bg-zinc-50"
                   >
-                    Закрити
-                  </button>
+                    Закрити </button>
                 </div>
               </div>
             ) : null}
@@ -1849,8 +1848,8 @@ function EditableItemCard({
           <div>{item.supplierMaterialCode ? `Код: ${item.supplierMaterialCode}` : "Код не вибрано"}</div>
           <div>
             {item.supplierPriceSnapshot
-              ? `Snapshot: ${formatMoney(item.supplierPriceSnapshot.price, item.supplierPriceSnapshot.currency)}`
-              : "Snapshot відсутній"}
+              ? `Знімок: ${formatMoney(item.supplierPriceSnapshot.price, item.supplierPriceSnapshot.currency)}`
+              : "Знімок відсутній"}
           </div>
           <button
             type="button"
@@ -2045,7 +2044,7 @@ function BottomActionBar({
             disabled ? "cursor-not-allowed bg-zinc-300" : "bg-zinc-950 hover:bg-zinc-800",
           )}
         >
-          {saving ? "Зберігаємо..." : `Create ${nextVersion}`}
+          {saving ? "Зберігаємо..." : `Створити ${nextVersion}`}
         </button>
       </div>
     </div>
@@ -2251,7 +2250,7 @@ function Sidebar({
               onClick={onOpenCompareMode}
               className="w-full rounded-2xl border border-zinc-200 bg-[var(--enver-card)] px-4 py-3 text-sm font-medium text-zinc-900 transition hover:bg-zinc-50"
             >
-              Open compare
+              Відкрити compare
             </button>
             <div className="rounded-2xl bg-zinc-50 p-3 text-xs text-zinc-600">
               {compareFrom && compareTo
@@ -2270,19 +2269,19 @@ function Sidebar({
           ) : (
             <QuickSidebarButton
               icon={<Plus className="h-4 w-4" />}
-              label="Create first estimate"
+              label="Створити first estimate"
               onClick={onCreateFirst}
             />
           )}
           <QuickSidebarButton
             icon={<FileText className="h-4 w-4" />}
-            label="Create proposal"
+            label="Створити proposal"
             onClick={() => alert("Proposal create action")}
           />
           <QuickSidebarButton
             icon={<PackageSearch className="h-4 w-4" />}
-            label="Open client files"
-            onClick={() => alert("Open lead files")}
+            label="Відкрити client files"
+            onClick={() => alert("Відкрити lead files")}
           />
         </div>
       </div>

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import type { ProjectFinancialSummary } from "../../types/models";
 import { SummaryCard } from "../../../../components/shared/SummaryCard";
 
@@ -15,18 +14,13 @@ type Props = {
 /**
  * Компактні віджети для Hub замовлення/проєкту: борги, шари закупівель, маржа, прострочення.
  */
-export function ProjectFinanceWidgets({ projectId, projectCode, summary }: Props) {
+export function ProjectFinanceWidgets({ projectId: _projectId, projectCode, summary }: Props) {
   const s = summary;
   return (
     <div className="space-y-3 rounded-xl border border-slate-200 bg-[var(--enver-card)] p-3 shadow-sm">
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-xs font-semibold text-[var(--enver-text)]">Фінанси · {projectCode}</h3>
-        <Link
-          href={`/crm/finance/${projectId}`}
-          className="text-[11px] font-medium text-blue-600 hover:underline"
-        >
-          Робоче місце
-        </Link>
+        <span className="text-[11px] text-slate-500">Доступ через бокове меню</span>
       </div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
         <SummaryCard label="Договір" value={money(s.contractAmount)} />

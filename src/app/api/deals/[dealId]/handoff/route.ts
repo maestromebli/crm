@@ -225,6 +225,27 @@ export async function PATCH(req: Request, ctx: Ctx) {
             { status: 400 },
           );
         }
+        const [requiredChecklistCount, requiredUncheckedCount] = await Promise.all([
+          prisma.dealHandoffChecklistItem.count({
+            where: { handoffId: current.id, isRequired: true },
+          }),
+          prisma.dealHandoffChecklistItem.count({
+            where: {
+              handoffId: current.id,
+              isRequired: true,
+              isChecked: false,
+            },
+          }),
+        ]);
+        if (requiredChecklistCount > 0 && requiredUncheckedCount > 0) {
+          return NextResponse.json(
+            {
+              error:
+                "Прийняття неможливе: checklist передачі не complete (є невідмічені обов'язкові пункти).",
+            },
+            { status: 400 },
+          );
+        }
         const attachments = await prisma.attachment.findMany({
           where: { entityType: "DEAL", entityId: deal.id },
           select: { category: true },

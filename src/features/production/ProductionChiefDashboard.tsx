@@ -18,7 +18,7 @@ export function ProductionChiefDashboard({ orders, aiRisks }: { orders: Producti
   return (
     <div className="space-y-4">
       <header className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h1 className="text-2xl font-semibold text-slate-900">Production Chief Dashboard</h1>
+        <h1 className="text-2xl font-semibold text-slate-900">Production Chief Дашборд</h1>
         <p className="text-sm text-slate-600">Штаб розбору польотів: що горить, що блокує, що рухати зараз.</p>
       </header>
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

@@ -84,8 +84,7 @@ export function VersionHistoryCard({
                     href={`/leads/${leadId}/estimate/${v.id}`}
                     className="mt-1 inline-block text-[10px] font-semibold text-blue-700 hover:underline"
                   >
-                    Відкрити
-                  </Link>
+                    Відкрити </Link>
                 </div>
               </li>
             );

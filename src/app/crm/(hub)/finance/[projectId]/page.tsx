@@ -10,6 +10,7 @@ import { getFinanceProjectData } from "../../../../../features/finance/data/repo
 import { FINANCE_CATEGORY_CATALOG } from "../../../../../lib/finance/finance-dictionaries";
 import { EmptyState } from "../../../../../components/shared/EmptyState";
 import { canAccess, resolveRole } from "../../../../../features/shared/lib/rbac";
+import { formatMoneyUa } from "../../../../../features/finance/lib/format-money";
 
 type Props = { params: Promise<{ projectId: string }>; searchParams?: Promise<{ role?: string }> };
 
@@ -21,14 +22,37 @@ export default async function FinanceProjectPage({ params, searchParams }: Props
   const clientName = data.clientName ?? "—";
   const projectNameById = { [data.project.id]: `${data.project.code} · ${data.project.title}` };
   const categoryNameById = Object.fromEntries(FINANCE_CATEGORY_CATALOG.map((c) => [c.id, c.name]));
+  const incomeByTx = data.transactions
+    .filter((tx) => tx.type === "INCOME" && tx.status !== "CANCELLED")
+    .reduce((sum, tx) => sum + tx.amount, 0);
+  const expenseByTx = data.transactions
+    .filter((tx) => tx.type === "EXPENSE" && tx.status !== "CANCELLED")
+    .reduce((sum, tx) => sum + tx.amount, 0);
+  const payrollByTx = data.transactions
+    .filter((tx) => tx.type === "PAYROLL" && tx.status !== "CANCELLED")
+    .reduce((sum, tx) => sum + tx.amount, 0);
+  const commissionByTx = data.transactions
+    .filter((tx) => tx.type === "COMMISSION" && tx.status !== "CANCELLED")
+    .reduce((sum, tx) => sum + tx.amount, 0);
 
   return (
     <main className="space-y-4 p-4">
       <PageHeader
-        title={`${data.project.title} (${data.project.code})`}
-        subtitle={`Клієнт: ${clientName} · Менеджер: ${data.project.managerId}`}
+        title={`Фінансовий кабінет замовлення: ${data.project.code}`}
+        subtitle={`${data.project.title} · Клієнт: ${clientName} · Менеджер: ${data.project.managerId}`}
         actions={[{ label: "Додати транзакцію" }, { label: "Експорт по проєкту" }]}
       />
+      <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600">
+        <Link href="/crm/finance" className="text-sky-700 underline-offset-2 hover:underline">
+          До матриці замовлень
+        </Link>
+        <Link
+          href={`/crm/procurement/${projectId}`}
+          className="text-emerald-700 underline-offset-2 hover:underline"
+        >
+          Закупівлі цього замовлення
+        </Link>
+      </p>
       <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
         <SummaryCard label="Сума договору" value={data.summary.contractAmount.toLocaleString("uk-UA")} />
         <SummaryCard label="Отримано" value={data.summary.receivedFromClient.toLocaleString("uk-UA")} tone="income" />
@@ -37,6 +61,14 @@ export default async function FinanceProjectPage({ params, searchParams }: Props
         <SummaryCard label="Факт витрат" value={data.summary.actualExpenses.toLocaleString("uk-UA")} tone="expense" />
         <SummaryCard label="Чистий прибуток" value={data.summary.netProfit.toLocaleString("uk-UA")} tone={data.summary.netProfit >= 0 ? "income" : "expense"} />
       </div>
+      <SectionCard title="Зріз по фінансових контурах" subtitle="Повна картина руху коштів по цьому замовленню">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <SummaryCard label="Надходження (cash)" value={`${formatMoneyUa(incomeByTx)} грн`} tone="income" />
+          <SummaryCard label="Витрати (cash)" value={`${formatMoneyUa(expenseByTx)} грн`} tone="expense" />
+          <SummaryCard label="Зарплата" value={`${formatMoneyUa(payrollByTx)} грн`} />
+          <SummaryCard label="Комісії" value={`${formatMoneyUa(commissionByTx)} грн`} />
+        </div>
+      </SectionCard>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-4">
@@ -51,12 +83,7 @@ export default async function FinanceProjectPage({ params, searchParams }: Props
                     <p className="font-medium text-slate-900">{o.title}</p>
                     <p className="text-xs text-slate-600">{o.objectType} · {o.address}</p>
                   </div>
-                  <Link
-                    href={`/crm/procurement/${projectId}`}
-                    className="text-xs font-medium text-amber-900 underline-offset-2 hover:underline"
-                  >
-                    Закупівлі об&apos;єкта
-                  </Link>
+                  <span className="text-xs text-slate-500">Закупівлі: через бокове меню</span>
                 </div>
               ))}
             </div>

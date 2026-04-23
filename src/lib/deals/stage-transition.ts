@@ -1,6 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import { canMoveToNextStage } from "@/lib/deal-os/flow-engine";
 import { evaluateDealStageTransitionGuard } from "@/lib/workflow/stage-policy";
+import { loadEnverExecutionSignals } from "@/lib/enver/load-execution-signals";
+import { syncProjectSpecFromDealMeta } from "@/lib/enver/sync-project-spec";
+import { saveOrderFinancialSnapshotsByDeal } from "@/lib/finance/save-order-finance-snapshots";
 import type { Prisma } from "@prisma/client";
 
 type StageBlocker = { id: string; label: string };
@@ -52,6 +55,7 @@ export async function transitionDealStage(args: {
       workspaceMeta: true,
       stage: { select: { id: true, name: true, slug: true, sortOrder: true } },
       contract: { select: { status: true } },
+      handoff: { select: { status: true } },
       dealPaymentPlan: { select: { stepsJson: true } },
       productionFlow: { select: { id: true } },
       _count: {
@@ -114,6 +118,11 @@ export async function transitionDealStage(args: {
       !Array.isArray(meta.executionChecklist)
         ? (meta.executionChecklist as Record<string, unknown>)
         : {};
+    const enverSignals = await loadEnverExecutionSignals({
+      prisma,
+      dealId: args.dealId,
+      meta,
+    });
 
     const validation = canMoveToNextStage({
       currentStageName: deal.stage.name,
@@ -134,6 +143,15 @@ export async function transitionDealStage(args: {
       contractSigned: deal.contract?.status === "FULLY_SIGNED",
       payment70Done: percentPaid >= 70,
       productionStarted: Boolean(deal.productionFlow),
+      hasExecutionSpec: enverSignals.hasExecutionSpec,
+      hasRequiredHandoffFiles: enverSignals.hasRequiredHandoffFiles,
+      handoffAccepted: deal.handoff?.status === "ACCEPTED",
+      handoffChecklistCompleted: enverSignals.handoffChecklistCompleted,
+      bomApproved: enverSignals.bomApproved,
+      criticalMaterialsReady: enverSignals.criticalMaterialsReady,
+      deliveryAccepted: enverSignals.deliveryAccepted,
+      financeActualsPosted: enverSignals.financeActualsPosted,
+      productionDone: enverSignals.productionDone,
     });
 
     if (!validation.ok || !guard.ok) {
@@ -175,6 +193,38 @@ export async function transitionDealStage(args: {
       },
     }),
   ]);
+
+  if (isForward) {
+    try {
+      await syncProjectSpecFromDealMeta({
+        dealId: args.dealId,
+        actorUserId: args.changedById,
+      });
+    } catch (error) {
+      console.error("[stage-transition] project-spec sync failed", {
+        dealId: args.dealId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+    try {
+      await saveOrderFinancialSnapshotsByDeal({
+        dealId: args.dealId,
+        source: "stage_transition",
+        actorUserId: args.changedById,
+        comment: `Автознімок ENVER при переході на стадію ${nextStage.slug}.`,
+        meta: {
+          fromStageId: deal.stageId,
+          toStageId: nextStage.id,
+          toStageSlug: nextStage.slug,
+        },
+      });
+    } catch (error) {
+      console.error("[stage-transition] order snapshot failed", {
+        dealId: args.dealId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
 
   return {
     ok: true,

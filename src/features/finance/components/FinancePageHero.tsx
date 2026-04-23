@@ -7,7 +7,7 @@ type Props = {
   title: string;
   /** 1–2 речення: що на сторінці і навіщо вона бухгалтеру. */
   description: string;
-  dataSource?: "db" | "mock";
+  dataSource?: "db";
   /** Додаткова технічна примітка під бейджем (джерело таблиць, оціночні коефіцієнти). */
   footnote?: string;
   actionsSlot?: ReactNode;

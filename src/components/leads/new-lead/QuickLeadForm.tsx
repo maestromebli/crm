@@ -26,6 +26,8 @@ type QuickLeadFormProps = {
   onContactNameChange: (v: string) => void;
   phone: string;
   onPhoneChange: (v: string) => void;
+  orderNumber: string;
+  onOrderNumberChange: (v: string) => void;
   companyContacts: CompanyContactDraft[];
   onCompanyContactChange: (
     id: string,
@@ -71,6 +73,8 @@ export function QuickLeadForm({
   onContactNameChange,
   phone,
   onPhoneChange,
+  orderNumber,
+  onOrderNumberChange,
   companyContacts,
   onCompanyContactChange,
   onAddCompanyContact,
@@ -160,6 +164,20 @@ export function QuickLeadForm({
             placeholder="+380…"
           />
         </label>
+        <label className="block space-y-0.5">
+          <span className="text-[11px] font-medium text-slate-700">
+            Номер замовлення<span className="text-rose-500">*</span>
+          </span>
+          <input
+            className={inputClass}
+            value={orderNumber}
+            onChange={(e) => onOrderNumberChange(e.target.value)}
+            placeholder="ЕМ-1"
+          />
+        </label>
+        <p className="text-[10px] text-slate-500">
+          Формат: ЕМ-1 ... ЕМ-200.
+        </p>
         {duplicateSlot}
         <p className="text-[10px] text-slate-500">
           Потрібно хоча б імʼя або телефон.

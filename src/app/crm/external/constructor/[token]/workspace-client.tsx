@@ -2,7 +2,7 @@
 
 import type { ConstructorRoomStatus } from "@prisma/client";
 
-type Snapshot = {
+type Знімок = {
   productionNumber: string;
   dealTitle: string;
   clientName: string;
@@ -20,7 +20,7 @@ export function ExternalConstructorWorkspace({
   snapshot,
 }: {
   token: string;
-  snapshot: Snapshot;
+  snapshot: Знімок;
 }) {
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-100 to-white text-slate-900">

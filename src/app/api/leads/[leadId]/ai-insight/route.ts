@@ -16,6 +16,7 @@ import { requireAiRateLimit } from "../../../../../lib/ai/route-guard";
 import { logAiEvent } from "../../../../../lib/ai/log-ai-event";
 import { openAiChatCompletionText } from "../../../../../features/ai/core/openai-client";
 import { evaluateAiTextQuality } from "../../../../../lib/ai/evals/quality";
+import { sanitizePipelineStageName } from "../../../../../lib/crm-core/pipeline-stage-name";
 
 type Ctx = { params: Promise<{ leadId: string }> };
 
@@ -94,7 +95,7 @@ async function postLeadAiInsight(req: Request, ctx: Ctx) {
       deals: {
         where: { status: "OPEN" },
         take: 1,
-        select: { title: true, stage: { select: { name: true } } },
+        select: { title: true, stage: { select: { name: true, slug: true } } },
       },
     },
   });
@@ -137,10 +138,19 @@ async function postLeadAiInsight(req: Request, ctx: Ctx) {
 
   const stageOpts: StageOpt[] = stages.map((s) => ({
     id: s.id,
-    name: s.name,
+    name: sanitizePipelineStageName({
+      name: s.name,
+      slug: s.slug,
+      entityType: "LEAD",
+    }),
     slug: s.slug,
   }));
   const stageIdSet = new Set(stageOpts.map((s) => s.id));
+  const currentStageName = sanitizePipelineStageName({
+    name: leadRow.stage.name,
+    slug: leadRow.stage.slug,
+    entityType: "LEAD",
+  });
 
   const apiKey = process.env.AI_API_KEY?.trim();
   const model = process.env.AI_MODEL ?? "gpt-4.1-mini";
@@ -148,14 +158,19 @@ async function postLeadAiInsight(req: Request, ctx: Ctx) {
   const dealHint = leadRow.deals[0];
   const contextLines = [
     `Назва: ${leadRow.title}`,
-    `Воронка: ${leadRow.pipeline.name}, поточна стадія: ${leadRow.stage.name} (id=${leadRow.stageId})`,
+    `Воронка: ${leadRow.pipeline.name}, поточна стадія: ${currentStageName} (id=${leadRow.stageId})`,
     `Джерело: ${leadRow.source}, пріоритет: ${leadRow.priority}`,
     `Відповідальний: ${leadRow.owner.name ?? "assigned_manager"}`,
     "Контактні реквізити клієнта: [приховано для AI-контексту]",
   ];
   if (dealHint) {
+    const dealHintStageName = sanitizePipelineStageName({
+      name: dealHint.stage.name,
+      slug: dealHint.stage.slug,
+      entityType: "DEAL",
+    });
     contextLines.push(
-      `Відкрита замовлення: ${dealHint.title} · ${dealHint.stage.name}`,
+      `Відкрита замовлення: ${dealHint.title} · ${dealHintStageName}`,
     );
   }
   contextLines.push(
@@ -175,7 +190,11 @@ async function postLeadAiInsight(req: Request, ctx: Ctx) {
   const stagesJson = JSON.stringify(
     stages.map((s) => ({
       id: s.id,
-      name: s.name,
+      name: sanitizePipelineStageName({
+        name: s.name,
+        slug: s.slug,
+        entityType: "LEAD",
+      }),
       slug: s.slug,
       isFinal: s.isFinal,
     })),
@@ -202,7 +221,7 @@ async function postLeadAiInsight(req: Request, ctx: Ctx) {
       recommendedStageId: null,
       recommendedStageName: null,
       currentStageId: leadRow.stageId,
-      currentStageName: leadRow.stage.name,
+      currentStageName,
       reason: "Модель не викликалась — немає ключа API.",
       confidence: "low" as const,
       appliedStage: false,
@@ -374,7 +393,7 @@ ${stagesJson}
         recommendedStageId,
         recommendedStageName,
         currentStageId: leadRow.stageId,
-        currentStageName: leadRow.stage.name,
+        currentStageName,
         reason,
         confidence,
         appliedStage: false,
@@ -462,8 +481,8 @@ ${stagesJson}
       ? recommendedStageId!
       : leadRow.stageId,
     currentStageName: appliedStage
-      ? (recommendedStageName ?? leadRow.stage.name)
-      : leadRow.stage.name,
+      ? (recommendedStageName ?? currentStageName)
+      : currentStageName,
     reason,
     confidence,
     appliedStage,

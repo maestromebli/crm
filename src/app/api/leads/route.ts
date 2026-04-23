@@ -63,6 +63,7 @@ export async function POST(req: Request) {
     title?: string;
     contactName?: string;
     phone?: string;
+    orderNumber?: string | null;
     email?: string | null;
     source?: string;
     note?: string | null;
@@ -106,6 +107,7 @@ export async function POST(req: Request) {
       title: str("title") || undefined,
       contactName: str("contactName") || undefined,
       phone: str("phone") || undefined,
+      orderNumber: str("orderNumber") || null,
       email: str("email") || null,
       source: str("source") || undefined,
       note: str("note") || null,
@@ -161,6 +163,25 @@ export async function POST(req: Request) {
   const contactName =
     typeof body.contactName === "string" ? body.contactName.trim() : "";
   const phone = typeof body.phone === "string" ? body.phone.trim() : "";
+  const orderNumberRaw =
+    body.orderNumber === null || body.orderNumber === undefined
+      ? ""
+      : String(body.orderNumber).trim().toUpperCase();
+  const orderNumberMatch = /^(?:ЕМ|EM)-([1-9]\d{0,2})$/u.exec(orderNumberRaw);
+  if (!orderNumberMatch) {
+    return NextResponse.json(
+      { error: "Номер замовлення має бути у форматі ЕМ-1 ... ЕМ-200" },
+      { status: 400 },
+    );
+  }
+  const orderNumberValue = Number(orderNumberMatch[1]);
+  if (!Number.isFinite(orderNumberValue) || orderNumberValue < 1 || orderNumberValue > 200) {
+    return NextResponse.json(
+      { error: "Номер замовлення має бути у діапазоні ЕМ-1 ... ЕМ-200" },
+      { status: 400 },
+    );
+  }
+  const orderNumber = `ЕМ-${orderNumberValue}`;
 
   const source =
     typeof body.source === "string" && body.source.trim()
@@ -477,6 +498,7 @@ export async function POST(req: Request) {
           contactsCount: companyContacts.length,
         };
       }
+      hubMeta.orderNumber = orderNumber;
 
       const leadCreateData: Prisma.LeadUncheckedCreateInput = {
         title,
@@ -560,7 +582,7 @@ export async function POST(req: Request) {
         },
       });
     } catch (error) {
-      logLeadCreateSideEffectError("publish-entity-event", error);
+      logLeadCreateSideEffectError("публікації-entity-event", error);
     }
 
     try {

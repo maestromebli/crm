@@ -19,6 +19,7 @@ import {
   buildLeadProposalHubSelect,
   mapLeadProposalHubRowToSummary,
 } from "../../lib/leads/lead-proposal-hub-select";
+import { sanitizePipelineStageName } from "../../lib/crm-core/pipeline-stage-name";
 import {
   type AccessContext,
   canAccessOwner,
@@ -64,7 +65,7 @@ const leadDetailInclude = {
     select: {
       id: true,
       title: true,
-      stage: { select: { name: true } },
+      stage: { select: { name: true, slug: true } },
     },
   },
   leadContacts: {
@@ -92,6 +93,7 @@ export type LeadLinkedDeal = {
 export type LeadListRow = {
   id: string;
   title: string;
+  orderNumber: string | null;
   source: string;
   pipelineId: string;
   stageId: string;
@@ -140,6 +142,37 @@ export type LeadListRow = {
     lifecycle?: ContactLifecycleUi;
   } | null;
 };
+
+function resolveLeadOrderNumber(hubMeta: unknown): string | null {
+  if (!hubMeta || typeof hubMeta !== "object" || Array.isArray(hubMeta)) {
+    return null;
+  }
+  const raw = (hubMeta as Record<string, unknown>).orderNumber;
+  if (typeof raw !== "string") return null;
+  const normalized = raw.trim().toUpperCase();
+  const m = /^(?:ЕМ|EM)-([1-9]\d{0,2})$/u.exec(normalized);
+  if (!m) return null;
+  const n = Number(m[1]);
+  if (!Number.isFinite(n) || n < 1 || n > 200) return null;
+  return `ЕМ-${n}`;
+}
+
+function mapLeadRowsWithOrderNumber(
+  rows: Array<Omit<LeadListRow, "orderNumber"> & { hubMeta?: unknown }>,
+): LeadListRow[] {
+  return rows.map((row) => ({
+    ...row,
+    orderNumber: resolveLeadOrderNumber(row.hubMeta),
+    stage: {
+      ...row.stage,
+      name: sanitizePipelineStageName({
+        name: row.stage.name,
+        slug: row.stage.slug,
+        entityType: "LEAD",
+      }),
+    },
+  }));
+}
 
 /** Короткий зріз аналізу файлу ШІ (якщо вже створено). */
 export type LeadFileIntelSummary = {
@@ -395,23 +428,23 @@ export async function listLeadsByView(
     switch (view) {
       case "all":
         return {
-          rows: (await prisma.lead.findMany({
+          rows: mapLeadRowsWithOrderNumber(await prisma.lead.findMany({
             ...qBase,
             ...(scopeActive ? { where: scopeActive } : {}),
-          })) as LeadListRow[],
+          })),
           error: null,
         };
       case "new":
         return {
-          rows: (await prisma.lead.findMany({
+          rows: mapLeadRowsWithOrderNumber(await prisma.lead.findMany({
             ...qBase,
             where: mergeLeadWhere({ stage: { slug: "new" } }, scope),
-          })) as LeadListRow[],
+          })),
           error: null,
         };
       case "no-response":
         return {
-          rows: (await prisma.lead.findMany({
+          rows: mapLeadRowsWithOrderNumber(await prisma.lead.findMany({
             ...qBase,
             where: mergeLeadWhere(
               {
@@ -421,7 +454,7 @@ export async function listLeadsByView(
               },
               scope,
             ),
-          })) as LeadListRow[],
+          })),
           error: null,
         };
       case "no-next-step": {
@@ -440,10 +473,10 @@ export async function listLeadsByView(
               nextContactAt: null,
             };
         return {
-          rows: (await prisma.lead.findMany({
+          rows: mapLeadRowsWithOrderNumber(await prisma.lead.findMany({
             ...qBase,
             where: mergeLeadWhere(whereNoNextStep, scope),
-          })) as LeadListRow[],
+          })),
           error: leadClientSupportsNextStep
             ? null
             : "Оновіть клієнт Prisma: pnpm prisma generate (поле nextStep на ліді).",
@@ -451,7 +484,7 @@ export async function listLeadsByView(
       }
       case "overdue":
         return {
-          rows: (await prisma.lead.findMany({
+          rows: mapLeadRowsWithOrderNumber(await prisma.lead.findMany({
             ...qBase,
             where: mergeLeadWhere(
               {
@@ -460,14 +493,14 @@ export async function listLeadsByView(
               },
               scope,
             ),
-          })) as LeadListRow[],
+          })),
           error: null,
         };
       case "duplicates": {
-        const all = (await prisma.lead.findMany({
+        const all = mapLeadRowsWithOrderNumber(await prisma.lead.findMany({
           ...qBase,
           ...(scopeActive ? { where: scopeActive } : {}),
-        })) as LeadListRow[];
+        }));
         const dupIds = duplicateLeadIdsByPhone(all);
         return {
           rows: all.filter((r) => dupIds.has(r.id)),
@@ -476,7 +509,7 @@ export async function listLeadsByView(
       }
       case "re-contact":
         return {
-          rows: (await prisma.lead.findMany({
+          rows: mapLeadRowsWithOrderNumber(await prisma.lead.findMany({
             ...qBase,
             where: mergeLeadWhere(
               {
@@ -485,20 +518,20 @@ export async function listLeadsByView(
               },
               scope,
             ),
-          })) as LeadListRow[],
+          })),
           error: null,
         };
       case "converted":
         return {
-          rows: (await prisma.lead.findMany({
+          rows: mapLeadRowsWithOrderNumber(await prisma.lead.findMany({
             ...qBase,
             where: mergeLeadWhere({ dealId: { not: null } }, scopeWithoutArchived),
-          })) as LeadListRow[],
+          })),
           error: null,
         };
       case "closed":
         return {
-          rows: (await prisma.lead.findMany({
+          rows: mapLeadRowsWithOrderNumber(await prisma.lead.findMany({
             ...qBase,
             where: mergeLeadWhere(
               {
@@ -507,12 +540,12 @@ export async function listLeadsByView(
               },
               scope,
             ),
-          })) as LeadListRow[],
+          })),
           error: null,
         };
       case "unassigned":
         return {
-          rows: (await prisma.lead.findMany({
+          rows: mapLeadRowsWithOrderNumber(await prisma.lead.findMany({
             ...qBase,
             where: mergeLeadWhere(
               {
@@ -521,7 +554,7 @@ export async function listLeadsByView(
               },
               scope,
             ),
-          })) as LeadListRow[],
+          })),
           error: null,
         };
       case "mine": {
@@ -530,24 +563,24 @@ export async function listLeadsByView(
           return { rows: [], error: null };
         }
         return {
-          rows: (await prisma.lead.findMany({
+          rows: mapLeadRowsWithOrderNumber(await prisma.lead.findMany({
             ...qBase,
             where: mergeLeadWhere({ ownerId: oid }, scopeActive),
-          })) as LeadListRow[],
+          })),
           error: null,
         };
       }
       case "qualified":
         return {
-          rows: (await prisma.lead.findMany({
+          rows: mapLeadRowsWithOrderNumber(await prisma.lead.findMany({
             ...qBase,
             where: mergeLeadWhere({ stage: { slug: "qualified" } }, scope),
-          })) as LeadListRow[],
+          })),
           error: null,
         };
       case "lost":
         return {
-          rows: (await prisma.lead.findMany({
+          rows: mapLeadRowsWithOrderNumber(await prisma.lead.findMany({
             ...qBase,
             where: mergeLeadWhere(
               {
@@ -555,33 +588,33 @@ export async function listLeadsByView(
               },
               scope,
             ),
-          })) as LeadListRow[],
+          })),
           error: null,
         };
       case "archived":
         return {
-          rows: (await prisma.lead.findMany({
+          rows: mapLeadRowsWithOrderNumber(await prisma.lead.findMany({
             ...qBase,
             where: mergeLeadWhere({ stage: { slug: "archived" } }, scope),
-          })) as LeadListRow[],
+          })),
           error: null,
         };
       case "sources":
       case "pipeline":
       case "import":
         return {
-          rows: (await prisma.lead.findMany({
+          rows: mapLeadRowsWithOrderNumber(await prisma.lead.findMany({
             ...qBase,
             ...(scopeActive ? { where: scopeActive } : {}),
-          })) as LeadListRow[],
+          })),
           error: null,
         };
       default:
         return {
-          rows: (await prisma.lead.findMany({
+          rows: mapLeadRowsWithOrderNumber(await prisma.lead.findMany({
             ...qBase,
             ...(scopeActive ? { where: scopeActive } : {}),
-          })) as LeadListRow[],
+          })),
           error: null,
         };
     }
@@ -622,7 +655,11 @@ export async function getLeadById(
     const pipelineStages: LeadPipelineStageOption[] = pFull.stages.map(
       (s) => ({
         id: s.id,
-        name: s.name,
+        name: sanitizePipelineStageName({
+          name: s.name,
+          slug: s.slug,
+          entityType: "LEAD",
+        }),
         slug: s.slug,
         sortOrder: s.sortOrder,
         isFinal: s.isFinal,
@@ -633,7 +670,31 @@ export async function getLeadById(
       ? {
           id: firstDeal.id,
           title: firstDeal.title,
-          stage: { name: firstDeal.stage.name },
+          stage: {
+            name: sanitizePipelineStageName({
+              name: firstDeal.stage.name,
+              slug: firstDeal.stage.slug,
+              entityType: "DEAL",
+            }),
+          },
+        }
+      : null;
+
+    const safeStageName = sanitizePipelineStageName({
+      name: row.stage.name,
+      slug: row.stage.slug,
+      entityType: "LEAD",
+    });
+
+    const safeStage = {
+      ...row.stage,
+      name: safeStageName,
+    };
+
+    const safeLinkedDeal = linkedDeal
+      ? {
+          ...linkedDeal,
+          stage: { name: linkedDeal.stage.name },
         }
       : null;
 
@@ -867,6 +928,7 @@ export async function getLeadById(
     return {
       id: row.id,
       title: row.title,
+      orderNumber: resolveLeadOrderNumber(row.hubMeta),
       source: row.source,
       pipelineId: row.pipelineId,
       stageId: row.stageId,
@@ -887,11 +949,11 @@ export async function getLeadById(
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
       owner: row.owner,
-      stage: row.stage,
+      stage: safeStage,
       pipeline,
       contact: contactOut,
       pipelineStages,
-      linkedDeal,
+      linkedDeal: safeLinkedDeal,
       attachments,
       qualification,
       estimates,
@@ -938,7 +1000,11 @@ export async function leadsGroupedByStage(
       stage: {
         id: stage.id,
         pipelineId: stage.pipelineId,
-        name: stage.name,
+        name: sanitizePipelineStageName({
+          name: stage.name,
+          slug: stage.slug,
+          entityType: "LEAD",
+        }),
         slug: stage.slug,
         sortOrder: stage.sortOrder,
         isFinal: stage.isFinal,

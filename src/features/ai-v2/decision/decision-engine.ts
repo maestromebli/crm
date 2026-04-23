@@ -41,7 +41,7 @@ export function runAiV2DecisionEngine(context: AiV2ContextSnapshot): AiV2Decisio
   const nextBestAction =
     blockers[0] ??
     (followUpUrgency === "high"
-      ? "Потрібен терміновий follow-up із клієнтом."
+      ? "Потрібен терміновий наступний контакт із клієнтом."
       : "Оновіть задачі та зафіксуйте наступний крок по замовленні.");
 
   const summary =

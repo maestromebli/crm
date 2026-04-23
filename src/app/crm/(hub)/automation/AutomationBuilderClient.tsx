@@ -84,7 +84,7 @@ export function AutomationBuilderClient() {
     let cancelled = false;
     const loadEventHealth = async () => {
       try {
-        const r = await fetch("/api/crm/event-health");
+        const r = await fetch("/api/crm/event-стан");
         if (!r.ok) return;
         const j = (await r.json()) as EventHealthMini;
         if (!cancelled) setEventHealth(j);
@@ -156,7 +156,7 @@ export function AutomationBuilderClient() {
           <h2 className="text-sm font-semibold text-slate-900">Потоки автоматизації</h2>
           <div className="flex items-center gap-2">
             <Button type="button" variant="outline" size="sm" asChild>
-              <Link href="/crm/automation/event-health">Стан подій</Link>
+              <Link href="/crm/automation/event-стан">Стан подій</Link>
             </Button>
             {healthStatus ? (
               <span

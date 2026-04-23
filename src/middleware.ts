@@ -1,5 +1,5 @@
 import { withAuth } from "next-auth/middleware";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import {
   isExactNavPathAllowed,
   sanitizeMenuAccess,
@@ -65,11 +65,37 @@ function withTracingHeaders(req: Request, res: NextResponse): NextResponse {
   return res;
 }
 
+function getDevAuthOriginRedirect(req: NextRequest): URL | null {
+  if (process.env.NODE_ENV !== "development") return null;
+  const configured = process.env.NEXTAUTH_URL?.trim();
+  if (!configured) return null;
+  try {
+    const configuredUrl = new URL(configured);
+    if (
+      configuredUrl.protocol === req.nextUrl.protocol &&
+      configuredUrl.host === req.nextUrl.host
+    ) {
+      return null;
+    }
+    const redirectUrl = req.nextUrl.clone();
+    redirectUrl.protocol = configuredUrl.protocol;
+    redirectUrl.host = configuredUrl.host;
+    return redirectUrl;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Захист дашборду. `/login` доступний без сесії; з активною сесією — редірект у дашборд.
  */
 export default withAuth(
   function middleware(req) {
+    const devAuthOriginRedirect = getDevAuthOriginRedirect(req);
+    if (devAuthOriginRedirect) {
+      return withTracingHeaders(req, NextResponse.redirect(devAuthOriginRedirect));
+    }
+
     const token = req.nextauth.token as Record<string, unknown> | null;
     const sessionExpired = isTokenSessionExpired(token);
 

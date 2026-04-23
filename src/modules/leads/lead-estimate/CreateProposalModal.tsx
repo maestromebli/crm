@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type ClipboardEvent } from "react";
 import { useRouter } from "next/navigation";
-import { ImageIcon, Info, Loader2, Upload } from "lucide-react";
+import { ImageIcon, Info, Loader2, Download as Вивантажити } from "lucide-react";
 import { postFormData, postJson } from "../../../lib/api/patch-json";
 
 type Props = {
@@ -458,7 +458,7 @@ export function CreateProposalModal({
                           {uploadingVisualizationIndex === i ? (
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
                           ) : (
-                            <Upload className="h-3.5 w-3.5" />
+                            <Вивантажити className="h-3.5 w-3.5" />
                           )}
                           Фото
                           <input

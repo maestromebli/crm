@@ -516,8 +516,7 @@ export function LeadHubOverviewClient({
             className="shrink-0 rounded-[12px] px-2 py-1 text-[11px] font-medium text-rose-800 transition duration-200 hover:bg-rose-100"
             onClick={() => setDismissedErr(true)}
           >
-            Закрити
-          </button>
+            Закрити </button>
         </div>
       ) : null}
 
@@ -529,8 +528,7 @@ export function LeadHubOverviewClient({
             className="shrink-0 rounded-[12px] px-2 py-1 text-[11px] font-medium text-amber-900 transition duration-200 hover:bg-amber-100"
             onClick={() => setDismissedStageHint(true)}
           >
-            Закрити
-          </button>
+            Закрити </button>
         </div>
       ) : null}
 

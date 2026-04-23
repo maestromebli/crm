@@ -1,6 +1,6 @@
 "use client";
 
-import { Download } from "lucide-react";
+import { Download as Завантажити } from "lucide-react";
 import { postJson } from "@/lib/api/patch-json";
 import { Button } from "../../../components/ui/button";
 import { buildFinanceProjectCsvString, type FinanceProjectCsvPayload } from "../lib/build-finance-project-csv";
@@ -50,7 +50,7 @@ export function FinanceProjectExportButton({
       aria-label={ariaLabel}
       title="Зведення по проєкту в одному файлі: підсумки, витрати по статтях, ЗП, графік оплат, транзакції (UTF-8 BOM)."
     >
-      <Download className="h-3.5 w-3.5" aria-hidden />
+      <Завантажити className="h-3.5 w-3.5" aria-hidden />
       Експорт CSV
     </Button>
   );

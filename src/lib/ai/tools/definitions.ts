@@ -12,6 +12,23 @@ export const AI_CHAT_TOOLS: {
   {
     type: "function",
     function: {
+      name: "crm_full_context",
+      description:
+        "Повний зведений контекст CRM у межах прав користувача: sales, задачі, календар, фінанси, закупівлі, виробництво. Виклич на старті діалогу для аналізу «всієї доступної інформації».",
+      parameters: {
+        type: "object",
+        properties: {
+          limit: {
+            type: "integer",
+            description: "Максимум записів на кожен блок (1–20), за замовчуванням 8",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "crm_list_leads",
       description:
         "Список лідів у межах видимості користувача (воронка, етап, власник). Виклич, коли питання про «мої ліди», кількість, етапи, що в роботі.",

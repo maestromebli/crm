@@ -25,6 +25,7 @@
     --enver-text-subtle: #bcd0e8;
     --enver-accent: #2dd4bf;
     --enver-accent-hover: #14b8a6;
+    --enver-accent-contrast: #06251f;
     --enver-accent-soft: rgba(45, 212, 191, 0.15);
     --enver-accent-ring: rgba(45, 212, 191, 0.34);
     --enver-success: #22c55e;
@@ -65,6 +66,7 @@
     --enver-text-subtle: #334155;
     --enver-accent: #0f766e;
     --enver-accent-hover: #115e59;
+    --enver-accent-contrast: #ffffff;
     --enver-accent-soft: rgba(15, 118, 110, 0.1);
     --enver-accent-ring: rgba(15, 118, 110, 0.28);
     --enver-success: #16a34a;
@@ -562,14 +564,14 @@
 .enver-cta-primary {
   border-color: var(--enver-accent);
   background: var(--enver-accent);
-  color: #fff;
+  color: var(--enver-accent-contrast);
   box-shadow: 0 1px 3px color-mix(in srgb, var(--enver-accent) 30%, transparent);
 }
 
 .enver-cta-primary:hover {
   background: var(--enver-accent-hover);
   border-color: var(--enver-accent-hover);
-  color: #fff;
+  color: var(--enver-accent-contrast);
 }
 
 .enver-cta-secondary {

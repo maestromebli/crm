@@ -133,8 +133,7 @@ export function ProcurementRequestDrawer({
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-sm font-semibold">Нова заявка на закупку</h3>
               <Button variant="outline" size="sm" onClick={() => setOpen(false)}>
-                Закрити
-              </Button>
+                Закрити </Button>
             </div>
 
             {error ? (

@@ -112,8 +112,7 @@ export function LeadQualificationCard({ lead, canUpdateLead }: Props) {
                 onClick={() => setOpen(false)}
                 className="rounded-lg px-2 py-1 text-xs text-slate-600 hover:bg-slate-100"
               >
-                Закрити
-              </button>
+                Закрити </button>
             </div>
             <div className="flex-1 overflow-y-auto px-4 py-3">
               {err ? (

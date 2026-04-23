@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
 import { CalendarShell } from "../../../../features/calendar/components/CalendarShell";
 import { AiV2InsightCard } from "../../../../features/ai-v2";
-import { demoCalendarEvents } from "../../../../features/calendar/demo-events";
 import { loadCalendarEventsFromDb } from "../../../../features/calendar/load-events";
 import { presetFromCalendarSlug } from "../../../../features/calendar/route-presets";
-import { hasUnrestrictedDataScope } from "../../../../lib/authz/roles";
 import { getSessionAccess } from "../../../../lib/authz/session-access";
 import {
   buildModulePath,
@@ -31,11 +29,7 @@ export default async function CalendarPage({ params }: PageProps) {
   const access = await getSessionAccess();
   const currentUserId = access?.userId ?? null;
 
-  const dbEvents = access
-    ? await loadCalendarEventsFromDb(access.ctx)
-    : [];
-  const showDemo = access ? hasUnrestrictedDataScope(access.role) : false;
-  const events = [...dbEvents, ...(showDemo ? demoCalendarEvents : [])];
+  const events = access ? await loadCalendarEventsFromDb(access.ctx) : [];
 
   return (
     <div className="space-y-3 md:space-y-4">

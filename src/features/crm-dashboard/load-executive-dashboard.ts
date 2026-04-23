@@ -67,6 +67,7 @@ import {
 import { hasEffectivePermission, P } from "../../lib/authz/permissions";
 import type { ExecutiveDashboardPerms } from "../dashboard/queries";
 import { taskListWhereForUser } from "../../lib/tasks/prisma-scope";
+import { sanitizePipelineStageName } from "../../lib/crm-core/pipeline-stage-name";
 import type {
   BehaviorEngineSnapshot,
   CashflowPreview,
@@ -99,6 +100,23 @@ type DashboardCacheEntry = {
 const DASHBOARD_CACHE_TTL_MS = 15_000;
 const DASHBOARD_CACHE_MAX_ENTRIES = 80;
 const dashboardPayloadCache = new Map<string, DashboardCacheEntry>();
+
+type ProductionStatsSnapshot = {
+  queued: number;
+  inProgress: number;
+  delayed: number;
+  ready: number;
+  loadPct: number;
+  ringPct: number;
+  atRiskCount: number;
+  issues: { id: string; title: string; orderId: string }[];
+  delayedOrders: {
+    id: string;
+    dealTitle?: string;
+    deal?: { title: string };
+    deadline: Date | null;
+  }[];
+};
 
 function makeDashboardCacheKey(input: {
   access: SessionAccess;
@@ -401,12 +419,17 @@ export async function loadExecutiveDashboard(
             dealWhere,
             now,
             overdueTasksCount,
+            taskScope,
           ),
         );
 
   try {
     if (layout === "measurer") {
-      const schedule = await loadSchedulePreview(access, perms, role);
+      const precomputedOverdueTasksCount = await overdueTasksCountPromise;
+      const schedule = await loadSchedulePreview(access, perms, role, {
+        taskScope,
+        precomputedOverdueTasksCount,
+      });
       return cacheAndReturn({
         layout,
         query,
@@ -440,7 +463,7 @@ export async function loadExecutiveDashboard(
       trendData,
       cashflow,
       financeBlock,
-      productionBlock,
+      productionBlockRaw,
       procurementBlock,
       schedule,
       riskRows,
@@ -563,12 +586,10 @@ export async function loadExecutiveDashboard(
       perms.paymentsView || perms.marginView
         ? loadFinanceOverview(dealWhere, mtWhere, canMoney, now)
         : Promise.resolve(null),
-      perms.productionView
-        ? loadProductionOverview(prodWhere, now)
-        : Promise.resolve(null),
+      Promise.resolve(null as ProductionOverview | null),
       perms.procurementView ? loadProcurementOverview(dealWhere) : Promise.resolve(null),
       perms.calendarView
-        ? loadSchedulePreview(access, perms, role)
+        ? loadSchedulePreview(access, perms, role, { taskScope })
         : Promise.resolve(null),
       perms.dealsView
         ? loadRisks(dealWhere, prodWhere, now)
@@ -578,6 +599,11 @@ export async function loadExecutiveDashboard(
       overdueTasksCountPromise,
       submittedHandoffsCountPromise,
     ]);
+
+    const productionBlock =
+      perms.productionView
+        ? buildProductionOverviewFromStats(productionStats, now)
+        : productionBlockRaw;
 
     const nextActions = await loadNextActions(access, perms, dealWhere, submittedHandoffsCount, {
       staleLeadsCount,
@@ -782,7 +808,11 @@ async function loadFunnel(
     prevCount = c;
     rows.push({
       stageId: s.id,
-      name: s.name,
+      name: sanitizePipelineStageName({
+        name: s.name,
+        slug: s.slug,
+        entityType: "LEAD",
+      }),
       slug: s.slug,
       count: c,
       amount,
@@ -1247,11 +1277,10 @@ async function loadProductionStats(
   };
 }
 
-async function loadProductionOverview(
-  prodWhere: Prisma.ProductionFlowWhereInput | undefined,
+function buildProductionOverviewFromStats(
+  s: ProductionStatsSnapshot,
   now: Date,
-): Promise<ProductionOverview> {
-  const s = await loadProductionStats(prodWhere);
+): ProductionOverview {
   return {
     queued: s.queued,
     inProgress: s.inProgress,
@@ -1261,7 +1290,7 @@ async function loadProductionOverview(
     progressRingPct: s.ringPct,
     topDelayed: s.delayedOrders.map((o) => ({
       id: o.id,
-      dealTitle: o.deal.title,
+      dealTitle: o.deal?.title ?? o.dealTitle ?? "—",
       deadline: o.deadline ? o.deadline.toISOString() : null,
       daysLate: o.deadline
         ? Math.max(0, Math.floor((+now - +o.deadline) / 86400000))
@@ -1337,6 +1366,10 @@ async function loadSchedulePreview(
   access: SessionAccess,
   perms: ExecutiveDashboardPerms,
   _role: EffectiveRole,
+  options?: {
+    taskScope?: Prisma.TaskWhereInput | null;
+    precomputedOverdueTasksCount?: number;
+  },
 ): Promise<SchedulePreview | null> {
   if (!perms.calendarView) return null;
   const ctx = access.ctx;
@@ -1393,20 +1426,24 @@ async function loadSchedulePreview(
     };
   }
 
-  const sessionUser = sessionUserFromAccess(access);
-  const taskScope = await taskListWhereForUser(prisma, sessionUser);
+  const taskScope =
+    options?.taskScope ??
+    (perms.tasksView
+      ? await taskListWhereForUser(prisma, sessionUserFromAccess(access))
+      : null);
   const overdueTasks = perms.tasksView
-    ? await prisma.task.count({
+    ? options?.precomputedOverdueTasksCount ??
+      (await prisma.task.count({
         where: {
           AND: [
-            taskScope,
+            taskScope ?? { id: { in: [] } },
             {
               status: { in: [TaskStatus.OPEN, TaskStatus.IN_PROGRESS] },
               dueAt: { not: null, lt: now },
             },
           ],
         },
-      })
+      }))
     : 0;
 
   return { today, nextEvent, overdueTasks };
@@ -1667,12 +1704,15 @@ async function loadTeamPerformance(
   dealWhere: Prisma.DealWhereInput,
   now: Date,
   precomputedOverdueTasks?: number,
+  precomputedTaskScope?: Prisma.TaskWhereInput | null,
 ): Promise<TeamPerformanceBlock | null> {
   if (!perms.dealsView) return null;
 
-  const taskScope = perms.tasksView
-    ? await taskListWhereForUser(prisma, sessionUser)
-    : null;
+  const taskScope =
+    precomputedTaskScope ??
+    (perms.tasksView
+      ? await taskListWhereForUser(prisma, sessionUser)
+      : null);
 
   const [dealGroups, taskGroups, won30] = await Promise.all([
     prisma.deal.groupBy({

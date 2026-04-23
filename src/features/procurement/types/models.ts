@@ -10,6 +10,29 @@ export type ProcurementRequestStatus =
   | "CLOSED"
   | "CANCELLED";
 
+export type ProcurementWorkflowStatus =
+  | "new_request"
+  | "in_progress_by_purchaser"
+  | "ai_grouping"
+  | "grouped_by_supplier_or_category"
+  | "sent_to_supplier"
+  | "supplier_response_received"
+  | "supplier_invoice_uploaded"
+  | "invoice_ai_matched"
+  | "invoice_verification"
+  | "approval_pending"
+  | "sent_to_payment"
+  | "payment_method_selected"
+  | "paid"
+  | "receipt_verification_pending"
+  | "awaiting_delivery"
+  | "goods_received"
+  | "stock_posted"
+  | "reserved_for_order"
+  | "issued_to_production"
+  | "rejected"
+  | "returned_for_revision";
+
 export type PurchaseOrderStatus =
   | "DRAFT"
   | "SENT"
@@ -51,6 +74,7 @@ export type ProcurementRequest = {
   objectId: Uuid | null;
   requestedById: Uuid | null;
   status: ProcurementRequestStatus;
+  workflowStatus?: ProcurementWorkflowStatus;
   neededByDate: string | null;
   budgetTotal: number;
   actualTotal: number;

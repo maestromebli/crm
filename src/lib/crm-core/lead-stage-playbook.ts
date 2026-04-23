@@ -46,9 +46,9 @@ export const LEAD_STAGE_PLAYBOOK: Record<LeadStageKey, StagePlaybookEntry> = {
   },
   QUOTE_SENT: {
     purposeUa: "Супровід клієнта після відправки КП.",
-    requiredFieldsUa: ["Статус діалогу", "Дата follow-up"],
+    requiredFieldsUa: ["Статус діалогу", "Дата наступний контакт"],
     exitConditionsUa: ["Узгодження умов або коректна відмова"],
-    recommendedCtaUa: "Запланувати follow-up",
+    recommendedCtaUa: "Запланувати наступний контакт",
   },
   APPROVED: {
     purposeUa: "Фіналізувати суму та перейти в замовлення.",

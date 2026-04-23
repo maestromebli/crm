@@ -61,7 +61,7 @@ export function buildProcurementRiskAlerts(
   if (out.length === 0) {
     out.push({
       level: "P2",
-      text: `Відкритих критичних сигналів немає (${saas.openRequestCount} заявок у роботі).`,
+      text: `Openх критичних сигналів немає (${saas.openRequestCount} заявок у роботі).`,
     });
   }
 

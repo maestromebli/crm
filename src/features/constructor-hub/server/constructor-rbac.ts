@@ -38,7 +38,15 @@ function isSalesOwner(user: SessionUser, workspace: WorkspaceScope): boolean {
 }
 
 function isAssignedConstructor(user: SessionUser, workspace: WorkspaceScope): boolean {
-  return workspace.assignedConstructorUserId === user.id || user.dbRole === "PRODUCTION_WORKER";
+  return (
+    workspace.assignedConstructorUserId === user.id ||
+    user.dbRole === "PRODUCTION_WORKER" ||
+    user.dbRole === "CUTTING" ||
+    user.dbRole === "EDGING" ||
+    user.dbRole === "DRILLING" ||
+    user.dbRole === "ASSEMBLY" ||
+    user.dbRole === "CONSTRUCTOR"
+  );
 }
 
 export function constructorRoleLabel(user: SessionUser): string {
@@ -46,7 +54,16 @@ export function constructorRoleLabel(user: SessionUser): string {
   if (isProductionLeadLike(user)) return "HEAD_OF_PRODUCTION";
   if (user.dbRole === "MEASURER") return "MEASURER";
   if (user.dbRole === "SALES_MANAGER") return "SALES_MANAGER";
-  if (user.dbRole === "PRODUCTION_WORKER") return "CONSTRUCTOR";
+  if (
+    user.dbRole === "PRODUCTION_WORKER" ||
+    user.dbRole === "CUTTING" ||
+    user.dbRole === "EDGING" ||
+    user.dbRole === "DRILLING" ||
+    user.dbRole === "ASSEMBLY" ||
+    user.dbRole === "CONSTRUCTOR"
+  ) {
+    return "CONSTRUCTOR";
+  }
   return user.dbRole;
 }
 

@@ -108,13 +108,7 @@ export function hasEffectivePermission(
     impersonatorId?: string | null;
   },
 ): boolean {
-  const impersonating = Boolean(ctx.impersonatorId);
-  if (
-    !impersonating &&
-    (ctx.realRole === "SUPER_ADMIN" ||
-      ctx.realRole === "ADMIN" ||
-      ctx.realRole === "DIRECTOR")
-  ) {
+  if (hasUnrestrictedPermissionScope(ctx)) {
     return true;
   }
   return hasPermission(granted, required);
@@ -130,6 +124,19 @@ export function hasEffectiveAnyPermission(
 ): boolean {
   return required.some((key) =>
     hasEffectivePermission(granted, key, ctx),
+  );
+}
+
+export function hasUnrestrictedPermissionScope(ctx: {
+  realRole?: string;
+  impersonatorId?: string | null;
+}): boolean {
+  const impersonating = Boolean(ctx.impersonatorId);
+  if (impersonating) return false;
+  return (
+    ctx.realRole === "SUPER_ADMIN" ||
+    ctx.realRole === "ADMIN" ||
+    ctx.realRole === "DIRECTOR"
   );
 }
 

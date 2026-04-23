@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { Bot, Loader2, Send, ShieldCheck, Sparkles } from "lucide-react";
 import { useAssistantChat } from "../../features/ai-assistant/hooks/useAssistantChat";
 import { cn } from "../../lib/utils";
-import { postJson } from "../../lib/api/patch-json";
+import { patchJson, postJson } from "../../lib/api/patch-json";
 
 const ADMIN_PROMPTS: string[] = [
   "Зроби аудит CRM: вузькі місця процесу продажу, виробництва, закупівель і комунікацій. Дай топ-10 покращень за ROI.",
@@ -16,8 +16,28 @@ const ADMIN_PROMPTS: string[] = [
 ];
 
 export function AdminAiAdvisorChat() {
+  type TemplateChangeProposal = {
+    proposalId: string;
+    title: string;
+    templateKey: string;
+    beforeTemplate: string;
+    afterTemplate: string;
+    expectedImpact: string;
+    rollbackPlan: string;
+    createdAt: string;
+    createdByUserId: string | null;
+    createdByRole: string | null;
+    status: "DRAFT" | "APPROVED" | "REJECTED" | "APPLIED";
+    statusAt: string;
+    statusByUserId: string | null;
+    statusByRole: string | null;
+    decisionComment: string | null;
+  };
+
   const { data } = useSession();
   const userId = data?.user?.id ?? null;
+  const userRole = String(data?.user?.realRole ?? data?.user?.role ?? "").toUpperCase();
+  const canApprove = userRole === "SUPER_ADMIN" || userRole === "DIRECTOR" || userRole === "ADMIN";
   const {
     messages,
     loading,
@@ -33,6 +53,42 @@ export function AdminAiAdvisorChat() {
   const [knowledgeNote, setKnowledgeNote] = useState("");
   const [knowledgeBusy, setKnowledgeBusy] = useState(false);
   const [knowledgeHint, setKnowledgeHint] = useState<string | null>(null);
+  const [proposalBusy, setProposalBusy] = useState(false);
+  const [proposalHint, setProposalHint] = useState<string | null>(null);
+  const [proposalDecisionComment, setProposalDecisionComment] = useState<Record<string, string>>({});
+  const [proposals, setProposals] = useState<TemplateChangeProposal[]>([]);
+  const [proposalsLoading, setProposalsLoading] = useState(false);
+  const [proposalForm, setProposalForm] = useState({
+    title: "",
+    templateKey: "",
+    beforeTemplate: "",
+    afterTemplate: "",
+    expectedImpact: "",
+    rollbackPlan: "",
+  });
+
+  const loadProposals = useCallback(async () => {
+    setProposalsLoading(true);
+    try {
+      const res = await fetch("/api/settings/ai/template-change/proposals?take=40", {
+        method: "GET",
+        credentials: "same-origin",
+      });
+      const data = (await res.json()) as { items?: TemplateChangeProposal[]; error?: string };
+      if (!res.ok) {
+        throw new Error(data.error || "Не вдалося завантажити пропозиції");
+      }
+      setProposals(Array.isArray(data.items) ? data.items : []);
+    } catch (e) {
+      setProposalHint(e instanceof Error ? e.message : "Не вдалося завантажити пропозиції");
+    } finally {
+      setProposalsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadProposals();
+  }, [loadProposals]);
 
   const saveKnowledge = async () => {
     const note = knowledgeNote.trim();
@@ -52,6 +108,89 @@ export function AdminAiAdvisorChat() {
       );
     } finally {
       setKnowledgeBusy(false);
+    }
+  };
+
+  const createProposal = async () => {
+    if (proposalBusy) return;
+    setProposalBusy(true);
+    setProposalHint(null);
+    try {
+      await postJson<{ proposalId: string }>(
+        "/api/settings/ai/template-change/proposals",
+        {
+          title: proposalForm.title.trim(),
+          templateKey: proposalForm.templateKey.trim(),
+          beforeTemplate: proposalForm.beforeTemplate.trim(),
+          afterTemplate: proposalForm.afterTemplate.trim(),
+          expectedImpact: proposalForm.expectedImpact.trim(),
+          rollbackPlan: proposalForm.rollbackPlan.trim(),
+        },
+      );
+      setProposalForm({
+        title: "",
+        templateKey: "",
+        beforeTemplate: "",
+        afterTemplate: "",
+        expectedImpact: "",
+        rollbackPlan: "",
+      });
+      setProposalHint("Чернетку зміни шаблону створено. Перед застосуванням потрібне погодження.");
+      await loadProposals();
+    } catch (e) {
+      setProposalHint(
+        e instanceof Error ? e.message : "Не вдалося створити пропозицію",
+      );
+    } finally {
+      setProposalBusy(false);
+    }
+  };
+
+  const decideProposal = async (
+    proposalId: string,
+    decision: "APPROVED" | "REJECTED",
+  ) => {
+    if (proposalBusy) return;
+    setProposalBusy(true);
+    setProposalHint(null);
+    try {
+      await patchJson<{ status: string }>(
+        `/api/settings/ai/template-change/proposals/${proposalId}/decision`,
+        {
+          decision,
+          comment: proposalDecisionComment[proposalId]?.trim() || undefined,
+        },
+      );
+      setProposalHint(
+        decision === "APPROVED"
+          ? "Пропозицію погоджено."
+          : "Пропозицію відхилено.",
+      );
+      await loadProposals();
+    } catch (e) {
+      setProposalHint(e instanceof Error ? e.message : "Не вдалося зберегти рішення");
+    } finally {
+      setProposalBusy(false);
+    }
+  };
+
+  const applyProposal = async (proposalId: string) => {
+    if (proposalBusy) return;
+    setProposalBusy(true);
+    setProposalHint(null);
+    try {
+      await postJson<{ status: string }>(
+        `/api/settings/ai/template-change/proposals/${proposalId}/apply`,
+        {},
+      );
+      setProposalHint("Зміну шаблону застосовано до системних налаштувань.");
+      await loadProposals();
+    } catch (e) {
+      setProposalHint(
+        e instanceof Error ? e.message : "Не вдалося застосувати зміну шаблону",
+      );
+    } finally {
+      setProposalBusy(false);
     }
   };
 
@@ -160,6 +299,183 @@ export function AdminAiAdvisorChat() {
           {knowledgeHint ? (
             <span className="text-[11px] text-emerald-900">{knowledgeHint}</span>
           ) : null}
+        </div>
+      </div>
+
+      <div className="mt-3 rounded-xl border border-violet-200 bg-violet-50/70 p-3">
+        <p className="text-[11px] font-semibold text-violet-900">
+          Процес змін шаблонів (з обов&apos;язковим погодженням)
+        </p>
+        <p className="mt-0.5 text-[11px] text-violet-900/90">
+          Схема: створити чернетку → погодити директором/адміном → застосувати в системі.
+        </p>
+
+        <div className="mt-2 grid gap-2 md:grid-cols-2">
+          <input
+            value={proposalForm.title}
+            onChange={(e) =>
+              setProposalForm((s) => ({ ...s, title: e.target.value }))
+            }
+            placeholder="Назва зміни шаблону"
+            className="rounded-lg border border-violet-200 bg-white px-3 py-2 text-xs text-slate-900 outline-none focus:border-violet-400"
+          />
+          <input
+            value={proposalForm.templateKey}
+            onChange={(e) =>
+              setProposalForm((s) => ({ ...s, templateKey: e.target.value }))
+            }
+            placeholder="Ключ шаблону (напр. manager.followup.v2)"
+            className="rounded-lg border border-violet-200 bg-white px-3 py-2 text-xs text-slate-900 outline-none focus:border-violet-400"
+          />
+          <textarea
+            value={proposalForm.beforeTemplate}
+            onChange={(e) =>
+              setProposalForm((s) => ({ ...s, beforeTemplate: e.target.value }))
+            }
+            rows={3}
+            placeholder="Поточний шаблон (до змін)"
+            className="rounded-lg border border-violet-200 bg-white px-3 py-2 text-xs text-slate-900 outline-none focus:border-violet-400"
+          />
+          <textarea
+            value={proposalForm.afterTemplate}
+            onChange={(e) =>
+              setProposalForm((s) => ({ ...s, afterTemplate: e.target.value }))
+            }
+            rows={3}
+            placeholder="Новий шаблон (після змін)"
+            className="rounded-lg border border-violet-200 bg-white px-3 py-2 text-xs text-slate-900 outline-none focus:border-violet-400"
+          />
+          <textarea
+            value={proposalForm.expectedImpact}
+            onChange={(e) =>
+              setProposalForm((s) => ({ ...s, expectedImpact: e.target.value }))
+            }
+            rows={2}
+            placeholder="Очікуваний вплив (KPI/результат)"
+            className="rounded-lg border border-violet-200 bg-white px-3 py-2 text-xs text-slate-900 outline-none focus:border-violet-400"
+          />
+          <textarea
+            value={proposalForm.rollbackPlan}
+            onChange={(e) =>
+              setProposalForm((s) => ({ ...s, rollbackPlan: e.target.value }))
+            }
+            rows={2}
+            placeholder="План відкату"
+            className="rounded-lg border border-violet-200 bg-white px-3 py-2 text-xs text-slate-900 outline-none focus:border-violet-400"
+          />
+        </div>
+        <div className="mt-2 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void createProposal()}
+            disabled={
+              proposalBusy ||
+              !proposalForm.title.trim() ||
+              !proposalForm.templateKey.trim() ||
+              !proposalForm.afterTemplate.trim() ||
+              !proposalForm.expectedImpact.trim() ||
+              !proposalForm.rollbackPlan.trim()
+            }
+            className="rounded-lg bg-violet-700 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-violet-800 disabled:opacity-50"
+          >
+            {proposalBusy ? "Зберігаю..." : "Створити пропозицію"}
+          </button>
+          {proposalHint ? (
+            <span className="text-[11px] text-violet-900">{proposalHint}</span>
+          ) : null}
+        </div>
+
+        <div className="mt-3 rounded-lg border border-violet-200 bg-white p-2">
+          <p className="text-[11px] font-semibold text-violet-900">
+            Черга погодження шаблонів
+          </p>
+          {proposalsLoading ? (
+            <p className="mt-1 text-[11px] text-slate-600">Завантажую...</p>
+          ) : proposals.length === 0 ? (
+            <p className="mt-1 text-[11px] text-slate-600">
+              Немає пропозицій змін шаблонів.
+            </p>
+          ) : (
+            <div className="mt-2 space-y-2">
+              {proposals.map((p) => (
+                <div
+                  key={p.proposalId}
+                  className="rounded-lg border border-violet-100 bg-violet-50/50 p-2"
+                >
+                  <p className="text-[11px] font-semibold text-slate-900">
+                    {p.title} · <span className="font-mono">{p.templateKey}</span>
+                  </p>
+                  <p className="mt-0.5 text-[10px] text-slate-700">
+                    Статус: {p.status} · Створено: {new Date(p.createdAt).toLocaleString("uk-UA")}
+                  </p>
+                  {p.decisionComment ? (
+                    <p className="mt-0.5 text-[10px] text-slate-700">
+                      Коментар рішення: {p.decisionComment}
+                    </p>
+                  ) : null}
+                  <div className="mt-1 grid gap-1 md:grid-cols-2">
+                    <div>
+                      <p className="text-[10px] font-semibold text-slate-700">Було</p>
+                      <p className="whitespace-pre-wrap text-[10px] text-slate-700">
+                        {p.beforeTemplate || "—"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-semibold text-slate-700">Стане</p>
+                      <p className="whitespace-pre-wrap text-[10px] text-slate-700">
+                        {p.afterTemplate}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                    <input
+                      value={proposalDecisionComment[p.proposalId] ?? ""}
+                      onChange={(e) =>
+                        setProposalDecisionComment((prev) => ({
+                          ...prev,
+                          [p.proposalId]: e.target.value,
+                        }))
+                      }
+                      placeholder="Коментар погодження/відхилення"
+                      className="min-w-[220px] flex-1 rounded border border-violet-200 bg-white px-2 py-1 text-[10px] text-slate-900 outline-none focus:border-violet-400"
+                    />
+                    {canApprove ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => void decideProposal(p.proposalId, "APPROVED")}
+                          disabled={proposalBusy || p.status === "APPLIED"}
+                          className="rounded bg-emerald-700 px-2 py-1 text-[10px] font-semibold text-white hover:bg-emerald-800 disabled:opacity-50"
+                        >
+                          Погодити
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void decideProposal(p.proposalId, "REJECTED")}
+                          disabled={proposalBusy || p.status === "APPLIED"}
+                          className="rounded bg-rose-700 px-2 py-1 text-[10px] font-semibold text-white hover:bg-rose-800 disabled:opacity-50"
+                        >
+                          Відхилити
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void applyProposal(p.proposalId)}
+                          disabled={proposalBusy || p.status !== "APPROVED"}
+                          className="rounded bg-indigo-700 px-2 py-1 text-[10px] font-semibold text-white hover:bg-indigo-800 disabled:opacity-50"
+                        >
+                          Застосувати
+                        </button>
+                      </>
+                    ) : (
+                      <span className="text-[10px] text-slate-600">
+                        Погодження/застосування доступне лише директору/адміну.
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

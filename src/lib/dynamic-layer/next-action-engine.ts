@@ -32,7 +32,7 @@ export function deriveDynamicNextAction(input: RuleInput): DynamicNextAction | n
       const now = input.now ?? new Date();
       if (now.getTime() - sentAt.getTime() >= FOLLOW_UP_MS) {
         return {
-          label: "Зробити follow-up по КП",
+          label: "Зробити наступний контакт по КП",
           action: "create_follow_up_task",
           priority: "medium",
         };

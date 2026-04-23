@@ -2,7 +2,6 @@
 
 import type { ReactNode } from "react";
 import { useCallback, useMemo, useState } from "react";
-import Link from "next/link";
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
 import { Textarea } from "../../../components/ui/textarea";
@@ -384,11 +383,7 @@ function FormPayables({ kpi, initialPayload, onSave, saving, error, okFlash, can
         Поточне значення: <strong className="text-[var(--enver-text)]">{money(kpi.payables)} UAH</strong>
       </p>
       <p className="text-[11px] text-slate-500">
-        Деталі по PO — у модулі{" "}
-        <Link href="/crm/procurement" className="font-medium text-blue-700 underline">
-          Закупівлі
-        </Link>
-        .
+        Деталі по PO доступні у відповідному пункті бокового меню.
       </p>
       <div>
         <FieldLabel>Пріоритет оплат постачальникам</FieldLabel>

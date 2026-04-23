@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, Download, Server } from "lucide-react";
+import { ChevronDown, Download as Завантажити, Server } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import {
   DropdownMenu,
@@ -50,7 +50,7 @@ export function FinanceOverviewExportMenu({ downloadFilename, ...payload }: Prop
           aria-haspopup="menu"
           aria-label="Експорт огляду фінансів у CSV — відкрити варіанти"
         >
-          <Download className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          <Завантажити className="h-3.5 w-3.5 shrink-0" aria-hidden />
           Експорт CSV
           <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden />
         </Button>
@@ -68,7 +68,7 @@ export function FinanceOverviewExportMenu({ downloadFilename, ...payload }: Prop
           }}
         >
           <div className="flex items-center gap-2 text-sm font-medium text-[var(--enver-text)]">
-            <Download className="h-4 w-4 shrink-0 text-violet-600" aria-hidden />
+            <Завантажити className="h-4 w-4 shrink-0 text-violet-600" aria-hidden />
             Швидкий (у браузері)
           </div>
           <p className="pl-6 text-[11px] leading-snug text-slate-600">

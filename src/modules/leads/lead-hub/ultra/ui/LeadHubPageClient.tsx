@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { Loader2, Sparkles, Upload, Wand2 } from "lucide-react";
+import { Loader2, Sparkles, Download as Вивантажити, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -60,7 +60,7 @@ async function uploadLeadHubFile(params: {
     method: "POST",
     body: form,
   });
-  if (!response.ok) throw new Error(`Upload failed: ${response.status}`);
+  if (!response.ok) throw new Error(`Вивантажити failed: ${response.status}`);
 
   return (await response.json()) as {
     ok: boolean;
@@ -169,7 +169,7 @@ export function LeadHubPageClient({ id }: { id: string }) {
       <div className="flex min-h-[70vh] items-center justify-center">
         <div className="flex items-center gap-2 text-sm text-slate-600">
           <Loader2 className="h-4 w-4 animate-spin" />
-          Loading Ultra Lead Hub...
+          Завантаження Ultra Lead Hub...
         </div>
       </div>
     );
@@ -204,7 +204,7 @@ export function LeadHubPageClient({ id }: { id: string }) {
                 await savePricingSession(session.pricingSessionId, pricingState);
               }}
             >
-              Save snapshot
+              Зберегти snapshot
             </Button>
           </div>
         </div>
@@ -216,8 +216,8 @@ export function LeadHubPageClient({ id }: { id: string }) {
           <div className="leadhub-card-soft p-3">
             <p className="mb-2 text-xs font-medium uppercase text-slate-500">Image uploader</p>
             <label className="flex cursor-pointer items-center gap-2 rounded-md border border-dashed p-3 text-sm hover:bg-slate-50">
-              <Upload className="h-4 w-4" />
-              Upload image
+              <Вивантажити className="h-4 w-4" />
+              Вивантажити image
               <input
                 type="file"
                 accept="image/*"
@@ -233,8 +233,8 @@ export function LeadHubPageClient({ id }: { id: string }) {
           <div className="leadhub-card-soft p-3">
             <p className="mb-2 text-xs font-medium uppercase text-slate-500">File uploader</p>
             <label className="flex cursor-pointer items-center gap-2 rounded-md border border-dashed p-3 text-sm hover:bg-slate-50">
-              <Upload className="h-4 w-4" />
-              Upload calc source
+              <Вивантажити className="h-4 w-4" />
+              Вивантажити calc source
               <input
                 type="file"
                 className="hidden"

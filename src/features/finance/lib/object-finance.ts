@@ -11,6 +11,8 @@ export type ObjectFinanceLedgerRow = {
   projectTitle: string;
   objectTitle: string;
   objectAddress: string;
+  /** Загальна вартість замовлення (сума договору). */
+  orderTotalAmount: number;
   incomeCash: number;
   expenseCash: number;
   payrollCash: number;
@@ -70,6 +72,7 @@ export function buildObjectFinanceLedger(
       projectTitle: title,
       objectTitle: obj.title,
       objectAddress: obj.address,
+      orderTotalAmount: project?.contractAmount ?? 0,
       incomeCash: sumTx(txs, (t) => t.type === "INCOME"),
       expenseCash: sumTx(txs, (t) => t.type === "EXPENSE"),
       payrollCash: sumTx(txs, (t) => t.type === "PAYROLL"),
@@ -85,6 +88,14 @@ export function buildObjectFinanceLedger(
 }
 
 export function consolidateObjectLedger(rows: ObjectFinanceLedgerRow[]): ObjectFinanceLedgerRow {
+  const uniqueOrderTotals = new Map<string, number>();
+  for (const row of rows) {
+    if (!uniqueOrderTotals.has(row.projectId)) {
+      uniqueOrderTotals.set(row.projectId, row.orderTotalAmount);
+    }
+  }
+  const portfolioOrderTotal = [...uniqueOrderTotals.values()].reduce((sum, value) => sum + value, 0);
+
   const z = rows.reduce(
     (acc, r) => ({
       incomeCash: acc.incomeCash + r.incomeCash,
@@ -114,6 +125,7 @@ export function consolidateObjectLedger(rows: ObjectFinanceLedgerRow[]): ObjectF
     projectTitle: "Усі замовлення та обʼєкти",
     objectTitle: "Консолідовано",
     objectAddress: "—",
+    orderTotalAmount: portfolioOrderTotal,
     ...z,
   };
 }

@@ -179,8 +179,7 @@ export function PostCreateActions({
           onClick={clearFresh}
           className="text-xs font-medium text-slate-500 underline decoration-slate-300 underline-offset-2 hover:text-slate-800"
         >
-          Закрити
-        </button>
+          Закрити </button>
       </div>
     </div>
   );

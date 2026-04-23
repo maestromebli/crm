@@ -56,6 +56,16 @@ function telFromPhone(raw: string): string | null {
   return `tel:+${d}`;
 }
 
+function normalizeLeadOrderNumber(raw: string): string | null {
+  const v = raw.trim().toUpperCase();
+  if (!v) return null;
+  const m = /^(?:ЕМ|EM)-([1-9]\d{0,2})$/u.exec(v);
+  if (!m) return null;
+  const n = Number(m[1]);
+  if (!Number.isFinite(n) || n < 1 || n > 200) return null;
+  return `ЕМ-${n}`;
+}
+
 export function NewLeadModal({
   open,
   onClose,
@@ -86,6 +96,7 @@ export function NewLeadModal({
   const [contactName, setContactName] = useState("");
   const [phone, setPhone] = useState("");
   const [source, setSource] = useState("");
+  const [orderNumber, setOrderNumber] = useState("");
   const [comment, setComment] = useState("");
   const [expanded, setExpanded] = useState(false);
 
@@ -112,6 +123,7 @@ export function NewLeadModal({
     setContactName("");
     setPhone("");
     setSource("");
+    setOrderNumber("");
     setComment("");
     setOwnerId("");
     setDesignerId("");
@@ -295,6 +307,13 @@ export function NewLeadModal({
     if (!src) {
       return { error: "Оберіть джерело зі списку." as const };
     }
+    const normalizedOrderNumber = normalizeLeadOrderNumber(orderNumber);
+    if (!normalizedOrderNumber) {
+      return {
+        error:
+          "Вкажіть номер замовлення у форматі ЕМ-1 ... ЕМ-200." as const,
+      };
+    }
     const did = designerId.trim();
     const normalizedReferralName = referralName.trim();
     const normalizedReferralPhone = referralPhone.trim();
@@ -328,6 +347,7 @@ export function NewLeadModal({
       name,
       ph,
       src,
+      normalizedOrderNumber,
       note,
       oid,
       email: email.trim(),
@@ -361,6 +381,7 @@ export function NewLeadModal({
         if (p.ph) fd.append("phone", p.ph);
         fd.append("email", p.email);
         fd.append("source", p.src);
+        fd.append("orderNumber", p.normalizedOrderNumber);
         if (p.note) fd.append("note", p.note);
         fd.append("ownerId", p.oid);
         if (p.designerId) fd.append("designerUserId", p.designerId);
@@ -391,6 +412,7 @@ export function NewLeadModal({
             phone: p.ph || undefined,
             email: p.email || null,
             source: p.src,
+            orderNumber: p.normalizedOrderNumber,
             note: p.note,
             ownerId: p.oid,
             designerUserId: p.designerId,
@@ -473,8 +495,7 @@ export function NewLeadModal({
             onClick={handleClose}
             className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-slate-500 transition hover:bg-slate-100 hover:text-[var(--enver-text)]"
           >
-            Закрити
-          </button>
+            Закрити </button>
         </header>
 
         <div className="flex-1 space-y-3 overflow-y-auto px-4 py-3 text-xs">
@@ -504,6 +525,8 @@ export function NewLeadModal({
             }
             source={source}
             onSourceChange={setSource}
+            orderNumber={orderNumber}
+            onOrderNumberChange={setOrderNumber}
             sourceOptions={LEAD_SOURCE_OPTIONS}
             designerSourceValue={DESIGNER_SOURCE_VALUE}
             designersLoading={designersLoading}

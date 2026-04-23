@@ -20,6 +20,51 @@ function isOptionalSchemaError(error: unknown): boolean {
   );
 }
 
+type ProcurementDashboardCacheEntry = {
+  expiresAt: number;
+  value: unknown;
+};
+
+const PROCUREMENT_DASHBOARD_TTL_MS = 20_000;
+const PROCUREMENT_DASHBOARD_MAX_ENTRIES = 120;
+const procurementDashboardCache = new Map<string, ProcurementDashboardCacheEntry>();
+
+function procurementDashboardCacheKey(args: {
+  userId: string;
+  ownerScope: string;
+  query: string;
+}): string {
+  return JSON.stringify(args);
+}
+
+function readProcurementDashboardCache(key: string): unknown | null {
+  const hit = procurementDashboardCache.get(key);
+  if (!hit) return null;
+  if (hit.expiresAt <= Date.now()) {
+    procurementDashboardCache.delete(key);
+    return null;
+  }
+  return hit.value;
+}
+
+function writeProcurementDashboardCache(key: string, value: unknown): void {
+  if (procurementDashboardCache.size >= PROCUREMENT_DASHBOARD_MAX_ENTRIES) {
+    let oldestKey: string | null = null;
+    let oldestExpiresAt = Number.POSITIVE_INFINITY;
+    for (const [existingKey, existing] of procurementDashboardCache.entries()) {
+      if (existing.expiresAt < oldestExpiresAt) {
+        oldestExpiresAt = existing.expiresAt;
+        oldestKey = existingKey;
+      }
+    }
+    if (oldestKey) procurementDashboardCache.delete(oldestKey);
+  }
+  procurementDashboardCache.set(key, {
+    value,
+    expiresAt: Date.now() + PROCUREMENT_DASHBOARD_TTL_MS,
+  });
+}
+
 async function safeOptionalList<T>(
   scope: string,
   query: () => Promise<T[]>,
@@ -58,6 +103,18 @@ export async function GET(req: Request) {
 
     const { searchParams } = new URL(req.url);
     const q = searchParams.get("q")?.trim() ?? "";
+    const cacheKey = procurementDashboardCacheKey({
+      userId: user.id,
+      ownerScope:
+        ownerFilter == null
+          ? "all"
+          : typeof ownerFilter === "string"
+            ? ownerFilter
+            : JSON.stringify(ownerFilter),
+      query: q,
+    });
+    const cached = readProcurementDashboardCache(cacheKey);
+    if (cached) return NextResponse.json(cached);
 
     const [suppliers, materials, orders, stock, requests] = await Promise.all([
       safeOptionalList("Supplier", () =>
@@ -121,11 +178,12 @@ export async function GET(req: Request) {
       ),
     ]);
 
+  const now = new Date();
   const delayed = orders.filter(
     (o) =>
       o.status === "ORDERED" &&
       o.expectedDate &&
-      o.expectedDate < new Date(),
+      o.expectedDate < now,
   );
 
   const ai = {
@@ -198,16 +256,42 @@ export async function GET(req: Request) {
     };
   });
 
+  const supplierOrderStats = new Map<
+    string,
+    { totalOrders: number; delayedOrders: number; paidOrders: number; spend: number }
+  >();
+  for (const order of orders) {
+    const key = order.supplierId;
+    const current = supplierOrderStats.get(key) ?? {
+      totalOrders: 0,
+      delayedOrders: 0,
+      paidOrders: 0,
+      spend: 0,
+    };
+    current.totalOrders += 1;
+    if (order.status === "ORDERED" && order.expectedDate && order.expectedDate < now) {
+      current.delayedOrders += 1;
+    }
+    if (order.status === "PAID") {
+      current.paidOrders += 1;
+    }
+    current.spend += n(order.total);
+    supplierOrderStats.set(key, current);
+  }
+
   const supplierStats = suppliers.map((supplier) => {
-    const supplierOrders = orders.filter((o) => o.supplierId === supplier.id);
-    const totalOrders = supplierOrders.length;
-    const delayedOrders = supplierOrders.filter(
-      (o) => o.status === "ORDERED" && o.expectedDate && o.expectedDate < new Date(),
-    ).length;
+    const stats = supplierOrderStats.get(supplier.id) ?? {
+      totalOrders: 0,
+      delayedOrders: 0,
+      paidOrders: 0,
+      spend: 0,
+    };
+    const totalOrders = stats.totalOrders;
+    const delayedOrders = stats.delayedOrders;
+    const spend = stats.spend;
+    const paidOrders = stats.paidOrders;
     const slaPct =
       totalOrders > 0 ? Number((((totalOrders - delayedOrders) / totalOrders) * 100).toFixed(1)) : 100;
-    const spend = supplierOrders.reduce((acc, o) => acc + n(o.total), 0);
-    const paidOrders = supplierOrders.filter((o) => o.status === "PAID").length;
     const paymentDisciplinePct =
       totalOrders > 0 ? Number(((paidOrders / totalOrders) * 100).toFixed(1)) : 100;
     const riskScore = Math.max(
@@ -253,7 +337,7 @@ export async function GET(req: Request) {
       unitPriceDelta: Math.round(row.unitPriceDelta * 100) / 100,
     }));
 
-    return NextResponse.json({
+    const payload = {
       suppliers,
       materials: materials.map((m) => ({
         ...m,
@@ -277,6 +361,7 @@ export async function GET(req: Request) {
         priority: r.priority,
         neededByDate: r.neededByDate?.toISOString() ?? null,
         status: r.status,
+        workflowStatus: (r as { workflowStatus?: string }).workflowStatus ?? "new_request",
         items: r.items.map((i) => ({
           ...i,
           qtyPlanned: i.qtyPlanned.toString(),
@@ -307,7 +392,9 @@ export async function GET(req: Request) {
         systemicRiskScore,
       },
       ai,
-    });
+    };
+    writeProcurementDashboardCache(cacheKey, payload);
+    return NextResponse.json(payload);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Помилка сервера";
     console.error("[api/crm/procurement/dashboard]", error);

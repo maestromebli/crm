@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { Download, RefreshCw, Upload, X } from "lucide-react";
+import { Download as Завантажити, RefreshCw, Download as Вивантажити, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FinanceExecutiveKpi } from "../lib/aggregation";
 import {
@@ -160,7 +159,7 @@ export function FinanceExecutiveKpiStrip({ kpi, initialNotesMap, canEditNotes }:
             onClick={() => fileInputRef.current?.click()}
             title={!canEditNotes ? "Потрібне право на редагування уточнень KPI" : undefined}
           >
-            <Upload className={`h-3.5 w-3.5 ${importing ? "animate-pulse" : ""}`} aria-hidden />
+            <Вивантажити className={`h-3.5 w-3.5 ${importing ? "animate-pulse" : ""}`} aria-hidden />
             {importing ? "Імпорт…" : "Імпорт JSON"}
           </Button>
           <Button
@@ -182,7 +181,7 @@ export function FinanceExecutiveKpiStrip({ kpi, initialNotesMap, canEditNotes }:
             disabled={importing}
             onClick={exportNotesJson}
           >
-            <Download className="h-3.5 w-3.5" aria-hidden />
+            <Завантажити className="h-3.5 w-3.5" aria-hidden />
             Експорт JSON
           </Button>
           {lastSyncedAt ? (
@@ -312,18 +311,7 @@ export function FinanceExecutiveKpiStrip({ kpi, initialNotesMap, canEditNotes }:
                 />
               </div>
               <div className="mt-6 border-t border-slate-100 pt-3 text-[11px] text-slate-600">
-                <span className="font-medium text-slate-700">Звʼязані розділи:</span>{" "}
-                <Link href="/crm/finance/registry" className="text-blue-700 underline hover:text-blue-900">
-                  Реєстр проєктів
-                </Link>
-                {" · "}
-                <Link href="/crm/procurement" className="text-blue-700 underline hover:text-blue-900">
-                  Закупівлі
-                </Link>
-                {" · "}
-                <Link href="/crm/finance/banking" className="text-blue-700 underline hover:text-blue-900">
-                  Банкінг
-                </Link>
+                <span className="font-medium text-slate-700">Звʼязані розділи:</span> доступ через бокове меню.
               </div>
             </>
           ) : null}

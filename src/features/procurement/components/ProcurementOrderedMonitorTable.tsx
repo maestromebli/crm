@@ -453,12 +453,9 @@ export function ProcurementOrderedMonitorTable({
                     className={`border-t border-slate-100 transition-colors hover:bg-sky-50/50 ${zebra}`}
                   >
                     <td className={`${cell} max-w-[200px] font-medium text-[var(--enver-text)]`}>
-                      <Link
-                        href={`/crm/procurement/${row.dealId}`}
-                        className="line-clamp-2 text-sky-800 underline-offset-2 hover:text-sky-950 hover:underline"
-                      >
+                      <span className="line-clamp-2 text-slate-800">
                         {row.dealTitle}
-                      </Link>
+                      </span>
                     </td>
                     <td className={`${cell} text-center`}>
                       <Link
@@ -470,12 +467,7 @@ export function ProcurementOrderedMonitorTable({
                       </Link>
                     </td>
                     <td className={`${cell} font-mono text-[11px] text-slate-600`}>
-                      <Link
-                        href={`/crm/procurement/${row.dealId}`}
-                        className="text-sky-800 underline-offset-2 hover:underline"
-                      >
-                        {row.requestId.slice(0, 10)}…
-                      </Link>
+                      {row.requestId.slice(0, 10)}…
                     </td>
                     <td className={`${cell} max-w-[200px]`}>
                       <span className="line-clamp-2 text-slate-800" title={row.itemName}>

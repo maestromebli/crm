@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Loader2, Send, Upload } from "lucide-react";
+import { Loader2, Send, Download as Вивантажити } from "lucide-react";
 import type { ContactCategory } from "@prisma/client";
 import type { ContactListRow } from "../../features/contacts/queries";
 import { CONTACT_CATEGORY_LABEL } from "../../lib/contacts/contact-categories";
@@ -113,7 +113,7 @@ export function ContactsSegmentsWorkspace({ rows }: ContactsSegmentsWorkspacePro
             disabled={importing}
             className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
           >
-            {importing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+            {importing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Вивантажити className="h-3.5 w-3.5" />}
             Імпортувати
           </button>
         </form>
@@ -197,8 +197,7 @@ export function ContactsSegmentsWorkspace({ rows }: ContactsSegmentsWorkspacePro
                       href={`/contacts/${item.id}`}
                       className="text-xs font-medium text-indigo-700 hover:underline"
                     >
-                      Відкрити
-                    </Link>
+                      Відкрити </Link>
                   </li>
                 ))}
               </ul>

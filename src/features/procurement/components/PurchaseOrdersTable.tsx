@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { CurrencyCell } from "../../../components/shared/CurrencyCell";
 import { DataTableShell } from "../../../components/shared/DataTableShell";
 import type { PurchaseOrder } from "../types/models";
@@ -18,12 +17,7 @@ export function PurchaseOrdersTable({ rows, supplierNameById, projectNameById }:
           <td className="px-3 py-2 text-slate-800">{r.orderNumber}</td>
           <td className="px-3 py-2 text-slate-700">{supplierNameById[r.supplierId] ?? r.supplierId}</td>
           <td className="px-3 py-2 text-slate-700">
-            <Link
-              className="text-sky-800 underline-offset-2 hover:text-sky-950 hover:underline"
-              href={`/crm/procurement/${r.projectId}`}
-            >
-              {projectNameById[r.projectId] ?? r.projectId}
-            </Link>
+            {projectNameById[r.projectId] ?? r.projectId}
           </td>
           <td className="px-3 py-2 text-slate-600">{new Date(r.orderDate).toLocaleDateString("uk-UA")}</td>
           <td className="px-3 py-2 text-slate-600">{r.expectedDate ? new Date(r.expectedDate).toLocaleDateString("uk-UA") : "—"}</td>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Download } from "lucide-react";
+import { Download as Завантажити } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 
 type Props = {
@@ -67,7 +67,7 @@ export function FinanceCsvExportButton({
       aria-label={ariaLabel}
       title={title}
     >
-      <Download className="h-3.5 w-3.5" aria-hidden />
+      <Завантажити className="h-3.5 w-3.5" aria-hidden />
       {loading ? "Експорт…" : "Експорт CSV"}
     </Button>
   );

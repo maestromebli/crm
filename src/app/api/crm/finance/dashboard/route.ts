@@ -20,6 +20,139 @@ function n(v: unknown): number {
 
 type FinanceObjectStatus = "ON_TRACK" | "DUE_SOON" | "OVERDUE" | "BLOCKED";
 
+type FinanceDashboardResponse = {
+  kpi: {
+    balance: number;
+    incomeMonth: number;
+    expenseMonth: number;
+    profit: number;
+  };
+  cashflow: Array<{ date: string; income: number; expense: number; balance: number }>;
+  forecast: {
+    inflow7: number;
+    inflow14: number;
+    inflow30: number;
+    outflow7: number;
+    outflow14: number;
+    outflow30: number;
+    net7: number;
+    net14: number;
+    net30: number;
+    deficitDetected: boolean;
+  };
+  aging: {
+    receivables: Record<"current" | "d1_7" | "d7_30" | "d30_plus", number>;
+    payables: Record<"current" | "d1_7" | "d7_30" | "d30_plus", number>;
+  };
+  commandCenter: {
+    totalCash: number;
+    expectedInflow: number;
+    expectedOutflow: number;
+    overduePayments: number;
+    riskyDeals: Array<{
+      dealId: string;
+      dealTitle: string;
+      riskLevel: string;
+      cashGap: number;
+      marginPercent: number;
+    }>;
+    marginLeaks: number;
+    payrollDue: number;
+  };
+  enterprise: {
+    arLedger: Array<{
+      dealId: string;
+      dealTitle: string;
+      invoiced: number;
+      received: number;
+      outstanding: number;
+      dueDate: string | null;
+    }>;
+    apLedger: Array<{
+      purchaseOrderId: string;
+      dealId: string | null;
+      dealTitle: string;
+      total: number;
+      paid: number;
+      outstanding: number;
+      expectedDate: string | null;
+      status: string;
+    }>;
+    objectLedger: Array<{
+      dealId: string;
+      dealTitle: string;
+      plannedInflow: number;
+      actualInflow: number;
+      actualOutflow: number;
+      openCommitment: number;
+      clientDebt: number;
+      grossMargin: number;
+      netMarginPct: number;
+      nextPaymentDate: string | null;
+      overdueDays: number;
+      status: FinanceObjectStatus;
+    }>;
+    cashflowForecast8w: Array<{
+      week: string;
+      inflow: number;
+      outflow: number;
+      net: number;
+      projectedBalance: number;
+    }>;
+    riskIndex: number;
+    riskLabel: string;
+  };
+  ai: {
+    paymentRisk: string;
+    cashflowForecast: string;
+    actions: string[];
+  };
+};
+
+type FinanceDashboardCacheEntry = {
+  expiresAt: number;
+  value: FinanceDashboardResponse;
+};
+
+const FINANCE_DASHBOARD_TTL_MS = 20_000;
+const FINANCE_DASHBOARD_MAX_ENTRIES = 100;
+const financeDashboardCache = new Map<string, FinanceDashboardCacheEntry>();
+
+function financeDashboardCacheKey(userId: string): string {
+  return userId;
+}
+
+function readFinanceDashboardCache(key: string): FinanceDashboardResponse | null {
+  const hit = financeDashboardCache.get(key);
+  if (!hit) return null;
+  if (hit.expiresAt <= Date.now()) {
+    financeDashboardCache.delete(key);
+    return null;
+  }
+  return hit.value;
+}
+
+function writeFinanceDashboardCache(
+  key: string,
+  value: FinanceDashboardResponse,
+): void {
+  if (financeDashboardCache.size >= FINANCE_DASHBOARD_MAX_ENTRIES) {
+    let oldestKey: string | null = null;
+    let oldestExpiresAt = Number.POSITIVE_INFINITY;
+    for (const [existingKey, existing] of financeDashboardCache.entries()) {
+      if (existing.expiresAt < oldestExpiresAt) {
+        oldestExpiresAt = existing.expiresAt;
+        oldestKey = existingKey;
+      }
+    }
+    if (oldestKey) financeDashboardCache.delete(oldestKey);
+  }
+  financeDashboardCache.set(key, {
+    value,
+    expiresAt: Date.now() + FINANCE_DASHBOARD_TTL_MS,
+  });
+}
+
 function resolveFinanceObjectStatus(args: {
   overdueDays: number;
   daysToNextPayment: number | null;
@@ -95,6 +228,9 @@ export async function GET() {
     if (!canFinanceAction(user, "finance.view")) {
       return NextResponse.json({ error: "Недостатньо прав" }, { status: 403 });
     }
+    const cacheKey = financeDashboardCacheKey(user.id);
+    const cached = readFinanceDashboardCache(cacheKey);
+    if (cached) return NextResponse.json(cached);
 
     const now = new Date();
     const start = monthStart(now);
@@ -431,32 +567,43 @@ export async function GET() {
       };
     });
 
-    const riskyDealsRaw = await Promise.all(
-      deals.map(async (deal) => {
-        const breakdown = await loadDealFinancialBreakdown(deal.id);
-        if (!breakdown) return null;
-        return {
-          dealId: deal.id,
-          dealTitle: deal.title,
-          riskLevel: breakdown.summary.riskLevel,
-          cashGap: breakdown.summary.cashGap,
-          marginPercent: breakdown.summary.marginPercent,
-        };
+    const overduePayments = paymentPlanEntries.filter((p) => p.dueDate < now).length;
+    const riskyDealCandidates = objectLedger
+      .slice()
+      .sort(
+        (a, b) =>
+          b.clientDebt +
+          b.openCommitment +
+          Math.max(b.overdueDays * 300, 0) -
+          (a.clientDebt + a.openCommitment + Math.max(a.overdueDays * 300, 0)),
+      )
+      .slice(0, 12);
+    const [riskyDealsRaw, payrollDue] = await Promise.all([
+      Promise.all(
+        riskyDealCandidates.map(async (deal) => {
+          const breakdown = await loadDealFinancialBreakdown(deal.dealId);
+          if (!breakdown) return null;
+          return {
+            dealId: deal.dealId,
+            dealTitle: deal.dealTitle,
+            riskLevel: breakdown.summary.riskLevel,
+            cashGap: breakdown.summary.cashGap,
+            marginPercent: breakdown.summary.marginPercent,
+          };
+        }),
+      ),
+      safeOptionalCount("PayrollEntry", () =>
+      prisma.payrollEntry.count({
+        where: { status: { in: ["PENDING", "APPROVED"] } },
       }),
-    );
+      ),
+    ]);
     const riskyDeals = riskyDealsRaw
       .filter((d): d is NonNullable<typeof d> => Boolean(d))
       .filter((d) => d.riskLevel !== "low")
       .sort((a, b) => b.cashGap - a.cashGap)
       .slice(0, 8);
-
-    const overduePayments = paymentPlanEntries.filter((p) => p.dueDate < now).length;
     const marginLeaks = riskyDeals.filter((d) => d.marginPercent < 20).length;
-    const payrollDue = await safeOptionalCount("PayrollEntry", () =>
-      prisma.payrollEntry.count({
-        where: { status: { in: ["PENDING", "APPROVED"] } },
-      }),
-    );
 
     const ai = {
       paymentRisk:
@@ -485,7 +632,7 @@ export async function GET() {
     );
     const riskLabel = riskIndex >= 70 ? "Критичний" : riskIndex >= 45 ? "Підвищений" : "Контрольований";
 
-    return NextResponse.json({
+    const payload: FinanceDashboardResponse = {
       kpi: {
         balance,
         incomeMonth,
@@ -527,7 +674,9 @@ export async function GET() {
         riskLabel,
       },
       ai,
-    });
+    };
+    writeFinanceDashboardCache(cacheKey, payload);
+    return NextResponse.json(payload);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Помилка сервера";
     console.error("[api/crm/finance/dashboard]", error);

@@ -222,7 +222,7 @@ export function DealWorkspaceShell({
     () => getCriticalBlockers(workspaceData, viewRole),
     [workspaceData, viewRole],
   );
-  const health = useMemo(
+  const стан = useMemo(
     () => getDealHealthStatus(workspaceData, viewRole),
     [workspaceData, viewRole],
   );
@@ -277,7 +277,7 @@ export function DealWorkspaceShell({
         <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-3 px-3 py-4 pb-24 md:px-6">
           <DealCommandHeader
             data={workspaceData}
-            health={health}
+            стан={стан}
             onTab={setTab}
             viewRole={viewRole}
             canSwitchRole={resolvedRole === "admin"}
@@ -344,13 +344,17 @@ export function DealWorkspaceShell({
             }
             right={
               <>
-              <DealFinanceCard finance={finance} />
+              <DealFinanceCard
+                finance={finance}
+                paymentMilestones={workspaceData.paymentMilestones}
+              />
               <DealDocumentsTasksCard data={workspaceData} onTab={setTab} />
               {workspaceData.leadId ? <DealLeadTransferCard data={workspaceData} /> : null}
               <DealProductionReadinessCard
                 readiness={productionReadiness}
                 insights={smartInsights}
                 warnings={warnings}
+                data={workspaceData}
                 onTab={setTab}
               />
               </>

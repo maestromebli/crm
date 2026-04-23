@@ -436,6 +436,12 @@ export function LeadDetailOverviewClient({
               <dd className="text-[var(--enver-text)]">{lead.source}</dd>
             </div>
             <div>
+              <dt className="text-[10px] text-slate-400">Номер замовлення</dt>
+              <dd className="text-[var(--enver-text)]">
+                {lead.orderNumber ?? "—"}
+              </dd>
+            </div>
+            <div>
               <dt className="text-[10px] text-slate-400">Пріоритет</dt>
               <dd className="text-[var(--enver-text)]">{lead.priority}</dd>
             </div>

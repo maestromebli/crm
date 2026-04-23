@@ -23,12 +23,28 @@ import {
   buildProcurementHubNewRequestHref,
   parseProcurementQuickAction,
 } from "../../../../features/procurement/lib/quick-actions";
+import { hasUnrestrictedPermissionScope } from "@/lib/authz/permissions";
+import { getCachedServerSession } from "@/lib/authz/server-session";
+import { redirect } from "next/navigation";
 
 type Props = {
   searchParams?: Promise<{ role?: string; view?: string; newRequest?: string; dealId?: string; tab?: string }>;
 };
 
 export default async function ProcurementOverviewPage({ searchParams }: Props) {
+  const session = await getCachedServerSession();
+  const hasUnrestricted = hasUnrestrictedPermissionScope({
+    realRole: session?.user?.realRole,
+    impersonatorId: session?.user?.impersonatorId,
+  });
+  if (
+    !hasUnrestricted &&
+    session?.user?.realRole !== "ACCOUNTANT" &&
+    session?.user?.realRole !== "PROCUREMENT_MANAGER"
+  ) {
+    redirect("/access-denied");
+  }
+
   const params = await searchParams;
   const role = resolveRole(params?.role);
   const quickAction = parseProcurementQuickAction(params);
@@ -75,11 +91,7 @@ export default async function ProcurementOverviewPage({ searchParams }: Props) {
     <main className="space-y-4 p-4">
       <PageHeader
         title="Закупки"
-        subtitle={
-          data.dataSource === "live"
-            ? "Управління заявками, постачальниками, замовленнями і бюджетом (дані з CRM)."
-            : "Управління заявками, постачальниками, замовленнями і бюджетом (демо-набір)."
-        }
+        subtitle="Управління заявками, постачальниками, замовленнями і бюджетом (дані з CRM)."
         actionsSlot={
           <div className="flex flex-wrap items-center gap-2">
             <div className="inline-flex rounded-lg border border-[var(--enver-border)] bg-[var(--enver-bg)] p-1">
@@ -112,11 +124,6 @@ export default async function ProcurementOverviewPage({ searchParams }: Props) {
           </div>
         }
       />
-      {data.dataSource === "demo" ? (
-        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
-          Показано демо-дані. Підключіть БД і заповніть замовлення / закупівлі — тут з’являться реальні цифри.
-        </p>
-      ) : null}
       <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600">
         <span className="font-medium text-slate-700">Швидкі звʼязки:</span>
         <Link href="/crm/production" className="text-sky-700 underline-offset-2 hover:underline">
@@ -124,9 +131,6 @@ export default async function ProcurementOverviewPage({ searchParams }: Props) {
         </Link>
         <Link href="/crm/production/workshop" className="text-sky-700 underline-offset-2 hover:underline">
           Kanban цеху
-        </Link>
-        <Link href="/crm/finance" className="text-sky-700 underline-offset-2 hover:underline">
-          фінанси
         </Link>
       </p>
       <AiV2InsightCard context="procurement" />
@@ -353,7 +357,7 @@ export default async function ProcurementOverviewPage({ searchParams }: Props) {
             ) : (
               <EmptyState
                 title="Немає критичних прострочень"
-                description="Відкритих заявок із дедлайном у минулому не знайдено."
+                description="Openх заявок із дедлайном у минулому не знайдено."
               />
             )}
           </SectionCard>

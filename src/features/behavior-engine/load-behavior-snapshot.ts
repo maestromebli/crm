@@ -39,7 +39,7 @@ function scoreSignals(metrics: ScoreMetrics): string[] {
     out.push("Слабка дисципліна першого контакту.");
   }
   if (metrics.followUpDiscipline < 70) {
-    out.push("Є прострочені follow-up без закриття.");
+    out.push("Є прострочені наступний контакт без закриття.");
   }
   if (metrics.dealMovement < 65) {
     out.push("Замовлення рухаються повільно між оновленнями.");
@@ -261,7 +261,7 @@ export async function loadBehaviorSnapshot({
     id: `behavior-${m.userId}`,
     severity: m.score < 55 ? ("high" as const) : ("medium" as const),
     label: `${m.name}: низька поведінкова дисципліна (${m.score}/100)`,
-    detail: `Проблемна зона: ${m.primaryIssue}. Потрібен операційний follow-up.`,
+    detail: `Проблемна зона: ${m.primaryIssue}. Потрібен операційний наступний контакт.`,
     href: "/crm/dashboard?view=issues",
   }));
 

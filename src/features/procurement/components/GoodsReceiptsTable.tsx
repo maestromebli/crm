@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { DataTableShell } from "../../../components/shared/DataTableShell";
 import type { GoodsReceipt } from "../types/models";
 
@@ -16,12 +15,7 @@ export function GoodsReceiptsTable({ rows, orderNumberById, projectNameById }: P
           <td className="px-3 py-2 text-slate-700">{new Date(r.receiptDate).toLocaleDateString("uk-UA")}</td>
           <td className="px-3 py-2 text-slate-700">{orderNumberById[r.purchaseOrderId] ?? r.purchaseOrderId}</td>
           <td className="px-3 py-2 text-slate-800">
-            <Link
-              className="text-sky-800 underline-offset-2 hover:text-sky-950 hover:underline"
-              href={`/crm/procurement/${r.projectId}`}
-            >
-              {projectNameById[r.projectId] ?? r.projectId}
-            </Link>
+            {projectNameById[r.projectId] ?? r.projectId}
           </td>
           <td className="px-3 py-2 text-slate-700">—</td>
           <td className="px-3 py-2 text-slate-700">—</td>

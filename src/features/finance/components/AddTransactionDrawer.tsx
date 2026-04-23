@@ -24,8 +24,7 @@ export function AddTransactionDrawer({ onCreate }: Props) {
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-sm font-semibold">Нова транзакція</h3>
               <Button size="sm" variant="outline" onClick={() => setOpen(false)}>
-                Закрити
-              </Button>
+                Закрити </Button>
             </div>
             <div className="grid gap-3">
               <label className="text-xs">

@@ -4,6 +4,12 @@ import { prisma } from "@/lib/prisma";
 import { persistReadinessSnapshot } from "@/lib/deal-api/persist-readiness";
 import { dispatchDealAutomationTrigger } from "@/lib/automation/dispatch";
 import {
+  evaluateReleaseToProductionGate,
+} from "@/lib/enver/order-execution-policy";
+import { loadEnverExecutionSignals } from "@/lib/enver/load-execution-signals";
+import { syncProjectSpecFromDealMeta } from "@/lib/enver/sync-project-spec";
+import { saveOrderFinancialSnapshotsByDeal } from "@/lib/finance/save-order-finance-snapshots";
+import {
   forbidUnlessDealAccess,
   requireSessionUser,
 } from "@/lib/authz/api-guard";
@@ -19,6 +25,11 @@ import { getRequestContext, writePlatformAudit } from "@/lib/platform";
 import { logError } from "@/lib/observability/logger";
 
 type Ctx = { params: Promise<{ dealId: string }> };
+
+function parseMeta(raw: unknown): Record<string, unknown> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  return raw as Record<string, unknown>;
+}
 
 export async function POST(req: Request, ctx: Ctx) {
   const requestCtx = getRequestContext(req);
@@ -37,7 +48,12 @@ export async function POST(req: Request, ctx: Ctx) {
   try {
     const deal = await prisma.deal.findUnique({
       where: { id: dealId },
-      select: { id: true, ownerId: true },
+      select: {
+        id: true,
+        ownerId: true,
+        workspaceMeta: true,
+        handoff: { select: { status: true } },
+      },
     });
 
     if (!deal) {
@@ -46,6 +62,26 @@ export async function POST(req: Request, ctx: Ctx) {
 
     const denied = await forbidUnlessDealAccess(user, P.PRODUCTION_LAUNCH, deal);
     if (denied) return denied;
+    const signals = await loadEnverExecutionSignals({
+      prisma,
+      dealId,
+      meta: parseMeta(deal.workspaceMeta),
+    });
+    const blockers = evaluateReleaseToProductionGate({
+      handoffAccepted: deal.handoff?.status === "ACCEPTED",
+      handoffChecklistCompleted: signals.handoffChecklistCompleted,
+      bomApproved: signals.bomApproved,
+      criticalMaterialsReady: signals.criticalMaterialsReady,
+    });
+    if (blockers.length > 0) {
+      return NextResponse.json(
+        {
+          error: "Запуск виробництва заблоковано правилами ENVER OS.",
+          blockers,
+        },
+        { status: 409 },
+      );
+    }
 
     const { flow, handoffImportedFileCount } = await createProductionFlowFromDealHandoff({
       dealId,
@@ -84,6 +120,33 @@ export async function POST(req: Request, ctx: Ctx) {
       payload: { productionFlowId: flow.id },
       dedupeKey: `production:core:${flow.id}`,
     });
+    try {
+      await syncProjectSpecFromDealMeta({
+        dealId,
+        actorUserId: user.id,
+      });
+    } catch (specError) {
+      console.error("[production-launch] project-spec sync failed", {
+        dealId,
+        error: specError instanceof Error ? specError.message : String(specError),
+      });
+    }
+    try {
+      await saveOrderFinancialSnapshotsByDeal({
+        dealId,
+        source: "production_launch",
+        actorUserId: user.id,
+        comment: "Автознімок ENVER при запуску виробництва.",
+      });
+    } catch (snapshotError) {
+      console.error("[production-launch] order snapshot failed", {
+        dealId,
+        error:
+          snapshotError instanceof Error
+            ? snapshotError.message
+            : String(snapshotError),
+      });
+    }
 
     revalidatePath(`/deals/${dealId}/workspace`);
     revalidatePath("/crm/production");
@@ -173,13 +236,38 @@ export async function PATCH(req: Request, ctx: Ctx) {
   const { dealId } = await ctx.params;
   const deal = await prisma.deal.findUnique({
     where: { id: dealId },
-    select: { id: true, ownerId: true },
+    select: {
+      id: true,
+      ownerId: true,
+      workspaceMeta: true,
+      handoff: { select: { status: true } },
+    },
   });
   if (!deal) {
     return NextResponse.json({ error: "Замовлення не знайдено" }, { status: 404 });
   }
   const denied = await forbidUnlessDealAccess(user, P.PRODUCTION_LAUNCH, deal);
   if (denied) return denied;
+  const signals = await loadEnverExecutionSignals({
+    prisma,
+    dealId,
+    meta: parseMeta(deal.workspaceMeta),
+  });
+  const blockers = evaluateReleaseToProductionGate({
+    handoffAccepted: deal.handoff?.status === "ACCEPTED",
+    handoffChecklistCompleted: signals.handoffChecklistCompleted,
+    bomApproved: signals.bomApproved,
+    criticalMaterialsReady: signals.criticalMaterialsReady,
+  });
+  if (blockers.length > 0) {
+    return NextResponse.json(
+      {
+        error: "Повторний запуск виробництва заблоковано правилами ENVER OS.",
+        blockers,
+      },
+      { status: 409 },
+    );
+  }
 
   let body: { action?: string; error?: string };
   try {
@@ -195,6 +283,33 @@ export async function PATCH(req: Request, ctx: Ctx) {
       actorName: user.id,
       defaultChiefUserId: user.id,
     });
+    try {
+      await syncProjectSpecFromDealMeta({
+        dealId,
+        actorUserId: user.id,
+      });
+    } catch (specError) {
+      console.error("[production-launch] retry project-spec sync failed", {
+        dealId,
+        error: specError instanceof Error ? specError.message : String(specError),
+      });
+    }
+    try {
+      await saveOrderFinancialSnapshotsByDeal({
+        dealId,
+        source: "production_launch_retry",
+        actorUserId: user.id,
+        comment: "Автознімок ENVER при повторному запуску виробництва.",
+      });
+    } catch (snapshotError) {
+      console.error("[production-launch] retry snapshot failed", {
+        dealId,
+        error:
+          snapshotError instanceof Error
+            ? snapshotError.message
+            : String(snapshotError),
+      });
+    }
     revalidatePath(`/deals/${dealId}/workspace`);
     return NextResponse.json({
       ok: true,

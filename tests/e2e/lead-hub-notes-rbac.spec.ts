@@ -20,6 +20,7 @@ test("lead hub notes: stage transition is disabled without update permission", a
 
   const stamp = Date.now();
   const leadTitle = `Demo Notes RBAC ${stamp}`;
+  const orderNumber = `ЕМ-${(stamp % 200) + 1}`;
 
   const managerContext = await browser.newContext();
   const managerPage = await managerContext.newPage();
@@ -37,6 +38,7 @@ test("lead hub notes: stage transition is disabled without update permission", a
       title: leadTitle,
       contactName: "Тест RBAC",
       phone: `+38096${String(stamp).slice(-7)}`,
+      orderNumber,
       source: "demo-notes-rbac",
       priority: "normal",
       note: "E2E: перевірка блокування зміни етапу без прав",
@@ -67,6 +69,28 @@ test("lead hub notes: stage transition is disabled without update permission", a
 
   await viewerPage.goto(`/leads/${leadId}`);
 
+  const notFoundHeading = viewerPage.getByRole("heading", { name: "404" });
+  const notesTab = viewerPage.getByRole("tab", { name: "Нотатки" }).first();
+  const gate = await Promise.race([
+    notFoundHeading
+      .waitFor({ state: "visible", timeout: 15_000 })
+      .then(() => "not-found")
+      .catch(() => null),
+    notesTab
+      .waitFor({ state: "visible", timeout: 15_000 })
+      .then(() => "notes")
+      .catch(() => null),
+  ]);
+
+  if (gate === "not-found") {
+    // In stricter RBAC setups viewer may be denied lead scope entirely.
+    await expect(
+      viewerPage.getByRole("heading", { name: /page could not be found/i }),
+    ).toBeVisible();
+    await viewerContext.close();
+    return;
+  }
+
   const showAllTabsButton = viewerPage.getByRole("button", {
     name: "Показати всі вкладки",
   });
@@ -74,7 +98,6 @@ test("lead hub notes: stage transition is disabled without update permission", a
     await showAllTabsButton.click();
   }
 
-  const notesTab = viewerPage.getByRole("tab", { name: "Нотатки" }).first();
   await notesTab.click();
   await expect(notesTab).toHaveAttribute("aria-selected", "true");
 

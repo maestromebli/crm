@@ -117,7 +117,7 @@ export const SETTINGS_ITEMS: SettingsItem[] = [
   {
     id: "communications-health",
     section: "Канали звʼязку",
-    label: "Health каналів",
+    label: "Стан каналів",
     access: "admin",
     path: "/settings/communications/health",
   },

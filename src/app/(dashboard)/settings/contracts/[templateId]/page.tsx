@@ -71,7 +71,7 @@ export default function ContractTemplateDetailPage() {
               className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs"
               onClick={async () => {
                 if (!data?.id) return;
-                await fetch(`/api/contract-templates/${data.id}/publish`, { method: "POST" });
+                await fetch(`/api/contract-templates/${data.id}/публікації`, { method: "POST" });
                 router.refresh();
               }}
             >

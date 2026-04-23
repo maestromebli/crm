@@ -4,6 +4,14 @@ import { authOptions } from "../../../../lib/auth/options";
 import { canAssignSuperAdminRole } from "../../../../lib/authz/permissions";
 import { prisma } from "../../../../lib/prisma";
 
+const BROKEN_NAME_RE = /^[\s?.\uFFFD]+$/;
+
+function sanitizeDisplayName(name: string | null): string | null {
+  const trimmed = name?.trim();
+  if (!trimmed) return null;
+  return BROKEN_NAME_RE.test(trimmed) ? null : trimmed;
+}
+
 /**
  * Список користувачів для імпersonації (лише SUPER_ADMIN, реальна сесія).
  */
@@ -43,7 +51,7 @@ export async function GET() {
       users: users.map((u) => ({
         id: u.id,
         email: u.email,
-        name: u.name,
+        name: sanitizeDisplayName(u.name),
         role: u.role,
       })),
     });

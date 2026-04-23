@@ -13,6 +13,16 @@ type Target = {
   role: string;
 };
 
+const BROKEN_NAME_RE = /^[\s?.\uFFFD]+$/;
+
+function resolveTargetDisplayName(target: Target): string {
+  const trimmedName = target.name?.trim();
+  if (!trimmedName || BROKEN_NAME_RE.test(trimmedName)) {
+    return target.email;
+  }
+  return trimmedName;
+}
+
 export function ImpersonationSwitcher() {
   const { data: session, status, update } = useSession();
   const router = useRouter();
@@ -87,7 +97,7 @@ export function ImpersonationSwitcher() {
       ) : (
         <div className="flex items-center gap-2">
           <span className="hidden text-[11px] text-muted-foreground sm:inline">
-            Імпersonація
+            Імперсонація
           </span>
           <select
             disabled={busy || loading}
@@ -104,7 +114,7 @@ export function ImpersonationSwitcher() {
             </option>
             {targets.map((u) => (
               <option key={u.id} value={u.id}>
-                {(u.name ?? u.email) + ` · ${u.role}`}
+                {`${resolveTargetDisplayName(u)} · ${u.role}`}
               </option>
             ))}
           </select>

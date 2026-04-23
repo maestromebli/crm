@@ -7,6 +7,7 @@ export type LeadCreateJsonBody = {
   title?: string;
   contactName?: string;
   phone?: string;
+  orderNumber?: string | null;
   email?: string | null;
   source?: string;
   note?: string | null;

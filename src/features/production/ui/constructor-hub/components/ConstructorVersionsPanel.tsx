@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, Eye, GitCompareArrows, SendHorizonal, Star } from "lucide-react";
+import { Download as Завантажити, Eye, GitCompareArrows, SendHorizonal, Star } from "lucide-react";
 import { VERSION_STATUS_LABEL, VERSION_TYPE_LABEL } from "../constructor-hub.labels";
 import type { ConstructorVersion } from "../constructor-hub.types";
 
@@ -28,9 +28,9 @@ export function ConstructorVersionsPanel({ versions }: { versions: ConstructorVe
                 {version.uploadedBy} · {new Date(version.uploadedAt).toLocaleString("uk-UA")}
               </p>
               <div className="mt-2 flex flex-wrap gap-1 text-xs">
-                <Action icon={Eye} label="Відкрити" />
+                <Action icon={Eye} label="Open" />
                 <Action icon={GitCompareArrows} label="Порівняти" />
-                <Action icon={Download} label="Завантажити" />
+                <Action icon={Завантажити} label="Завантажити" />
                 <Action icon={SendHorizonal} label="Надіслати на перевірку" />
                 <Action icon={Star} label="Позначити як фінальну" />
               </div>

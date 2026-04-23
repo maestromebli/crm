@@ -5,7 +5,7 @@ export type EnverPageHeaderProps = {
   eyebrow?: string;
   title: string;
   description?: string;
-  /** Primary action — “Next step” pattern */
+  /** Primary action — “наступний крок” pattern */
   action?: ReactNode;
   className?: string;
 };

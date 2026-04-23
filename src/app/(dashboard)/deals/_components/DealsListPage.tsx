@@ -61,10 +61,7 @@ export async function DealsListPage({ view, defaultLayout = "table" }: Props) {
 
   const listHref = dealListHrefForView(view);
 
-  const showHub =
-    !error &&
-    !showFilteredEmptyHint &&
-    (rows.length > 0 || view === "pipeline");
+  const showHub = !error && !showFilteredEmptyHint;
   const stagger = (index: number) => ({
     animationDelay: `${Math.min(index, 10) * 45}ms`,
   });
@@ -173,35 +170,6 @@ export async function DealsListPage({ view, defaultLayout = "table" }: Props) {
                 усі замовлення
               </Link>{" "}
               або змініть розділ вище.
-            </p>
-          </div>
-        ) : null}
-
-        {rows.length === 0 &&
-        !error &&
-        !showFilteredEmptyHint &&
-        view !== "pipeline" ? (
-          <div
-            className="enver-card-appear rounded-xl border border-dashed border-[var(--enver-border)] bg-[var(--enver-card)] px-4 py-12 text-center text-sm text-[var(--enver-text-muted)] shadow-[var(--enver-shadow)]"
-            style={stagger(2)}
-          >
-            <p>Немає замовлень у вашій зоні видимості.</p>
-            <p className="mt-2 text-xs text-[var(--enver-muted)]">
-              Почніть з{" "}
-              <Link
-                href="/leads"
-                className="font-semibold text-[var(--enver-accent)] underline-offset-2 hover:text-[var(--enver-accent-hover)] hover:underline"
-              >
-                лідів
-              </Link>{" "}
-              або відкрийте{" "}
-              <Link
-                href="/deals/pipeline"
-                className="font-semibold text-[var(--enver-accent)] underline-offset-2 hover:text-[var(--enver-accent-hover)] hover:underline"
-              >
-                воронку замовлень
-              </Link>{" "}
-              для швидкої навігації.
             </p>
           </div>
         ) : null}

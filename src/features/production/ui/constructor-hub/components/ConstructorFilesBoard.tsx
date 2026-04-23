@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, Eye, FileBadge, MessageSquare, Search, Star } from "lucide-react";
+import { Download as Завантажити, Eye, FileBadge, MessageSquare, Search as Пошук, Star } from "lucide-react";
 import { useMemo, useState } from "react";
 import { FILE_CATEGORY_LABEL } from "../constructor-hub.labels";
 import type { ConstructorFile, ConstructorFileCategory } from "../constructor-hub.types";
@@ -30,7 +30,7 @@ export function ConstructorFilesBoard({ files }: { files: ConstructorFile[] }) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-base font-semibold text-slate-900">Файли</h3>
         <label className="relative">
-          <Search className="pointer-events-none absolute left-2 top-2.5 h-4 w-4 text-slate-400" />
+          <Пошук className="pointer-events-none absolute left-2 top-2.5 h-4 w-4 text-slate-400" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -107,7 +107,7 @@ function FileSection({ title, items }: { title: string; items: ConstructorFile[]
 
               <div className="mt-3 flex flex-wrap gap-1">
                 <Action icon={Eye} label="Перегляд" />
-                <Action icon={Download} label="Завантажити" />
+                <Action icon={Завантажити} label="Завантажити" />
                 <Action icon={MessageSquare} label={`Коментарі (${file.comments.length})`} />
                 <Action icon={Star} label="Позначити важливим" />
               </div>

@@ -1104,8 +1104,7 @@ export function LeadEstimateWorkspace({
                 className={btnGhost}
                 onClick={() => setImageIntelOpen(false)}
               >
-                Закрити
-              </button>
+                Закрити </button>
             </div>
 
             <div className="mt-4 grid gap-4 lg:grid-cols-[1.15fr_1fr]">
@@ -2012,8 +2011,7 @@ export function LeadEstimateWorkspace({
                           href={`/leads/${leadId}/estimate/${v.id}`}
                           className="font-semibold text-blue-700 hover:underline"
                         >
-                          Відкрити
-                        </Link>
+                          Відкрити </Link>
                         {v.id !== estimateId ? (
                           <button
                             type="button"

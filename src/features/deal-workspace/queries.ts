@@ -17,6 +17,7 @@ import {
   mapPrismaConstructorRoomToWorkspacePayload,
 } from "../../lib/constructor-room/workspace-room-map";
 import { deriveDealListWarningBadge } from "./deal-workspace-warnings";
+import { sanitizePipelineStageName } from "../../lib/crm-core/pipeline-stage-name";
 
 /** Фільтр списку замовлень (бокове меню / статичні маршрути). */
 export type DealListViewId =
@@ -173,7 +174,11 @@ export async function listDealsForTable(
           id: d.id,
           title: d.title,
           stageId: d.stage.id,
-          stageName: d.stage.name,
+          stageName: sanitizePipelineStageName({
+            name: d.stage.name,
+            slug: d.stage.slug,
+            entityType: "DEAL",
+          }),
           stageSortOrder: d.stage.sortOrder,
           pipelineId: d.pipeline.id,
           pipelineName: d.pipeline.name,
@@ -248,7 +253,11 @@ export async function listDealBoardStages(
       for (const s of p.stages) {
         out.push({
           id: s.id,
-          name: s.name,
+          name: sanitizePipelineStageName({
+            name: s.name,
+            slug: s.slug,
+            entityType: "DEAL",
+          }),
           sortOrder: s.sortOrder,
           pipelineId: p.id,
           pipelineName: p.name,
@@ -417,6 +426,8 @@ export async function getDealWorkspacePayload(
       latestEstimate,
       linkedProjects,
       conversionAudit,
+      projectSpecRow,
+      orderFinancialSnapshotsRaw,
     ] = await Promise.all([
       prisma.attachment.findMany({
         where: {
@@ -497,7 +508,93 @@ export async function getDealWorkspacePayload(
             },
           })
         : Promise.resolve(null),
+      prisma.projectSpec
+        .findFirst({
+          where: { dealId: deal.id },
+          select: {
+            id: true,
+            status: true,
+            currentVersionId: true,
+            currentVersion: {
+              select: {
+                versionNo: true,
+                status: true,
+                approvalStage: true,
+                approvedAt: true,
+                isExecutionBaseline: true,
+              },
+            },
+          },
+          orderBy: { updatedAt: "desc" },
+        })
+        .catch((error) => {
+          if (
+            isMissingTableError(error, "ProjectSpec") ||
+            isMissingColumnError(error)
+          ) {
+            return null;
+          }
+          throw error;
+        }),
+      prisma.orderFinancialSnapshot
+        .findMany({
+          where: { dealId: deal.id },
+          orderBy: { snapshotDate: "desc" },
+          take: 20,
+          select: {
+            id: true,
+            orderId: true,
+            snapshotDate: true,
+            plannedRevenue: true,
+            actualRevenue: true,
+            plannedCost: true,
+            actualCost: true,
+            plannedMargin: true,
+            actualMargin: true,
+            source: true,
+            comment: true,
+            order: { select: { orderNumber: true } },
+          },
+        })
+        .catch((error) => {
+          if (
+            isMissingTableError(error, "OrderFinancialSnapshot") ||
+            isMissingColumnError(error)
+          ) {
+            return [];
+          }
+          throw error;
+        }),
     ]);
+
+    const handoffChecklistCounts = await prisma.dealHandoffChecklistItem
+      .aggregate({
+        where: { handoffId: handoffRow.id },
+        _count: { _all: true, isRequired: true },
+      })
+      .then(async (agg) => {
+        const checkedRequiredCount = await prisma.dealHandoffChecklistItem.count({
+          where: { handoffId: handoffRow.id, isRequired: true, isChecked: true },
+        });
+        return {
+          totalCount: agg._count._all,
+          requiredCount: agg._count.isRequired ?? 0,
+          checkedRequiredCount,
+        };
+      })
+      .catch((error) => {
+        if (
+          isMissingTableError(error, "DealHandoffChecklistItem") ||
+          isMissingColumnError(error)
+        ) {
+          return {
+            totalCount: 0,
+            requiredCount: 0,
+            checkedRequiredCount: 0,
+          };
+        }
+        throw error;
+      });
 
     const attachmentsByCategory: Record<string, number> = {};
     for (const a of attachmentRows) {
@@ -535,6 +632,16 @@ export async function getDealWorkspacePayload(
     });
 
     const manifest = parseHandoffManifest(handoffRow.manifestJson);
+    const handoffChecklistComplete =
+      handoffChecklistCounts.requiredCount > 0 &&
+      handoffChecklistCounts.checkedRequiredCount >=
+        handoffChecklistCounts.requiredCount;
+    const specApprovedForExecution = Boolean(
+      projectSpecRow?.currentVersion &&
+        projectSpecRow.currentVersion.status === "APPROVED" &&
+        (projectSpecRow.currentVersion.approvalStage === "EXECUTION" ||
+          projectSpecRow.currentVersion.isExecutionBaseline),
+    );
     const productionLaunch: DealWorkspacePayload["productionLaunch"] = !flow
       ? {
           status:
@@ -595,13 +702,21 @@ export async function getDealWorkspacePayload(
       pipeline: { id: deal.pipeline.id, name: deal.pipeline.name },
       stage: {
         id: deal.stage.id,
-        name: deal.stage.name,
+        name: sanitizePipelineStageName({
+          name: deal.stage.name,
+          slug: deal.stage.slug,
+          entityType: "DEAL",
+        }),
         slug: deal.stage.slug,
         sortOrder: deal.stage.sortOrder,
       },
       stages: stages.map((s) => ({
         id: s.id,
-        name: s.name,
+        name: sanitizePipelineStageName({
+          name: s.name,
+          slug: s.slug,
+          entityType: "DEAL",
+        }),
         slug: s.slug,
         sortOrder: s.sortOrder,
       })),
@@ -697,6 +812,37 @@ export async function getDealWorkspacePayload(
         rejectedAt: handoffRow.rejectedAt?.toISOString() ?? null,
         rejectionReason: handoffRow.rejectionReason,
         manifest,
+      },
+      enverExecution: {
+        projectSpec: {
+          id: projectSpecRow?.id ?? null,
+          status: projectSpecRow?.status ?? null,
+          currentVersionId: projectSpecRow?.currentVersionId ?? null,
+          currentVersionNo: projectSpecRow?.currentVersion?.versionNo ?? null,
+          currentVersionApprovedForExecution: specApprovedForExecution,
+          approvedAt:
+            projectSpecRow?.currentVersion?.approvedAt?.toISOString() ?? null,
+        },
+        handoffChecklist: {
+          totalCount: handoffChecklistCounts.totalCount,
+          requiredCount: handoffChecklistCounts.requiredCount,
+          checkedRequiredCount: handoffChecklistCounts.checkedRequiredCount,
+          complete: handoffChecklistComplete,
+        },
+        orderFinancialSnapshots: orderFinancialSnapshotsRaw.map((row) => ({
+          id: row.id,
+          orderId: row.orderId,
+          orderNumber: row.order?.orderNumber ?? null,
+          snapshotDate: row.snapshotDate.toISOString(),
+          plannedRevenue: Number(row.plannedRevenue),
+          actualRevenue: Number(row.actualRevenue),
+          plannedCost: Number(row.plannedCost),
+          actualCost: Number(row.actualCost),
+          plannedMargin: row.plannedMargin != null ? Number(row.plannedMargin) : null,
+          actualMargin: row.actualMargin != null ? Number(row.actualMargin) : null,
+          source: row.source,
+          comment: row.comment,
+        })),
       },
       productionLaunch,
       constructorRoom: constructorRoom

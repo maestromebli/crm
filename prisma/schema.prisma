@@ -80,15 +80,21 @@ model User {
    */
   dealHubSavedViews DealHubSavedView[]
 
-  moneyTransactionsCreated         MoneyTransaction[]           @relation("MoneyTransactionCreatedBy")
-  financeTransactionsCreated       FinanceTransaction[]         @relation("FinanceTransactionCreatedBy")
-  invoicesCreated                  Invoice[]                    @relation("InvoiceCreatedBy")
-  financeJournalEntriesCreated     FinanceJournalEntry[]        @relation("FinanceJournalEntryCreatedBy")
-  dealConstructorRoomsAssignedBy   DealConstructorRoom[]        @relation("DealConstructorRoomAssignedBy")
-  dealConstructorRoomsAssignedUser DealConstructorRoom[]        @relation("DealConstructorRoomAssignedUser")
-  constructorRoomMessagesAuthored  DealConstructorRoomMessage[] @relation("ConstructorRoomMessageAuthor")
+  moneyTransactionsCreated         MoneyTransaction[]                @relation("MoneyTransactionCreatedBy")
+  financeTransactionsCreated       FinanceTransaction[]              @relation("FinanceTransactionCreatedBy")
+  invoicesCreated                  Invoice[]                         @relation("InvoiceCreatedBy")
+  financeJournalEntriesCreated     FinanceJournalEntry[]             @relation("FinanceJournalEntryCreatedBy")
+  dealConstructorRoomsAssignedBy   DealConstructorRoom[]             @relation("DealConstructorRoomAssignedBy")
+  dealConstructorRoomsAssignedUser DealConstructorRoom[]             @relation("DealConstructorRoomAssignedUser")
+  constructorRoomMessagesAuthored  DealConstructorRoomMessage[]      @relation("ConstructorRoomMessageAuthor")
   aiAssistantLogs                  AiAssistantLog[]
-  warehouseStockMovementsCreated   WarehouseStockMovement[]     @relation("WarehouseStockMovementCreatedBy")
+  warehouseStockMovementsCreated   WarehouseStockMovement[]          @relation("WarehouseStockMovementCreatedBy")
+  procurementRequestsRequested     ProcurementRequest[]              @relation("ProcurementRequestRequester")
+  procurementRequestsResponsible   ProcurementRequest[]              @relation("ProcurementRequestResponsible")
+  procurementRequestStatusHistory  ProcurementRequestStatusHistory[] @relation("ProcurementRequestStatusHistoryActor")
+  projectSpecVersionsCreated       ProjectSpecVersion[]              @relation("ProjectSpecVersionCreatedBy")
+  projectSpecVersionsApproved      ProjectSpecVersion[]              @relation("ProjectSpecVersionApprovedBy")
+  dealHandoffChecklistItems        DealHandoffChecklistItem[]
 }
 
 /**
@@ -458,10 +464,12 @@ model Order {
   managerId String?
   manager   User?   @relation("OrderManager", fields: [managerId], references: [id])
 
-  dealId   String?
-  deal     Deal?   @relation(fields: [dealId], references: [id], onDelete: SetNull)
-  clientId String?
-  client   Client? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  dealId             String?
+  deal               Deal?                    @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  clientId           String?
+  client             Client?                  @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  projectSpec        ProjectSpec?
+  financialSnapshots OrderFinancialSnapshot[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -469,6 +477,112 @@ model Order {
   @@index([managerId])
   @@index([dealId])
   @@index([clientId])
+}
+
+enum ProjectSpecStatus {
+  DRAFT
+  UNDER_REVIEW
+  APPROVED_FOR_CONTRACT
+  APPROVED_FOR_EXECUTION
+  SUPERSEDED
+  ARCHIVED
+}
+
+enum ProjectSpecVersionStatus {
+  DRAFT
+  REVIEW
+  APPROVED
+  REJECTED
+  SUPERSEDED
+}
+
+enum ProjectSpecApprovalStage {
+  COMMERCIAL
+  CLIENT
+  TECHNICAL
+  EXECUTION
+}
+
+enum SpecLineType {
+  PRODUCT
+  MODULE
+  PART
+  MATERIAL
+  HARDWARE
+  SERVICE
+  OPERATION
+}
+
+model ProjectSpec {
+  id               String               @id @default(cuid())
+  orderId          String               @unique
+  order            Order                @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  dealId           String?
+  deal             Deal?                @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  currentVersionId String?              @unique
+  currentVersion   ProjectSpecVersion?  @relation("ProjectSpecCurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+  status           ProjectSpecStatus    @default(DRAFT)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  versions         ProjectSpecVersion[] @relation("ProjectSpecVersions")
+
+  @@index([dealId])
+}
+
+model ProjectSpecVersion {
+  id                         String                   @id @default(cuid())
+  projectSpecId              String
+  projectSpec                ProjectSpec              @relation("ProjectSpecVersions", fields: [projectSpecId], references: [id], onDelete: Cascade)
+  selectedAsCurrentForSpec   ProjectSpec?             @relation("ProjectSpecCurrentVersion")
+  versionNo                  Int
+  basedOnEstimateId          String?
+  basedOnMeasurementResultId String?
+  approvalStage              ProjectSpecApprovalStage @default(COMMERCIAL)
+  status                     ProjectSpecVersionStatus @default(DRAFT)
+  changeReason               String?                  @db.Text
+  approvedByUserId           String?
+  approvedByUser             User?                    @relation("ProjectSpecVersionApprovedBy", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+  approvedAt                 DateTime?
+  isExecutionBaseline        Boolean                  @default(false)
+  notes                      String?                  @db.Text
+  createdById                String
+  createdBy                  User                     @relation("ProjectSpecVersionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt                  DateTime                 @default(now())
+  updatedAt                  DateTime                 @updatedAt
+  lines                      ProjectSpecLine[]
+
+  @@unique([projectSpecId, versionNo])
+  @@index([projectSpecId, status])
+}
+
+model ProjectSpecLine {
+  id                String             @id @default(cuid())
+  specVersionId     String
+  specVersion       ProjectSpecVersion @relation(fields: [specVersionId], references: [id], onDelete: Cascade)
+  parentLineId      String?
+  parentLine        ProjectSpecLine?   @relation("ProjectSpecLineTree", fields: [parentLineId], references: [id], onDelete: SetNull)
+  childLines        ProjectSpecLine[]  @relation("ProjectSpecLineTree")
+  lineCode          String?
+  lineType          SpecLineType
+  title             String
+  description       String?            @db.Text
+  quantity          Decimal            @db.Decimal(12, 3)
+  unit              String
+  width             Decimal?           @db.Decimal(12, 3)
+  height            Decimal?           @db.Decimal(12, 3)
+  depth             Decimal?           @db.Decimal(12, 3)
+  length            Decimal?           @db.Decimal(12, 3)
+  area              Decimal?           @db.Decimal(12, 3)
+  color             String?
+  plannedSaleAmount Decimal?           @db.Decimal(14, 2)
+  plannedCostAmount Decimal?           @db.Decimal(14, 2)
+  sortOrder         Int                @default(0)
+  attributesJson    Json?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  @@index([specVersionId, sortOrder])
+  @@index([parentLineId])
 }
 
 /**
@@ -1306,30 +1420,32 @@ model Deal {
   productionFlow           ProductionFlow?
   constructorWorkspace     ConstructorWorkspace?
 
-  dealPaymentPlan       DealPaymentPlan?
-  moneyTransactions     MoneyTransaction[]
-  financeTransactions   FinanceTransaction[]
-  operatingExpenses     OperatingExpense[]
-  payrollEntries        PayrollEntry[]
-  commissions           Commission[]
-  procurementRequests   ProcurementRequest[]
-  purchaseOrders        PurchaseOrder[]
-  dealPurchaseOrders    DealPurchaseOrder[]
-  invoices              Invoice[]
-  paymentPlanEntries    PaymentPlanEntry[]
-  projects              Project[]
-  constructorRoom       DealConstructorRoom?
-  financeSnapshots      DealFinanceSnapshot[]
-  financeJournalEntries FinanceJournalEntry[]
-  milestones            DealMilestone[]
-  notes                 DealNote[]
-  risks                 DealRisk[]
-  activities            DealActivity[]
-  financeProfile        DealFinanceProfile?
-  paymentScheduleItems  DealPaymentScheduleItem[]
-  documentLinks         DealDocumentLink[]
-  timelineEvents        DealTimelineEvent[]
-  fileLinks             DealFileLink[]
+  dealPaymentPlan         DealPaymentPlan?
+  moneyTransactions       MoneyTransaction[]
+  financeTransactions     FinanceTransaction[]
+  operatingExpenses       OperatingExpense[]
+  payrollEntries          PayrollEntry[]
+  commissions             Commission[]
+  procurementRequests     ProcurementRequest[]
+  purchaseOrders          PurchaseOrder[]
+  dealPurchaseOrders      DealPurchaseOrder[]
+  invoices                Invoice[]
+  paymentPlanEntries      PaymentPlanEntry[]
+  projects                Project[]
+  constructorRoom         DealConstructorRoom?
+  financeSnapshots        DealFinanceSnapshot[]
+  orderFinancialSnapshots OrderFinancialSnapshot[]
+  projectSpecs            ProjectSpec[]
+  financeJournalEntries   FinanceJournalEntry[]
+  milestones              DealMilestone[]
+  notes                   DealNote[]
+  risks                   DealRisk[]
+  activities              DealActivity[]
+  financeProfile          DealFinanceProfile?
+  paymentScheduleItems    DealPaymentScheduleItem[]
+  documentLinks           DealDocumentLink[]
+  timelineEvents          DealTimelineEvent[]
+  fileLinks               DealFileLink[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1375,32 +1491,73 @@ model ReadinessCheckItem {
  * Пакет передачі у виробництво по угоді (структурований, окремо від workspaceMeta).
  */
 model DealHandoff {
-  id              String        @id @default(cuid())
-  dealId          String        @unique
-  deal            Deal          @relation(fields: [dealId], references: [id], onDelete: Cascade)
-  status          HandoffStatus @default(DRAFT)
+  id              String                     @id @default(cuid())
+  dealId          String                     @unique
+  deal            Deal                       @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  status          HandoffStatus              @default(DRAFT)
   manifestJson    Json?
-  notes           String?       @db.Text
+  notes           String?                    @db.Text
   submittedAt     DateTime?
   acceptedAt      DateTime?
   rejectedAt      DateTime?
-  rejectionReason String?       @db.Text
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  rejectionReason String?                    @db.Text
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+  checklistItems  DealHandoffChecklistItem[]
+}
+
+model DealHandoffChecklistItem {
+  id          String      @id @default(cuid())
+  handoffId   String
+  handoff     DealHandoff @relation(fields: [handoffId], references: [id], onDelete: Cascade)
+  code        String
+  title       String
+  isRequired  Boolean     @default(true)
+  isChecked   Boolean     @default(false)
+  checkedById String?
+  checkedBy   User?       @relation(fields: [checkedById], references: [id], onDelete: SetNull)
+  checkedAt   DateTime?
+  note        String?     @db.Text
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([handoffId, isRequired, isChecked])
+}
+
+model OrderFinancialSnapshot {
+  id             String   @id @default(cuid())
+  orderId        String
+  order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  dealId         String?
+  deal           Deal?    @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  snapshotDate   DateTime @default(now())
+  plannedRevenue Decimal  @db.Decimal(18, 2)
+  actualRevenue  Decimal  @db.Decimal(18, 2)
+  plannedCost    Decimal  @db.Decimal(18, 2)
+  actualCost     Decimal  @db.Decimal(18, 2)
+  plannedMargin  Decimal? @db.Decimal(9, 4)
+  actualMargin   Decimal? @db.Decimal(9, 4)
+  source         String   @default("system")
+  comment        String?  @db.Text
+  metaJson       Json?
+  createdAt      DateTime @default(now())
+
+  @@index([orderId, snapshotDate])
+  @@index([dealId, snapshotDate])
 }
 
 model DealMilestone {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   dealId      String
-  deal        Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  deal        Deal      @relation(fields: [dealId], references: [id], onDelete: Cascade)
   type        String
   title       String
   status      String
   dueAt       DateTime?
   completedAt DateTime?
   metaJson    Json?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@index([dealId, status, dueAt])
 }
@@ -1482,16 +1639,16 @@ model DealFinanceProfile {
 }
 
 model DealPaymentScheduleItem {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   dealId    String
-  deal      Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  deal      Deal      @relation(fields: [dealId], references: [id], onDelete: Cascade)
   label     String
-  amount    Decimal  @db.Decimal(12, 2)
+  amount    Decimal   @db.Decimal(12, 2)
   dueAt     DateTime?
   status    String
   paidAt    DateTime?
   metaJson  Json?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   @@index([dealId, dueAt, status])
 }
@@ -1592,25 +1749,25 @@ model DealContract {
   /**
    * Pointer to row that mirrors API “current” contract; dual-write during migration.
    */
-  currentVersionId String?               @unique
-  currentVersion   DealContractVersion?  @relation("ContractCurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
-  versions         DealContractVersion[] @relation("ContractVersionsRoot")
+  currentVersionId String?                 @unique
+  currentVersion   DealContractVersion?    @relation("ContractCurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+  versions         DealContractVersion[]   @relation("ContractVersionsRoot")
   shareLinks       DealContractShareLink[]
 }
 
 model DealContractShareLink {
-  id          String                  @id @default(cuid())
-  contractId  String
-  contract    DealContract            @relation(fields: [contractId], references: [id], onDelete: Cascade)
-  tokenHash   String                      @unique
-  status      DealContractShareLinkStatus @default(ACTIVE)
-  expiresAt   DateTime
-  maxViews    Int?
-  viewCount   Int                     @default(0)
+  id           String                      @id @default(cuid())
+  contractId   String
+  contract     DealContract                @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  tokenHash    String                      @unique
+  status       DealContractShareLinkStatus @default(ACTIVE)
+  expiresAt    DateTime
+  maxViews     Int?
+  viewCount    Int                         @default(0)
   lastViewedAt DateTime?
-  createdById String?
-  createdAt   DateTime                @default(now())
-  revokedAt   DateTime?
+  createdById  String?
+  createdAt    DateTime                    @default(now())
+  revokedAt    DateTime?
 
   @@index([contractId, status, expiresAt])
 }
@@ -2178,6 +2335,11 @@ enum Role {
   SALES_MANAGER
   TEAM_LEAD
   PRODUCTION_WORKER
+  CUTTING
+  EDGING
+  DRILLING
+  ASSEMBLY
+  CONSTRUCTOR
   MEASURER
   ACCOUNTANT
   PROCUREMENT_MANAGER
@@ -2425,34 +2587,91 @@ model Commission {
 }
 
 model ProcurementRequest {
-  id           String                   @id @default(cuid())
-  dealId       String
-  deal         Deal                     @relation(fields: [dealId], references: [id], onDelete: Cascade)
-  source       String
-  status       String
-  priority     String?
-  neededByDate DateTime?
-  createdAt    DateTime                 @default(now())
-  updatedAt    DateTime                 @updatedAt
-  items        ProcurementRequestItem[]
+  id                    String                            @id @default(cuid())
+  number                String?                           @unique
+  dealId                String
+  deal                  Deal                              @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  requesterId           String?
+  requester             User?                             @relation("ProcurementRequestRequester", fields: [requesterId], references: [id], onDelete: SetNull)
+  responsibleUserId     String?
+  responsibleUser       User?                             @relation("ProcurementRequestResponsible", fields: [responsibleUserId], references: [id], onDelete: SetNull)
+  source                String
+  status                String
+  workflowStatus        String                            @default("new_request")
+  approvalStatus        String?
+  supplierId            String?
+  supplier              Supplier?                         @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  priority              String?
+  neededByDate          DateTime?
+  requestDate           DateTime                          @default(now())
+  plannedTotal          Decimal?                          @db.Decimal(18, 2)
+  actualTotal           Decimal?                          @db.Decimal(18, 2)
+  currency              String?                           @default("UAH")
+  projectId             String?
+  clientOrderId         String?
+  comment               String?                           @db.Text
+  invoiceAttachmentUrl  String?
+  invoiceAmount         Decimal?                          @db.Decimal(18, 2)
+  paymentDate           DateTime?
+  paymentAmount         Decimal?                          @db.Decimal(18, 2)
+  paymentReference      String?
+  goodsReceivedAt       DateTime?
+  accountedAt           DateTime?
+  accountingDocumentRef String?
+  createdAt             DateTime                          @default(now())
+  updatedAt             DateTime                          @updatedAt
+  items                 ProcurementRequestItem[]
+  statusHistory         ProcurementRequestStatusHistory[]
 
   @@index([dealId])
+  @@index([workflowStatus])
+  @@index([supplierId])
 }
 
 model ProcurementRequestItem {
-  id          String             @id @default(cuid())
-  requestId   String
-  request     ProcurementRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  name        String?
-  qtyPlanned  Float?
-  qtyOrdered  Float?
-  qtyReceived Float?
-  costPlanned Decimal            @db.Decimal(18, 2)
-  costActual  Decimal            @db.Decimal(18, 2)
-  status      String?
+  id                String             @id @default(cuid())
+  requestId         String
+  request           ProcurementRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  productId         String?
+  name              String?
+  unit              String?
+  itemType          String             @default("stock")
+  projectId         String?
+  clientOrderId     String?
+  reservationStatus String             @default("none")
+  warehouseId       String?
+  qtyPlanned        Float?
+  qtyOrdered        Float?
+  qtyReceived       Float?
+  qtyIssued         Float?
+  plannedPrice      Decimal?           @db.Decimal(18, 2)
+  actualPrice       Decimal?           @db.Decimal(18, 2)
+  costPlanned       Decimal            @db.Decimal(18, 2)
+  costActual        Decimal            @db.Decimal(18, 2)
+  supplierId        String?
+  status            String?
+  comment           String?
 
   @@index([requestId])
+  @@index([itemType, projectId])
   @@map("ProcurementItem")
+}
+
+model ProcurementRequestStatusHistory {
+  id         String             @id @default(cuid())
+  requestId  String
+  request    ProcurementRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  fromStatus String?
+  toStatus   String
+  actorId    String?
+  actor      User?              @relation("ProcurementRequestStatusHistoryActor", fields: [actorId], references: [id], onDelete: SetNull)
+  actorRole  String?
+  reason     String?
+  payload    Json?
+  createdAt  DateTime           @default(now())
+
+  @@index([requestId, createdAt])
+  @@index([toStatus])
 }
 
 model PurchaseOrder {
@@ -2469,13 +2688,14 @@ model PurchaseOrder {
 }
 
 model Supplier {
-  id                 String              @id @default(cuid())
-  name               String
-  category           String
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
-  dealPurchaseOrders DealPurchaseOrder[]
-  materials          Material[]
+  id                  String               @id @default(cuid())
+  name                String
+  category            String
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  dealPurchaseOrders  DealPurchaseOrder[]
+  materials           Material[]
+  procurementRequests ProcurementRequest[]
 }
 
 model DealPurchaseOrder {
@@ -3302,7 +3522,7 @@ model LeadHubSession {
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
-  lead           Lead?         @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  lead           Lead?          @relation(fields: [leadId], references: [id], onDelete: SetNull)
   pricingSession PricingSession @relation(fields: [pricingSessionId], references: [id], onDelete: Cascade)
   files          LeadHubFile[]
 
@@ -3335,7 +3555,7 @@ model PricingSession {
 
   versions      PricingVersion[]
   leadHub       LeadHubSession?
-  activeVersion PricingVersion? @relation("PricingSessionActiveVersion", fields: [activeVersionId], references: [id], onDelete: SetNull)
+  activeVersion PricingVersion?  @relation("PricingSessionActiveVersion", fields: [activeVersionId], references: [id], onDelete: SetNull)
 
   @@index([entityType, entityId, updatedAt])
 }
@@ -3348,7 +3568,7 @@ model PricingVersion {
   summaryJson      Json
   createdAt        DateTime @default(now())
 
-  pricingSession PricingSession @relation(fields: [pricingSessionId], references: [id], onDelete: Cascade)
+  pricingSession PricingSession   @relation(fields: [pricingSessionId], references: [id], onDelete: Cascade)
   items          PricingItem[]
   activeFor      PricingSession[] @relation("PricingSessionActiveVersion")
 
@@ -3447,19 +3667,19 @@ model Quotation {
 }
 
 model QuotationItem {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   quotationId String
   quotation   Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
   lineNumber  Int
   productName String
   article     String?
   unit        String
-  quantity    Decimal  @db.Decimal(18, 3)
-  unitPrice   Decimal  @db.Decimal(18, 2)
-  lineTotal   Decimal  @db.Decimal(18, 2)
-  notes       String?  @db.Text
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  quantity    Decimal   @db.Decimal(18, 3)
+  unitPrice   Decimal   @db.Decimal(18, 2)
+  lineTotal   Decimal   @db.Decimal(18, 2)
+  notes       String?   @db.Text
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@index([quotationId, lineNumber])
 }
@@ -3540,65 +3760,65 @@ model ContractSpecification {
 }
 
 model ContractSpecificationItem {
-  id              String               @id @default(cuid())
+  id              String                @id @default(cuid())
   specificationId String
   specification   ContractSpecification @relation(fields: [specificationId], references: [id], onDelete: Cascade)
   lineNumber      Int
   productName     String
   unit            String
-  quantity        Decimal              @db.Decimal(18, 3)
-  unitPrice       Decimal              @db.Decimal(18, 2)
-  lineTotal       Decimal              @db.Decimal(18, 2)
-  notes           String?              @db.Text
-  createdAt       DateTime             @default(now())
-  updatedAt       DateTime             @updatedAt
+  quantity        Decimal               @db.Decimal(18, 3)
+  unitPrice       Decimal               @db.Decimal(18, 2)
+  lineTotal       Decimal               @db.Decimal(18, 2)
+  notes           String?               @db.Text
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
 
   @@index([specificationId, lineNumber])
 }
 
 model ContractDocument {
-  id         String               @id @default(cuid())
-  contractId String
-  contract   Contract             @relation(fields: [contractId], references: [id], onDelete: Cascade)
-  type       ContractDocumentType
-  fileName   String
-  storageKey String
-  mimeType   String
-  htmlBody   String?              @db.Text
-  pdfUrl     String?
+  id          String               @id @default(cuid())
+  contractId  String
+  contract    Contract             @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  type        ContractDocumentType
+  fileName    String
+  storageKey  String
+  mimeType    String
+  htmlBody    String?              @db.Text
+  pdfUrl      String?
   createdById String?
-  createdAt  DateTime             @default(now())
+  createdAt   DateTime             @default(now())
 
   @@index([contractId, type, createdAt])
 }
 
 model ContractShareLink {
-  id              String                  @id @default(cuid())
-  contractId      String
-  contract        Contract                @relation(fields: [contractId], references: [id], onDelete: Cascade)
-  token           String                  @unique
-  status          ContractShareLinkStatus @default(ACTIVE)
-  expiresAt       DateTime
-  maxViews        Int?
-  viewCount       Int                     @default(0)
-  lastViewedAt    DateTime?
-  createdById     String?
-  createdAt       DateTime                @default(now())
-  revokedAt       DateTime?
+  id               String                  @id @default(cuid())
+  contractId       String
+  contract         Contract                @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  token            String                  @unique
+  status           ContractShareLinkStatus @default(ACTIVE)
+  expiresAt        DateTime
+  maxViews         Int?
+  viewCount        Int                     @default(0)
+  lastViewedAt     DateTime?
+  createdById      String?
+  createdAt        DateTime                @default(now())
+  revokedAt        DateTime?
   signatureSession SignatureSession?
 
   @@index([contractId, status, expiresAt])
 }
 
 model ContractAuditLog {
-  id           String   @id @default(cuid())
-  contractId   String
-  contract     Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
-  action       String
-  actorRole    String?
-  actorUserId  String?
-  payloadJson  Json?
-  createdAt    DateTime @default(now())
+  id          String   @id @default(cuid())
+  contractId  String
+  contract    Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  action      String
+  actorRole   String?
+  actorUserId String?
+  payloadJson Json?
+  createdAt   DateTime @default(now())
 
   @@index([contractId, createdAt])
   @@index([action, createdAt])
@@ -3697,16 +3917,16 @@ model EnverContractTemplate {
 }
 
 model EnverContract {
-  id                  String                @id @default(cuid())
-  contractNumber      String                @unique
+  id                  String                  @id @default(cuid())
+  contractNumber      String                  @unique
   orderId             String
   dealId              String?
   clientId            String
   templateId          String
   templateCode        String
   templateVersion     Int
-  status              EnverContractStatus   @default(DRAFT)
-  signatureStatus     EnverSignatureStatus  @default(NOT_STARTED)
+  status              EnverContractStatus     @default(DRAFT)
+  signatureStatus     EnverSignatureStatus    @default(NOT_STARTED)
   provider            EnverSignatureProvider?
   payloadJson         Json
   pricingSnapshotJson Json?
@@ -3719,15 +3939,15 @@ model EnverContract {
   cancelledAt         DateTime?
   createdById         String?
   updatedById         String?
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
 
-  template   EnverContractTemplate   @relation(fields: [templateId], references: [id], onDelete: Restrict)
-  parties    EnverContractParty[]
-  sessions   EnverSigningSession[]
-  artifacts  EnverSignatureArtifact[]
+  template    EnverContractTemplate     @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  parties     EnverContractParty[]
+  sessions    EnverSigningSession[]
+  artifacts   EnverSignatureArtifact[]
   auditEvents EnverContractAuditEvent[]
-  reminders  EnverContractReminder[]
+  reminders   EnverContractReminder[]
 
   @@index([orderId])
   @@index([dealId])
@@ -3736,7 +3956,7 @@ model EnverContract {
 }
 
 model EnverContractParty {
-  id         String                @id @default(cuid())
+  id         String                 @id @default(cuid())
   contractId String
   role       EnverContractPartyRole
   partyType  EnverPartyType
@@ -3744,12 +3964,12 @@ model EnverContractParty {
   taxId      String?
   email      String?
   phone      String?
-  signOrder  Int                   @default(1)
-  mustSign   Boolean               @default(true)
-  signStatus EnverSignatureStatus  @default(NOT_STARTED)
+  signOrder  Int                    @default(1)
+  mustSign   Boolean                @default(true)
+  signStatus EnverSignatureStatus   @default(NOT_STARTED)
   signedAt   DateTime?
-  createdAt  DateTime              @default(now())
-  updatedAt  DateTime              @updatedAt
+  createdAt  DateTime               @default(now())
+  updatedAt  DateTime               @updatedAt
 
   contract EnverContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
 
@@ -3757,20 +3977,20 @@ model EnverContractParty {
 }
 
 model EnverSigningSession {
-  id                  String                @id @default(cuid())
+  id                  String                 @id @default(cuid())
   contractId          String
   provider            EnverSignatureProvider
   providerEnvelopeId  String?
   providerSessionId   String?
-  status              EnverSignatureStatus  @default(NOT_STARTED)
+  status              EnverSignatureStatus   @default(NOT_STARTED)
   startUrl            String?
   deepLink            String?
   qrCodeUrl           String?
   expiresAt           DateTime?
   lastWebhookAt       DateTime?
   providerPayloadJson Json?
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
 
   contract EnverContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
 
@@ -3779,18 +3999,18 @@ model EnverSigningSession {
 }
 
 model EnverSignatureArtifact {
-  id                   String                @id @default(cuid())
-  contractId           String
-  partyId              String?
-  provider             EnverSignatureProvider
-  signatureType        String
-  signedDocumentUrl    String?
-  signatureContainerUrl String?
+  id                     String                 @id @default(cuid())
+  contractId             String
+  partyId                String?
+  provider               EnverSignatureProvider
+  signatureType          String
+  signedDocumentUrl      String?
+  signatureContainerUrl  String?
   verificationResultJson Json?
-  certificateInfoJson  Json?
-  hash                 String?
-  timestampedAt        DateTime?
-  createdAt            DateTime              @default(now())
+  certificateInfoJson    Json?
+  hash                   String?
+  timestampedAt          DateTime?
+  createdAt              DateTime               @default(now())
 
   contract EnverContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
 
@@ -3812,16 +4032,16 @@ model EnverContractAuditEvent {
 }
 
 model EnverContractReminder {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   contractId   String
   channel      String
   recipient    String
   scheduledAt  DateTime
   sentAt       DateTime?
-  status       String   @default("PENDING")
+  status       String    @default("PENDING")
   metadataJson Json?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   contract EnverContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
 

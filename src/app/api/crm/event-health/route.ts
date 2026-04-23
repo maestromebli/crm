@@ -39,7 +39,7 @@ export async function GET(req: Request) {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Помилка сервера";
     logError({
-      module: "api.crm.event-health",
+      module: "api.crm.event-стан",
       message: "Не вдалося завантажити знімок стану подій",
       requestId: requestCtx.requestId,
       correlationId: requestCtx.correlationId,

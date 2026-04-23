@@ -38,7 +38,7 @@ export type DealHubOverview = {
   deal: {
     id: string;
     title: string;
-    code: string;
+    code: string | null;
     status: string;
     stage: DealHubStage;
     stageLabel: string;
@@ -98,7 +98,7 @@ export type DealHubOverview = {
   stageGates: DealHubStageGateResult[];
   nextActions: DealHubNextAction[];
   risks: DealHubRiskItem[];
-  health: {
+  стан: {
     status: DealHubHealthStatus;
     score: number;
     reasons: string[];

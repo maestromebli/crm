@@ -95,8 +95,7 @@ export function LeadFileIntelBadge({
                 className="rounded-lg px-2 py-1 text-xs text-slate-500 hover:bg-slate-100"
                 onClick={() => setOpen(false)}
               >
-                Закрити
-              </button>
+                Закрити </button>
             </div>
             <p className="mt-1 text-[11px] text-slate-500">{item.fileName}</p>
             <dl className="mt-3 space-y-2 text-xs">

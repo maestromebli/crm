@@ -28,6 +28,8 @@ export function FinanceOperationsScopePanel({
   accountLabelById,
 }: Props) {
   const [scope, setScope] = useState<Scope>("all");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
 
   const filtered = useMemo(() => {
     if (scope === "consolidated") return [];
@@ -50,6 +52,15 @@ export function FinanceOperationsScopePanel({
     }
     return { income, outflow };
   }, [filtered]);
+
+  const totalRows = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const pageStart = (safePage - 1) * pageSize;
+  const pagedRows = filtered.slice(pageStart, pageStart + pageSize);
+
+  const from = totalRows === 0 ? 0 : pageStart + 1;
+  const to = Math.min(pageStart + pageSize, totalRows);
 
   return (
     <div className="space-y-5">
@@ -102,14 +113,60 @@ export function FinanceOperationsScopePanel({
           </p>
         </div>
       ) : (
-        <FinanceTransactionsTable
-          rows={filtered}
-          projectNameById={projectNameById}
-          categoryNameById={categoryNameById}
-          accountLabelById={accountLabelById}
-          objectNameById={objectNameById}
-          totals={totals}
-        />
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-xs text-slate-700">
+            <p>
+              Показано <strong>{from}</strong>–<strong>{to}</strong> з{" "}
+              <strong>{totalRows}</strong>
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="inline-flex items-center gap-1">
+                <span>На сторінку:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    const next = Number(e.target.value);
+                    setPageSize(next);
+                    setPage(1);
+                  }}
+                  className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs"
+                >
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </label>
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={safePage <= 1}
+                className="rounded-md border border-slate-200 bg-white px-2 py-1 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Назад
+              </button>
+              <span>
+                Сторінка <strong>{safePage}</strong> / {totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={safePage >= totalPages}
+                className="rounded-md border border-slate-200 bg-white px-2 py-1 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Далі
+              </button>
+            </div>
+          </div>
+          <FinanceTransactionsTable
+            rows={pagedRows}
+            projectNameById={projectNameById}
+            categoryNameById={categoryNameById}
+            accountLabelById={accountLabelById}
+            objectNameById={objectNameById}
+            totals={totals}
+          />
+        </div>
       )}
     </div>
   );

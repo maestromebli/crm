@@ -56,13 +56,13 @@ export function evaluateDealHealth(aggregate: DealHubAggregate): DealHealthEvalu
   if (!hasDrawings) {
     signals.push("MISSING_TECHNICAL_FILES");
     reasons.push("No technical drawing files found");
-    suggestedActions.push("Upload technical drawings before production release");
+    suggestedActions.push("Вивантажити technical drawings before production release");
   }
 
   if (!deal.productionFlow && String(deal.stage.slug).toLowerCase().includes("production")) {
     signals.push("PRODUCTION_BLOCKER");
     reasons.push("Deal is in production stage without production flow");
-    suggestedActions.push("Create or attach production flow");
+    suggestedActions.push("Створити or attach production flow");
   }
 
   const hasOverdueTask = aggregate.openTasks.some(
@@ -71,7 +71,7 @@ export function evaluateDealHealth(aggregate: DealHubAggregate): DealHealthEvalu
   if (hasOverdueTask) {
     signals.push("MISSED_MILESTONE");
     reasons.push("There are overdue execution tasks");
-    suggestedActions.push("Close or replan overdue tasks");
+    suggestedActions.push("Закрити or replan overdue tasks");
   }
 
   if (!deal.installationDate && ["DELIVERY_READY", "INSTALLATION"].includes(String(deal.stage.slug).toUpperCase())) {

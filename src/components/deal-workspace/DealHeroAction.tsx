@@ -48,7 +48,7 @@ export function DealHeroAction({
         onClick={onAction}
         className="mt-4 rounded-xl bg-[var(--enver-accent)] px-4 py-2.5 text-sm font-semibold text-white hover:opacity-95"
       >
-        Відкрити: {action.label}
+        Open: {action.label}
       </button>
       {safeNextActions.length > 0 ? (
         <div className="mt-4 border-t border-[var(--enver-border)] pt-3">

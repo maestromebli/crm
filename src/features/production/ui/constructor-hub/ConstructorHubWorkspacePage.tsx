@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { buildProcurementHubNewRequestHref } from "@/features/procurement/lib/quick-actions";
 import { ConstructorActionBar } from "./components/ConstructorActionBar";
 import { ConstructorAIInsights } from "./components/ConstructorAIInsights";
 import { ConstructorApprovalPanel } from "./components/ConstructorApprovalPanel";
@@ -32,6 +33,8 @@ export function ConstructorHubWorkspacePage({ workspace }: { workspace: Construc
   const [activeTab, setActiveTab] = useState<TabId>("TECH");
   const [messages, setMessages] = useState(workspace.communication);
   const [flash, setFlash] = useState<string | null>(null);
+  const canCreateProcurementRequest =
+    workspace.header.status === "APPROVED" || workspace.header.status === "HANDED_OFF";
 
   const criticalOpenQuestions = useMemo(
     () => workspace.questions.filter((question) => question.priority === "CRITICAL" && question.status !== "CLOSED").length,
@@ -88,6 +91,29 @@ export function ConstructorHubWorkspacePage({ workspace }: { workspace: Construc
             >
               Робоча зона в замовленні
             </Link>
+          </div>
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-3 text-xs text-emerald-900">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="font-medium">Передача в закупівлі з конструктора</p>
+              {canCreateProcurementRequest ? (
+                <Link
+                  href={buildProcurementHubNewRequestHref(
+                    workspace.header.dealId,
+                    "constructor_workspace",
+                  )}
+                  className="rounded-lg border border-emerald-300 bg-white px-2.5 py-1 font-semibold text-emerald-900 hover:bg-emerald-100"
+                >
+                  Створити заявку закупівлі
+                </Link>
+              ) : (
+                <span className="rounded bg-amber-100 px-2 py-0.5 font-medium text-amber-900">
+                  Очікується погодження
+                </span>
+              )}
+            </div>
+            <p className="mt-1 text-[11px] text-emerald-900/90">
+              Заявка створюється тільки після погодження начальником виробництва або головним конструктором.
+            </p>
           </div>
 
           {activeTab === "TECH" ? (

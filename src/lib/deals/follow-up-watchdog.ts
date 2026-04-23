@@ -55,7 +55,7 @@ export async function runFollowUpWatchdog(params?: {
         entityId: deal.id,
         dealId: deal.id,
         userId: deal.ownerId,
-        dedupeKey: `follow-up:${deal.id}:${dateOnlyKey(now)}`,
+        dedupeKey: `наступний контакт:${deal.id}:${dateOnlyKey(now)}`,
       },
     );
     if (id) emitted += 1;

@@ -12,6 +12,7 @@ const TYPES: Array<{ value: CalculationRowType; label: string }> = [
 
 const inputCls =
   "w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
+const cellCls = "px-2 py-2 align-top text-sm text-slate-700";
 
 type Props = {
   index: number;
@@ -51,7 +52,7 @@ export function CalculationRow({
         row.selected ? "bg-blue-50/80 ring-1 ring-inset ring-blue-200" : index % 2 === 0 ? "bg-white" : "bg-slate-50/40",
       )}
     >
-      <td className="px-2 py-2 align-top">
+      <td className={cellCls}>
         <button
           type="button"
           className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 text-xs hover:bg-white"
@@ -60,7 +61,7 @@ export function CalculationRow({
           {row.selected ? "✓" : index + 1}
         </button>
       </td>
-      <td className="px-2 py-2 align-top">
+      <td className={cellCls}>
         <input
           className={inputCls}
           value={row.name}
@@ -69,7 +70,7 @@ export function CalculationRow({
         />
         {warning ? <p className="mt-1 text-xs text-amber-700">{warning}</p> : null}
       </td>
-      <td className="px-2 py-2 align-top">
+      <td className={cellCls}>
         <select
           className={inputCls}
           value={row.type}
@@ -82,7 +83,7 @@ export function CalculationRow({
           ))}
         </select>
       </td>
-      <td className="px-2 py-2 align-top">
+      <td className={cellCls}>
         <input
           type="number"
           className={`${inputCls} text-right tabular-nums`}
@@ -90,7 +91,7 @@ export function CalculationRow({
           onChange={(e) => onChange({ qty: Number(e.target.value) || 0 })}
         />
       </td>
-      <td className="px-2 py-2 align-top">
+      <td className={cellCls}>
         <input
           type="number"
           step="0.01"
@@ -99,7 +100,7 @@ export function CalculationRow({
           onChange={(e) => onChange({ coeff: Number(e.target.value) || 0 })}
         />
       </td>
-      <td className="px-2 py-2 align-top">
+      <td className={cellCls}>
         <input
           type="number"
           className={`${inputCls} text-right tabular-nums`}
@@ -107,10 +108,10 @@ export function CalculationRow({
           onChange={(e) => onChange({ price: Number(e.target.value) || 0 })}
         />
       </td>
-      <td className="px-2 py-2 align-top text-right text-sm font-semibold tabular-nums text-slate-900">
+      <td className={`${cellCls} text-right font-semibold tabular-nums text-slate-900`}>
         {row.amount.toLocaleString("uk-UA", { maximumFractionDigits: 2 })} ₴
       </td>
-      <td className="px-2 py-2 align-top">
+      <td className={cellCls}>
         <div className="flex items-center justify-end gap-1 opacity-60 transition group-hover:opacity-100">
           <button type="button" className="rounded-md px-2 py-1 text-xs hover:bg-slate-100" onClick={onDuplicate}>
             Дубль

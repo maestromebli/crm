@@ -81,7 +81,7 @@ const ACTION_COMMANDS: Array<{
     id: "action:followup",
     label: "Команда · Потрібен повторний контакт",
     href: "/leads",
-    searchable: "повторний контакт follow-up ліди контакт нагадування",
+    searchable: "повторний контакт наступний контакт ліди контакт нагадування",
     requiredSectionId: "leads",
   },
   {
@@ -104,7 +104,13 @@ function buildNavIndex(sections: ReturnType<typeof getVisibleNavSections>): NavS
   const items: NavSearchItem[] = [];
   const visibleSectionIds = new Set(sections.map((section) => section.id));
   for (const section of sections) {
-    const sectionSyn = SYNONYMS_BY_SECTION[section.id]?.join(" ") ?? "";
+    const sectionSynonyms = Object.prototype.hasOwnProperty.call(
+      SYNONYMS_BY_SECTION,
+      section.id,
+    )
+      ? SYNONYMS_BY_SECTION[section.id]
+      : undefined;
+    const sectionSyn = Array.isArray(sectionSynonyms) ? sectionSynonyms.join(" ") : "";
     items.push({
       id: section.id,
       label: section.label,
@@ -529,7 +535,7 @@ export function CrmCommandPalette({ onOpenChange }: CrmCommandPaletteProps) {
                         <button
                           type="button"
                           className="rounded-lg p-1.5 text-[var(--enver-muted)] transition hover:bg-[var(--enver-hover)] hover:text-[var(--enver-text)]"
-                          aria-label="Закрити"
+                          aria-label="Close"
                           onClick={() => closeAll(setSearchOpen, setExpanded, setSearchQuery)}
                         >
                           <X className="h-4 w-4" />

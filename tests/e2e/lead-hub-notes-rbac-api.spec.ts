@@ -18,6 +18,7 @@ test("lead API: viewer gets 403 on lead patch", async ({ browser }) => {
 
   const stamp = Date.now();
   const leadTitle = `Demo Notes RBAC API ${stamp}`;
+  const orderNumber = `ЕМ-${(stamp % 200) + 1}`;
 
   const managerContext = await browser.newContext();
   const managerPage = await managerContext.newPage();
@@ -35,6 +36,7 @@ test("lead API: viewer gets 403 on lead patch", async ({ browser }) => {
       title: leadTitle,
       contactName: "Тест RBAC API",
       phone: `+38095${String(stamp).slice(-7)}`,
+      orderNumber,
       source: "demo-notes-rbac-api",
       priority: "normal",
       note: "E2E: серверна заборона PATCH для viewer",

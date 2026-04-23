@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Download, RefreshCcw } from "lucide-react";
+import { Download as Завантажити, RefreshCcw } from "lucide-react";
 import { SummaryCard } from "@/components/shared/SummaryCard";
 import { cn } from "@/lib/utils";
 import {
@@ -179,7 +179,7 @@ export function ReportsHubClient({ activeSection }: { activeSection: string }) {
                 disabled={!data}
                 className="inline-flex items-center gap-1 rounded-lg border border-[var(--enver-border)] bg-[var(--enver-surface)] px-2.5 py-1 text-xs font-medium text-[var(--enver-text)] transition hover:bg-[var(--enver-hover)] disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <Download className="h-3.5 w-3.5" />
+                <Завантажити className="h-3.5 w-3.5" />
                 CSV
               </button>
             </div>

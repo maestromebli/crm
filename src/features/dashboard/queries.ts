@@ -21,6 +21,7 @@ import {
 import { hasEffectivePermission, P } from "../../lib/authz/permissions";
 import { isSalesPipelineRole, normalizeRole } from "../../lib/authz/roles";
 import { taskListWhereForUser } from "../../lib/tasks/prisma-scope";
+import { sanitizePipelineStageName } from "../../lib/crm-core/pipeline-stage-name";
 
 export type DashboardPerms = {
   leadsView: boolean;
@@ -165,6 +166,15 @@ export type DashboardSnapshot = {
   }>;
 };
 
+type DashboardSnapshotCacheEntry = {
+  expiresAt: number;
+  value: DashboardSnapshot;
+};
+
+const DASHBOARD_SNAPSHOT_TTL_MS = 15_000;
+const DASHBOARD_SNAPSHOT_MAX_ENTRIES = 120;
+const dashboardSnapshotCache = new Map<string, DashboardSnapshotCacheEntry>();
+
 const emptySnapshot = (): DashboardSnapshot => ({
   kpiNewLeads24h: 0,
   kpiNewLeadsPrev24h: 0,
@@ -182,6 +192,48 @@ const emptySnapshot = (): DashboardSnapshot => ({
   signatureStaleCount: 0,
   signatureStaleDeals: [],
 });
+
+function makeDashboardSnapshotCacheKey(
+  access: SessionAccess,
+  perms: DashboardPerms,
+): string {
+  return JSON.stringify({
+    userId: access.userId,
+    role: access.role,
+    realRole: access.realRole,
+    impersonatorId: access.impersonatorId ?? null,
+    ctx: access.ctx,
+    perms,
+  });
+}
+
+function readDashboardSnapshotCache(key: string): DashboardSnapshot | null {
+  const entry = dashboardSnapshotCache.get(key);
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) {
+    dashboardSnapshotCache.delete(key);
+    return null;
+  }
+  return entry.value;
+}
+
+function writeDashboardSnapshotCache(key: string, value: DashboardSnapshot): void {
+  if (dashboardSnapshotCache.size >= DASHBOARD_SNAPSHOT_MAX_ENTRIES) {
+    let oldestKey: string | null = null;
+    let oldestExpiry = Number.POSITIVE_INFINITY;
+    for (const [existingKey, existing] of dashboardSnapshotCache.entries()) {
+      if (existing.expiresAt < oldestExpiry) {
+        oldestExpiry = existing.expiresAt;
+        oldestKey = existingKey;
+      }
+    }
+    if (oldestKey) dashboardSnapshotCache.delete(oldestKey);
+  }
+  dashboardSnapshotCache.set(key, {
+    value,
+    expiresAt: Date.now() + DASHBOARD_SNAPSHOT_TTL_MS,
+  });
+}
 
 function leadOwnerWhere(
   ctx: AccessContext,
@@ -217,6 +269,11 @@ export async function loadDashboardSnapshot(
   access: SessionAccess,
   perms: DashboardPerms,
 ): Promise<DashboardSnapshot> {
+  const cacheKey = makeDashboardSnapshotCacheKey(access, perms);
+  const cached = readDashboardSnapshotCache(cacheKey);
+  if (cached) {
+    return cached;
+  }
   if (!process.env.DATABASE_URL?.trim()) {
     return emptySnapshot();
   }
@@ -339,7 +396,7 @@ export async function loadDashboardSnapshot(
               expectedCloseDate: true,
               value: true,
               currency: true,
-              stage: { select: { name: true } },
+              stage: { select: { name: true, slug: true } },
               owner: { select: { name: true, email: true } },
             },
           })
@@ -414,7 +471,11 @@ export async function loadDashboardSnapshot(
       return {
         id: d.id,
         title: d.title,
-        stage: d.stage.name,
+        stage: sanitizePipelineStageName({
+          name: d.stage.name,
+          slug: d.stage.slug,
+          entityType: "DEAL",
+        }),
         valueLabel,
         dueLabel,
         owner,
@@ -486,7 +547,11 @@ export async function loadDashboardSnapshot(
           .filter((s) => !s.isFinal)
           .map((s) => ({
             stageId: s.id,
-            name: s.name,
+            name: sanitizePipelineStageName({
+              name: s.name,
+              slug: s.slug,
+              entityType: "LEAD",
+            }),
             count: countMap.get(s.id) ?? 0,
             note: "у стадії",
           }));
@@ -668,7 +733,7 @@ export async function loadDashboardSnapshot(
       }
     }
 
-    return {
+    const snapshot = {
       kpiNewLeads24h: newLeadsLast24,
       kpiNewLeadsPrev24h: newLeadsPrev24,
       kpiOpenDeals: openDeals,
@@ -692,6 +757,8 @@ export async function loadDashboardSnapshot(
         ),
       })),
     };
+    writeDashboardSnapshotCache(cacheKey, snapshot);
+    return snapshot;
   } catch {
     return emptySnapshot();
   }

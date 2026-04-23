@@ -88,7 +88,7 @@ export async function openAiChatCompletionText(args: {
         max_tokens: args.maxTokens ?? 1200,
       },
     });
-    if (!providerResult.ok) {
+    if (!("response" in providerResult)) {
       return {
         ok: false,
         error: providerResult.errorText || `Помилка AI (${providerResult.status})`,

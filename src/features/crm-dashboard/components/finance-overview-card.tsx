@@ -1,7 +1,7 @@
-import Link from "next/link";
 import { Wallet } from "lucide-react";
+import Link from "next/link";
+import { cn } from "@/lib/utils";
 import type { FinanceOverview } from "../executive-types";
-import { cn } from "../../../lib/utils";
 
 type FinanceOverviewCardProps = {
   data: FinanceOverview | null;
@@ -103,23 +103,9 @@ export function FinanceOverviewCard({
           ))}
         </ul>
       </div>
-      <div className="mt-4 flex flex-wrap gap-2 border-t border-[var(--enver-border)] pt-4">
-        <Link
-          href="/crm/finance"
-          className={cn(
-            "rounded-lg border border-[var(--enver-border)] bg-white px-3 py-1.5 text-sm font-semibold !text-slate-900 shadow-sm",
-            "hover:bg-slate-50",
-          )}
-        >
-          Відкрити фінанси
-        </Link>
-        <Link
-          href="/crm/finance"
-          className="rounded-lg border border-[var(--enver-border)] bg-[var(--enver-surface)] px-3 py-1.5 text-sm font-semibold text-[var(--enver-text)] hover:bg-[var(--enver-hover)]"
-        >
-          Переглянути прострочення
-        </Link>
-      </div>
+      <p className="mt-4 border-t border-[var(--enver-border)] pt-4 text-xs text-[var(--enver-text-muted)]">
+        Доступ до фінансів відкривається через бокове меню.
+      </p>
     </div>
   );
 }

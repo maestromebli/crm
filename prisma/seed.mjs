@@ -253,9 +253,177 @@ const HEAD_MANAGER_EXCLUDED_KEYS = new Set([
   "ADMIN_PANEL_VIEW",
 ]);
 
-async function grantHeadManagerPermissions(userId) {
-  const keys = PERMISSION_KEYS.filter((k) => !HEAD_MANAGER_EXCLUDED_KEYS.has(k));
-  for (const key of keys) {
+const WORKSHOP_BASE_KEYS = [
+  "DASHBOARD_VIEW",
+  "DEALS_VIEW",
+  "DEAL_WORKSPACE_VIEW",
+  "TASKS_VIEW",
+  "TASKS_UPDATE",
+  "PRODUCTION_ORDERS_VIEW",
+  "NOTIFICATIONS_VIEW",
+  "AI_USE",
+];
+
+const CUTTING_KEYS = [...WORKSHOP_BASE_KEYS, "FILES_VIEW"];
+const EDGING_KEYS = [...WORKSHOP_BASE_KEYS, "FILES_VIEW"];
+const DRILLING_KEYS = [...WORKSHOP_BASE_KEYS, "FILES_VIEW"];
+const ASSEMBLY_KEYS = [
+  ...WORKSHOP_BASE_KEYS,
+  "FILES_VIEW",
+  "FILES_UPLOAD",
+  "HANDOFF_ACCEPT",
+];
+const CONSTRUCTOR_KEYS = [
+  "DASHBOARD_VIEW",
+  "DEALS_VIEW",
+  "DEAL_WORKSPACE_VIEW",
+  "FILES_VIEW",
+  "FILES_UPLOAD",
+  "FILES_DELETE",
+  "FILE_UPLOAD",
+  "FILE_DELETE",
+  "TASKS_VIEW",
+  "TASKS_UPDATE",
+  "PRODUCTION_ORDERS_VIEW",
+  "PRODUCTION_ORCHESTRATION_VIEW",
+  "PRODUCTION_ORCHESTRATION_MANAGE",
+  "NOTIFICATIONS_VIEW",
+  "AI_USE",
+];
+
+function getDefaultPermissionKeysForRole(role) {
+  switch (role) {
+    case "SUPER_ADMIN":
+    case "DIRECTOR":
+    case "DIRECTOR_PRODUCTION":
+      return "ALL";
+    case "HEAD_MANAGER":
+    case "MANAGER":
+    case "TEAM_LEAD":
+      return PERMISSION_KEYS.filter((k) => !HEAD_MANAGER_EXCLUDED_KEYS.has(k));
+    case "ADMIN":
+      return PERMISSION_KEYS.filter((k) => k !== "ROLES_MANAGE");
+    case "SALES_MANAGER":
+    case "USER":
+      return [
+        "DASHBOARD_VIEW",
+        "LEADS_VIEW",
+        "LEADS_CREATE",
+        "LEADS_UPDATE",
+        "LEADS_ASSIGN",
+        "CONTACTS_VIEW",
+        "CALENDAR_VIEW",
+        "TASKS_VIEW",
+        "TASKS_CREATE",
+        "TASKS_UPDATE",
+        "TASKS_ASSIGN",
+        "DEALS_VIEW",
+        "DEALS_CREATE",
+        "DEALS_UPDATE",
+        "DEALS_ASSIGN",
+        "DEALS_STAGE_CHANGE",
+        "DEAL_WORKSPACE_VIEW",
+        "NOTIFICATIONS_VIEW",
+        "FILES_VIEW",
+        "FILES_UPLOAD",
+        "FILES_DELETE",
+        "FILE_UPLOAD",
+        "FILE_DELETE",
+        "ESTIMATES_VIEW",
+        "ESTIMATES_CREATE",
+        "ESTIMATES_UPDATE",
+        "QUOTES_CREATE",
+        "CONTRACTS_VIEW",
+        "CONTRACTS_CREATE",
+        "CONTRACTS_UPDATE",
+        "CONTRACT_VIEW",
+        "CONTRACT_EDIT",
+        "CONTRACT_SEND_SIGNATURE",
+        "PAYMENTS_VIEW",
+        "PAYMENTS_UPDATE",
+        "PAYMENT_CONFIRM",
+        "HANDOFF_SUBMIT",
+        "READINESS_OVERRIDE_REQUEST",
+        "PRODUCTION_LAUNCH",
+        "REPORTS_VIEW",
+        "ORDERS_VIEW",
+        "PRODUCTS_VIEW",
+        "AI_USE",
+      ];
+    case "MEASURER":
+      return [
+        "DASHBOARD_VIEW",
+        "LEADS_VIEW",
+        "CALENDAR_VIEW",
+        "TASKS_VIEW",
+        "NOTIFICATIONS_VIEW",
+        "AI_USE",
+      ];
+    case "PRODUCTION_WORKER":
+      return [
+        "DASHBOARD_VIEW",
+        "DEALS_VIEW",
+        "DEAL_WORKSPACE_VIEW",
+        "FILES_VIEW",
+        "FILES_UPLOAD",
+        "TASKS_VIEW",
+        "TASKS_UPDATE",
+        "PRODUCTION_ORDERS_VIEW",
+        "PRODUCTION_ORCHESTRATION_VIEW",
+        "NOTIFICATIONS_VIEW",
+        "AI_USE",
+      ];
+    case "CUTTING":
+      return CUTTING_KEYS;
+    case "EDGING":
+      return EDGING_KEYS;
+    case "DRILLING":
+      return DRILLING_KEYS;
+    case "ASSEMBLY":
+      return ASSEMBLY_KEYS;
+    case "CONSTRUCTOR":
+      return CONSTRUCTOR_KEYS;
+    case "ACCOUNTANT":
+      return [
+        ...PERMISSION_KEYS.filter(
+          (k) =>
+            !HEAD_MANAGER_EXCLUDED_KEYS.has(k) &&
+            k !== "LEADS_ASSIGN" &&
+            k !== "DEALS_ASSIGN",
+        ),
+        "AI_USE",
+      ];
+    case "PROCUREMENT_MANAGER":
+      return [
+        ...PERMISSION_KEYS.filter(
+          (k) =>
+            !HEAD_MANAGER_EXCLUDED_KEYS.has(k) &&
+            k !== "ROLES_MANAGE" &&
+            k !== "USERS_MANAGE",
+        ),
+        "AI_USE",
+        "AI_ANALYTICS",
+      ];
+    default:
+      return [
+        "DASHBOARD_VIEW",
+        "LEADS_VIEW",
+        "CONTACTS_VIEW",
+        "TASKS_VIEW",
+        "DEALS_VIEW",
+        "NOTIFICATIONS_VIEW",
+      ];
+  }
+}
+
+async function grantPermissionsForRole(userId, role) {
+  const mode = getDefaultPermissionKeysForRole(role);
+  if (mode === "ALL") {
+    await grantAllPermissions(userId);
+    return;
+  }
+
+  for (const key of mode) {
     const p = await prisma.permission.findUnique({ where: { key } });
     if (!p) continue;
     await prisma.permissionOnUser.upsert({
@@ -518,6 +686,171 @@ async function ensureConstructorHubSeed(prisma, { ownerId }) {
   console.log("Seed: Constructor Hub demo workspace готов.");
 }
 
+async function ensureConstructorStageDemoOrders(prisma, { ownerId, dealPipelineId, dealStageId }) {
+  const now = Date.now();
+  const rows = [
+    {
+      dealId: "seed_deal_constructor_test",
+      title: "тест",
+      description: "Демо-замовлення для етапу конструкторів",
+      clientId: "seed_client_constructor_test",
+      clientName: "Клієнт Тест",
+      contactId: "seed_contact_constructor_test",
+      contactName: "Контакт Тест",
+      contactEmail: "constructor.test@enver.local",
+      contactPhone: "+380671000001",
+      flowNumber: "PF-DEMO-CONSTRUCTOR-TEST",
+      roomToken: "seed-constructor-test",
+      externalConstructorLabel: "Демо конструктор #1",
+      dueInDays: 2,
+      priority: "HIGH",
+    },
+    {
+      dealId: "seed_deal_constructor_test2",
+      title: "тест2",
+      description: "Демо-замовлення для етапу конструкторів",
+      clientId: "seed_client_constructor_test2",
+      clientName: "Клієнт Тест 2",
+      contactId: "seed_contact_constructor_test2",
+      contactName: "Контакт Тест 2",
+      contactEmail: "constructor.test2@enver.local",
+      contactPhone: "+380671000002",
+      flowNumber: "PF-DEMO-CONSTRUCTOR-TEST2",
+      roomToken: "seed-constructor-test2",
+      externalConstructorLabel: "Демо конструктор #2",
+      dueInDays: 3,
+      priority: "NORMAL",
+    },
+  ];
+
+  for (const row of rows) {
+    await prisma.client.upsert({
+      where: { id: row.clientId },
+      update: { name: row.clientName },
+      create: {
+        id: row.clientId,
+        name: row.clientName,
+        type: "PERSON",
+      },
+    });
+
+    await prisma.contact.upsert({
+      where: { id: row.contactId },
+      update: {
+        fullName: row.contactName,
+        email: row.contactEmail,
+        phone: row.contactPhone,
+        clientId: row.clientId,
+      },
+      create: {
+        id: row.contactId,
+        fullName: row.contactName,
+        email: row.contactEmail,
+        phone: row.contactPhone,
+        clientId: row.clientId,
+      },
+    });
+
+    await prisma.deal.upsert({
+      where: { id: row.dealId },
+      update: {
+        title: row.title,
+        description: row.description,
+        status: "OPEN",
+        pipelineId: dealPipelineId,
+        stageId: dealStageId,
+        clientId: row.clientId,
+        primaryContactId: row.contactId,
+        ownerId,
+        value: 120000,
+        currency: "UAH",
+      },
+      create: {
+        id: row.dealId,
+        title: row.title,
+        description: row.description,
+        status: "OPEN",
+        pipelineId: dealPipelineId,
+        stageId: dealStageId,
+        clientId: row.clientId,
+        primaryContactId: row.contactId,
+        ownerId,
+        value: 120000,
+        currency: "UAH",
+      },
+    });
+
+    await prisma.dealHandoff.upsert({
+      where: { dealId: row.dealId },
+      update: {
+        status: "ACCEPTED",
+        acceptedAt: new Date(now - 24 * 60 * 60 * 1000),
+        submittedAt: new Date(now - 2 * 24 * 60 * 60 * 1000),
+        rejectedAt: null,
+        rejectionReason: null,
+      },
+      create: {
+        dealId: row.dealId,
+        status: "ACCEPTED",
+        acceptedAt: new Date(now - 24 * 60 * 60 * 1000),
+        submittedAt: new Date(now - 2 * 24 * 60 * 60 * 1000),
+      },
+    });
+
+    await prisma.productionFlow.upsert({
+      where: { dealId: row.dealId },
+      update: {
+        number: row.flowNumber,
+        title: row.title,
+        clientName: row.clientName,
+        status: "ACTIVE",
+        currentStepKey: "CONSTRUCTOR_IN_PROGRESS",
+        priority: row.priority,
+        readinessPercent: 45,
+        dueDate: new Date(now + row.dueInDays * 24 * 60 * 60 * 1000),
+        acceptedAt: new Date(now - 24 * 60 * 60 * 1000),
+      },
+      create: {
+        number: row.flowNumber,
+        dealId: row.dealId,
+        title: row.title,
+        clientName: row.clientName,
+        status: "ACTIVE",
+        currentStepKey: "CONSTRUCTOR_IN_PROGRESS",
+        priority: row.priority,
+        readinessPercent: 45,
+        dueDate: new Date(now + row.dueInDays * 24 * 60 * 60 * 1000),
+        acceptedAt: new Date(now - 24 * 60 * 60 * 1000),
+      },
+    });
+
+    await prisma.dealConstructorRoom.upsert({
+      where: { dealId: row.dealId },
+      update: {
+        status: "IN_PROGRESS",
+        priority: row.priority,
+        dueAt: new Date(now + row.dueInDays * 24 * 60 * 60 * 1000),
+        publicToken: row.roomToken,
+        assignedById: ownerId,
+        assignedUserId: ownerId,
+        externalConstructorLabel: row.externalConstructorLabel,
+      },
+      create: {
+        dealId: row.dealId,
+        status: "IN_PROGRESS",
+        priority: row.priority,
+        dueAt: new Date(now + row.dueInDays * 24 * 60 * 60 * 1000),
+        publicToken: row.roomToken,
+        assignedById: ownerId,
+        assignedUserId: ownerId,
+        externalConstructorLabel: row.externalConstructorLabel,
+      },
+    });
+  }
+
+  console.log("Seed: додано 2 демо-замовлення (тест, тест2) на етап конструкторів.");
+}
+
 async function main() {
   const adminPasswordHash = await bcrypt.hash("admin123", 10);
   const demoPasswordHash = await bcrypt.hash("demo123", 10);
@@ -555,8 +888,8 @@ async function main() {
     },
   });
 
-  await grantAllPermissions(admin.id);
-  await grantAllPermissions(user.id);
+  await grantPermissionsForRole(admin.id, "SUPER_ADMIN");
+  await grantPermissionsForRole(user.id, "DIRECTOR");
 
   const veraPasswordHash = await bcrypt.hash("vera123", 10);
   const vera = await prisma.user.upsert({
@@ -573,7 +906,95 @@ async function main() {
       role: "HEAD_MANAGER",
     },
   });
-  await grantHeadManagerPermissions(vera.id);
+  await grantPermissionsForRole(vera.id, "HEAD_MANAGER");
+
+  const groupUsers = [
+    {
+      email: "sales.manager@enver.local",
+      name: "Менеджер з продажу",
+      role: "SALES_MANAGER",
+      password: "sales123",
+    },
+    {
+      email: "head.manager@enver.local",
+      name: "Головний менеджер",
+      role: "HEAD_MANAGER",
+      password: "head12345",
+    },
+    {
+      email: "director@enver.local",
+      name: "Директор",
+      role: "DIRECTOR",
+      password: "director123",
+    },
+    {
+      email: "production.chief@enver.local",
+      name: "Начальник виробництва",
+      role: "DIRECTOR_PRODUCTION",
+      password: "chief12345",
+    },
+    {
+      email: "cutting@enver.local",
+      name: "Порізка",
+      role: "CUTTING",
+      password: "cutting123",
+    },
+    {
+      email: "edging@enver.local",
+      name: "Крайкування",
+      role: "EDGING",
+      password: "edging123",
+    },
+    {
+      email: "drilling@enver.local",
+      name: "Присадка",
+      role: "DRILLING",
+      password: "drilling123",
+    },
+    {
+      email: "assembly@enver.local",
+      name: "Збірка",
+      role: "ASSEMBLY",
+      password: "assembly123",
+    },
+    {
+      email: "constructor@enver.local",
+      name: "Конструктор",
+      role: "CONSTRUCTOR",
+      password: "constructor123",
+    },
+    {
+      email: "procurement@enver.local",
+      name: "Закупівля",
+      role: "PROCUREMENT_MANAGER",
+      password: "procure123",
+    },
+    {
+      email: "accountant@enver.local",
+      name: "Бухгалтер",
+      role: "ACCOUNTANT",
+      password: "account123",
+    },
+  ];
+
+  for (const item of groupUsers) {
+    const passwordHash = await bcrypt.hash(item.password, 10);
+    const created = await prisma.user.upsert({
+      where: { email: item.email },
+      update: {
+        name: item.name,
+        passwordHash,
+        role: item.role,
+      },
+      create: {
+        email: item.email,
+        name: item.name,
+        passwordHash,
+        role: item.role,
+      },
+    });
+    await grantPermissionsForRole(created.id, item.role);
+  }
 
   await ensureDefaultWorkspace(prisma, {
     adminId: admin.id,
@@ -803,6 +1224,11 @@ async function main() {
   }
 
   await ensureConstructorHubSeed(prisma, { ownerId: user.id });
+  await ensureConstructorStageDemoOrders(prisma, {
+    ownerId: user.id,
+    dealPipelineId: dealPipeline.id,
+    dealStageId: dealStage("production"),
+  });
 
    
   console.log(

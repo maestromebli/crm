@@ -108,8 +108,8 @@ export function buildDealNextActions(
 
   if (actions.length === 0) {
     actions.push({
-      id: "monitor-health",
-      title: "Monitor deal health and keep activity updated",
+      id: "monitor-стан",
+      title: "Monitor deal стан and keep activity updated",
       ownerRole: "MANAGER",
       status: "suggested",
       command: "ask-ai-summary",

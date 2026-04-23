@@ -365,7 +365,7 @@ export function ConstructorRoomPanel({
         </p>
         <p className="mt-2">
           <Link
-            href="/production/constructor"
+            href="/crm/constructor"
             className="font-medium text-indigo-700 underline hover:text-indigo-900"
           >
             Борд усіх конструкторів (виробництво)

@@ -23,7 +23,7 @@ export async function getDealHubOverview(
 
   const deal = aggregate.deal;
   const stage = normalizeDealHubStage(deal.stage.slug);
-  const health = evaluateDealHealth(aggregate);
+  const стан = evaluateDealHealth(aggregate);
   const nextActions = buildDealNextActions(aggregate, { role });
   const timeline = buildDealTimeline(aggregate);
 
@@ -72,12 +72,12 @@ export async function getDealHubOverview(
   };
 
   const marginPct = toNumber(finance?.marginPct);
-  const risks: DealHubRiskItem[] = health.reasons.map((reason, idx) => ({
+  const risks: DealHubRiskItem[] = стан.reasons.map((reason, idx) => ({
     id: `risk-${idx + 1}`,
     severity:
-      health.status === "CRITICAL"
+      стан.status === "CRITICAL"
         ? "critical"
-        : health.status === "RISK"
+        : стан.status === "RISK"
           ? "risk"
           : "warning",
     title: reason,
@@ -87,10 +87,7 @@ export async function getDealHubOverview(
     deal: {
       id: deal.id,
       title: deal.title,
-      code:
-        readDealNumberFromMeta(deal.workspaceMeta) ||
-        deal.productionFlow?.number?.trim() ||
-        deal.id.slice(0, 8).toUpperCase(),
+      code: readDealNumberFromMeta(deal.workspaceMeta) || deal.productionFlow?.number?.trim() || null,
       status: deal.status,
       stage,
       stageLabel: DEAL_HUB_STAGE_LABELS[stage],
@@ -160,6 +157,6 @@ export async function getDealHubOverview(
     stageGates: evaluateDealStageGates(gateContext),
     nextActions,
     risks,
-    health,
+    стан,
   };
 }

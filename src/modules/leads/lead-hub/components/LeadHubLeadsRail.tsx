@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { Search } from "lucide-react";
+import { Search as Пошук } from "lucide-react";
 import { cn } from "../../../../lib/utils";
 
 type Item = { id: string; title: string; stageName: string; updatedAt: string };
@@ -64,7 +64,7 @@ export function LeadHubLeadsRail({ currentLeadId }: Props) {
           Ліди
         </p>
         <div className="relative mt-2">
-          <Search
+          <Пошук
             className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--enver-muted)]"
             aria-hidden
           />

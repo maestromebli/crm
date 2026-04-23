@@ -150,7 +150,7 @@ export function LeadTasksCard({ leadId, canViewTasks }: Props) {
         </ul>
       ) : null}
       {!loading && !items.length ? (
-        <p className="mt-2 text-[12px] text-[var(--enver-muted)]">Відкритих задач немає.</p>
+        <p className="mt-2 text-[12px] text-[var(--enver-muted)]">Openх задач немає.</p>
       ) : null}
     </section>
   );

@@ -23,10 +23,7 @@ export function GlobalThemeToggle() {
     return htmlTheme === "dark" || htmlTheme === "light" ? htmlTheme : "light";
   };
 
-  const [theme, setTheme] = useState<ThemeMode>(() => {
-    return resolveInitialTheme();
-  });
-
+  const [theme, setTheme] = useState<ThemeMode>(resolveInitialTheme);
   useEffect(() => {
     applyThemeMode(theme);
     try {

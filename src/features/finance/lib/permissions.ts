@@ -1,4 +1,9 @@
-import { P, hasEffectivePermission, type Phase1Permission } from "../../../lib/authz/permissions";
+import {
+  P,
+  hasEffectivePermission,
+  hasUnrestrictedPermissionScope,
+  type Phase1Permission,
+} from "../../../lib/authz/permissions";
 import type { SessionUser } from "../../../lib/authz/api-guard";
 
 /**
@@ -38,6 +43,21 @@ function can(user: SessionUser, keys: Phase1Permission[]): boolean {
 }
 
 export function canFinanceAction(user: SessionUser, action: FinanceAction): boolean {
+  if (
+    hasUnrestrictedPermissionScope({
+      realRole: user.realRole,
+      impersonatorId: user.impersonatorId,
+    })
+  ) {
+    return true;
+  }
+  if (
+    action === "finance.view" &&
+    user.realRole !== "ACCOUNTANT" &&
+    user.realRole !== "PROCUREMENT_MANAGER"
+  ) {
+    return false;
+  }
   return can(user, ACTION_TO_PERMISSION[action]);
 }
 

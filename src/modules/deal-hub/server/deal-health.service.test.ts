@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { evaluateDealHealth } from "./deal-health.service";
 
-test("health engine returns warning/risk when major signals exist", () => {
+test("стан engine returns warning/risk when major signals exist", () => {
   const aggregate = {
     deal: {
       stage: { slug: "production" },
@@ -18,7 +18,7 @@ test("health engine returns warning/risk when major signals exist", () => {
     stageHistory: [],
   } as any;
 
-  const health = evaluateDealHealth(aggregate);
-  assert.ok(["WARNING", "RISK", "CRITICAL"].includes(health.status));
-  assert.ok(health.signals.length > 0);
+  const стан = evaluateDealHealth(aggregate);
+  assert.ok(["WARNING", "RISK", "CRITICAL"].includes(стан.status));
+  assert.ok(стан.signals.length > 0);
 });

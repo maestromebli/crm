@@ -35,8 +35,7 @@ export function CopyConstructorLinkButton({ publicToken }: { publicToken: string
         className="text-indigo-700 underline"
         title={fullUrl}
       >
-        Відкрити
-      </a>
+        Відкрити </a>
       <button
         type="button"
         onClick={() => void copy()}

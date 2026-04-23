@@ -17,7 +17,7 @@ export function buildAiV2ActionPlan(
   if (decision.followUpUrgency === "high") {
     items.push({
       type: "create_reminder",
-      title: "Терміновий follow-up з клієнтом",
+      title: "Терміновий наступний контакт з клієнтом",
       description: `AI V2: ${decision.nextBestAction}`,
       priority: "URGENT",
       lowRisk: true,

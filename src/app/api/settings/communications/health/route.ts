@@ -36,14 +36,14 @@ export async function GET(req: Request) {
       ? selectedUserId
       : users[0]?.id ?? user.id;
 
-  const health = await getCommunicationsHealth();
+  const стан = await getCommunicationsHealth();
   const policy = await getCommunicationsHealthPolicy();
-  const digest = buildWeeklyDigest({ health, policy, users });
+  const digest = buildWeeklyDigest({ стан, policy, users });
   return NextResponse.json({
     ok: true,
     users,
     selectedUserId: effectiveUserId,
-    channels: health[effectiveUserId] ?? {},
+    channels: стан[effectiveUserId] ?? {},
     policy,
     digest,
   });

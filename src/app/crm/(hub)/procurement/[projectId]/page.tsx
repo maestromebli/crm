@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { PageHeader } from "../../../../../components/shared/PageHeader";
 import { SectionCard } from "../../../../../components/shared/SectionCard";
@@ -13,10 +13,25 @@ import { canAccess, resolveRole } from "../../../../../features/shared/lib/rbac"
 import { EmptyState } from "../../../../../components/shared/EmptyState";
 import { AiV2InsightCard } from "../../../../../features/ai-v2";
 import { buildProcurementHubHref, buildProcurementHubNewRequestHref } from "../../../../../features/procurement/lib/quick-actions";
+import { hasUnrestrictedPermissionScope } from "@/lib/authz/permissions";
+import { getCachedServerSession } from "@/lib/authz/server-session";
 
 type Props = { params: Promise<{ projectId: string }>; searchParams?: Promise<{ role?: string }> };
 
 export default async function ProcurementProjectPage({ params, searchParams }: Props) {
+  const session = await getCachedServerSession();
+  const hasUnrestricted = hasUnrestrictedPermissionScope({
+    realRole: session?.user?.realRole,
+    impersonatorId: session?.user?.impersonatorId,
+  });
+  if (
+    !hasUnrestricted &&
+    session?.user?.realRole !== "ACCOUNTANT" &&
+    session?.user?.realRole !== "PROCUREMENT_MANAGER"
+  ) {
+    redirect("/access-denied");
+  }
+
   const { projectId } = await params;
   const role = resolveRole((await searchParams)?.role);
   const data = await getProcurementProjectData(projectId);
@@ -31,42 +46,25 @@ export default async function ProcurementProjectPage({ params, searchParams }: P
   return (
     <main className="space-y-4 p-4">
       <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--enver-muted)]">
-        <Link href="/crm/procurement" className="hover:text-[var(--enver-text)] hover:underline">
-          Закупки
-        </Link>
+        <span>Закупки</span>
         <span aria-hidden>·</span>
-        <span className="text-[var(--enver-text)]">
-          {data.dataSource === "live" ? "Замовлення (CRM)" : "Проєкт (демо)"}
-        </span>
+        <span className="text-[var(--enver-text)]">Замовлення (CRM)</span>
       </div>
-
-      {data.dataSource === "demo" ? (
-        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
-          Демо-проєкт з mock-даних. Для реального замовлення відкрийте сторінку з ID замовлення з CRM (той самий маршрут з{" "}
-          <code className="rounded bg-slate-100 px-1">dealId</code>).
-        </p>
-      ) : null}
 
       <PageHeader
         title={`${data.project.title} (${data.project.code})`}
-        subtitle={
-          data.dataSource === "live"
-            ? "Закупівлі по замовленню: заявки, позиції, замовлення постачальникам (дані з CRM)."
-            : "Закупівлі проєкту: бюджет, замовлення, поставки (демо)."
-        }
+        subtitle="Закупівлі по замовленню: заявки, позиції, замовлення постачальникам (дані з CRM)."
         actionsSlot={
           <div className="flex flex-wrap items-center gap-2">
-            {data.dataSource === "live" ? (
-              <Link
-                href={`/deals/${projectId}/workspace`}
-                className="rounded-lg border border-[var(--enver-border)] bg-[var(--enver-card)] px-3 py-1.5 text-xs font-medium text-[var(--enver-text)] hover:bg-[var(--enver-hover)]"
-              >
-                Робоче місце замовлення
-              </Link>
-            ) : null}
+            <Link
+              href={`/deals/${projectId}/workspace`}
+              className="rounded-lg border border-[var(--enver-border)] bg-[var(--enver-card)] px-3 py-1.5 text-xs font-medium text-[var(--enver-text)] hover:bg-[var(--enver-hover)]"
+            >
+              Робоче місце замовлення
+            </Link>
             {canAccess(role, "PROCUREMENT_FULL") ? (
               <Link
-                href={buildProcurementHubNewRequestHref(data.dataSource === "live" ? projectId : undefined)}
+                href={buildProcurementHubNewRequestHref(projectId)}
                 className="rounded-lg border border-[var(--enver-border)] bg-[var(--enver-card)] px-3 py-1.5 text-xs font-medium text-[var(--enver-text)] hover:bg-[var(--enver-hover)]"
               >
                 Нова заявка
@@ -81,11 +79,7 @@ export default async function ProcurementProjectPage({ params, searchParams }: P
           </div>
         }
       />
-      {data.dataSource === "live" ? (
-        <AiV2InsightCard context="procurement" dealId={projectId} />
-      ) : (
-        <AiV2InsightCard context="procurement" />
-      )}
+      <AiV2InsightCard context="procurement" dealId={projectId} />
       <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
         <SummaryCard label="План закупки" value={data.summary.planned.toLocaleString("uk-UA")} />
         <SummaryCard label="Факт закупки" value={data.summary.actual.toLocaleString("uk-UA")} tone="expense" />
@@ -141,7 +135,7 @@ export default async function ProcurementProjectPage({ params, searchParams }: P
                 Борг постачальникам:{" "}
                 {Math.max(data.summary.ordered - data.summary.received, 0).toLocaleString("uk-UA")} грн
               </p>
-              {data.dataSource === "live" && data.summary.overdueLines > 0 ? (
+              {data.summary.overdueLines > 0 ? (
                 <p className="font-medium text-amber-800">
                   Прострочені відкриті рядки (за датою заявки): {data.summary.overdueLines}
                 </p>

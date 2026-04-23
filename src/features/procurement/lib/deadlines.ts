@@ -13,7 +13,7 @@ export function isNeededByPast(neededByDate: string | null | undefined, ref: Dat
   return startOfDue < startOfRef;
 }
 
-/** Відкритий рядок із датою «потрібно до» у минулому. */
+/** Openй рядок із датою «потрібно до» у минулому. */
 export function isProcurementLineOverdue(
   neededByDate: string | null | undefined,
   lineStatus: string,

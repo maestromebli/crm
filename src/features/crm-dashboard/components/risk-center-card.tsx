@@ -67,8 +67,7 @@ export function RiskCenterCard({ rows }: RiskCenterCardProps) {
                   href={r.href}
                   className="text-[11px] font-semibold text-[var(--enver-accent)] underline-offset-2 hover:text-[var(--enver-accent-hover)] hover:underline"
                 >
-                  Відкрити
-                </Link>
+                  Відкрити </Link>
               </div>
             </div>
           </li>

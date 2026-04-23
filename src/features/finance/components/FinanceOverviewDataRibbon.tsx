@@ -15,12 +15,9 @@ export function FinanceOverviewDataRibbon({
   transactionSampleSize,
   executiveKpiNotesSaved,
 }: Props) {
-  const srcLabel =
-    source === "database" ? (
-      <span className="rounded bg-emerald-100 px-1.5 py-0.5 font-medium text-emerald-900">PostgreSQL</span>
-    ) : (
-      <span className="rounded bg-amber-100 px-1.5 py-0.5 font-medium text-amber-900">Демо (mock)</span>
-    );
+  const srcLabel = (
+    <span className="rounded bg-emerald-100 px-1.5 py-0.5 font-medium text-emerald-900">PostgreSQL</span>
+  );
 
   return (
     <div

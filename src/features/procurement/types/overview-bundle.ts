@@ -65,7 +65,7 @@ export type ProcurementOverviewBundle = {
   projectNameById: Record<string, string>;
   supplierNameById: Record<string, string>;
   orderNumberById: Record<string, string>;
-  dataSource: "demo" | "live";
+  dataSource: "live";
   riskAlerts: Array<{ level: "P0" | "P1" | "P2"; text: string }>;
   /** Відкриті позиції за строками заявки та фінансовими індикаторами. */
   orderedLineMonitor: OrderedLineMonitorRow[];

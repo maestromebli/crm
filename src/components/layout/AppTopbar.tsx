@@ -62,7 +62,7 @@ export function AppTopbar({
 
           <div className="relative inline-flex items-center gap-2 rounded-full border border-[var(--enver-border)] bg-[var(--enver-card)] px-2 py-0.5 text-xs shadow-sm shadow-black/20">
             <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--enver-surface-elevated)] text-[11px] font-semibold text-[var(--enver-text)]">
-              EN
+              UA
             </div>
             <div className="hidden flex-col md:flex">
               <span className="text-[11px] font-medium text-[var(--enver-text)]">

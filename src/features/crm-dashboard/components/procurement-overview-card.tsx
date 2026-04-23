@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { Package } from "lucide-react";
 import type { ProcurementOverview } from "../executive-types";
 
@@ -31,26 +30,9 @@ export function ProcurementOverviewCard({
         <Cell label="Низький залишок" value={data.lowStockMaterials} />
         <Cell label="Поставки цього тижня" value={data.deliveriesThisWeek} />
       </div>
-      <div className="mt-4 flex flex-wrap gap-2">
-        <Link
-          href="/crm/procurement"
-          className="rounded-lg border border-[var(--enver-border)] bg-white px-3 py-1.5 text-sm font-semibold !text-slate-900 shadow-sm hover:bg-slate-50"
-        >
-          Закупівлі
-        </Link>
-        <Link
-          href="/crm/procurement"
-          className="rounded-lg border border-[var(--enver-border)] bg-[var(--enver-surface)] px-3 py-1.5 text-sm font-semibold text-[var(--enver-text)] hover:bg-[var(--enver-hover)]"
-        >
-          Створити PO
-        </Link>
-        <Link
-          href="/crm/procurement"
-          className="rounded-lg border border-[var(--enver-border)] bg-[var(--enver-surface)] px-3 py-1.5 text-sm font-semibold text-[var(--enver-text)] hover:bg-[var(--enver-hover)]"
-        >
-          Затримки
-        </Link>
-      </div>
+      <p className="mt-4 text-xs text-[var(--enver-text-muted)]">
+        Доступ до закупівель відкривається через бокове меню.
+      </p>
     </div>
   );
 }

@@ -18,7 +18,7 @@ export function useDealActions(dealId: string) {
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["deal-hub", "overview", dealId] }),
-        queryClient.invalidateQueries({ queryKey: ["deal-hub", "health", dealId] }),
+        queryClient.invalidateQueries({ queryKey: ["deal-hub", "стан", dealId] }),
         queryClient.invalidateQueries({ queryKey: ["deal-hub", "timeline", dealId] }),
       ]);
     },

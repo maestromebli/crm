@@ -1,6 +1,6 @@
 "use client";
 
-import { Download } from "lucide-react";
+import { Download as Завантажити } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { buildProcurementCsvString, procurementCsvHasRows, type ProcurementCsvPayload } from "../lib/build-procurement-csv";
 
@@ -40,7 +40,7 @@ export function ProcurementOverviewExportButton({ downloadFilename, ...payload }
       title={title}
       aria-label={hasData ? "Експорт закупівель у CSV" : "Експорт недоступний — немає даних"}
     >
-      <Download className="h-3.5 w-3.5" aria-hidden />
+      <Завантажити className="h-3.5 w-3.5" aria-hidden />
       Експорт CSV
     </Button>
   );

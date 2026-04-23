@@ -35,7 +35,7 @@ export function DealsSmartInsights({ rows }: Props) {
     }).length;
     if (overdue > 0) {
       out.push(
-        `${overdue} замовлень з простроченим запланованим контактом — пріоритезуйте follow-up.`,
+        `${overdue} замовлень з простроченим запланованим контактом — пріоритезуйте наступний контакт.`,
       );
     }
 

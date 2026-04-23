@@ -1,6 +1,6 @@
 "use client";
 
-import { ImagePlus, Trash2, Upload, X } from "lucide-react";
+import { ImagePlus, Trash2, Download as Вивантажити, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 
 type Props = {
@@ -278,7 +278,7 @@ export function ObjectPhotoDropWindow({
             type="button"
             onClick={onClose}
             className="rounded-md p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
-            aria-label="Закрити"
+            aria-label="Close"
           >
             <X className="h-4 w-4" />
           </button>
@@ -293,7 +293,7 @@ export function ObjectPhotoDropWindow({
                 disabled={busy}
                 className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-60"
               >
-                <Upload className="h-3.5 w-3.5" />
+                <Вивантажити className="h-3.5 w-3.5" />
                 Додати фото
               </button>
               {previews.length > 0 ? (
@@ -356,7 +356,7 @@ export function ObjectPhotoDropWindow({
               disabled={busy}
               className="mt-3 inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-800 hover:bg-slate-100"
             >
-              <Upload className="h-3.5 w-3.5" />
+              <Вивантажити className="h-3.5 w-3.5" />
               {busy ? "Завантаження..." : "Обрати фото"}
             </button>
             <input

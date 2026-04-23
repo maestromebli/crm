@@ -22,6 +22,10 @@ const constructorRoles = new Set<string>([
   "CONSTRUCTOR",
   "OUTSOURCE_CONSTRUCTOR",
   "PRODUCTION_WORKER",
+  "CUTTING",
+  "EDGING",
+  "DRILLING",
+  "ASSEMBLY",
 ]);
 
 export function resolveConstructorHubRole(user: SessionLikeUser): ConstructorHubRole {

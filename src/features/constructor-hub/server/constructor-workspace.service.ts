@@ -127,7 +127,7 @@ export async function createConstructorWorkspace(input: {
   await prisma.productionFlow.update({
     where: { id: flow.id },
     data: {
-      constructorWorkspaceUrl: `/crm/production/constructor/${row.id}`,
+      constructorWorkspaceUrl: `/crm/constructor/${row.id}`,
     },
   });
 
@@ -165,7 +165,7 @@ export async function assignConstructor(input: {
       data: {
         constructorMode: "INTERNAL",
         currentStepKey: "CONSTRUCTOR_IN_PROGRESS",
-        constructorWorkspaceUrl: `/crm/production/constructor/${updated.id}`,
+        constructorWorkspaceUrl: `/crm/constructor/${updated.id}`,
       },
     });
   }

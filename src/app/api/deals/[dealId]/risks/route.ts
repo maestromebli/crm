@@ -9,14 +9,14 @@ export async function GET(_req: Request, ctx: Ctx) {
   const access = await requireDealAccess(dealId);
   if ("error" in access) return access.error;
 
-  const health = await queryDealHubHealth(dealId);
-  const risks = (health?.reasons ?? []).map((reason, index) => ({
-    id: `health-${index + 1}`,
+  const стан = await queryDealHubHealth(dealId);
+  const risks = (стан?.reasons ?? []).map((reason, index) => ({
+    id: `стан-${index + 1}`,
     title: reason,
     severity:
-      health?.status === "CRITICAL"
+      стан?.status === "CRITICAL"
         ? "critical"
-        : health?.status === "RISK"
+        : стан?.status === "RISK"
           ? "risk"
           : "warning",
   }));

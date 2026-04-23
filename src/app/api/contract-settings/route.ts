@@ -23,7 +23,7 @@ export async function PATCH(req: NextRequest) {
 
   const body = (await req.json()) as { key?: string; valueJson?: unknown };
   if (!body.key) {
-    return NextResponse.json({ error: "key is required" }, { status: 400 });
+    return NextResponse.json({ error: "Поле key є обов'язковим" }, { status: 400 });
   }
   const updated = await prisma.enverContractSetting.upsert({
     where: { key: body.key },

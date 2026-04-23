@@ -113,7 +113,7 @@ async function callChatCompletion(params: {
     body,
   });
 
-  if (!providerResult.ok) {
+  if (!("response" in providerResult)) {
     return {
       ok: false,
       status: providerResult.status,
@@ -209,9 +209,11 @@ export async function POST(request: Request) {
     userId: user.id,
     take: 14,
   });
+  const fullContextDirective =
+    "Перед формуванням відповіді спочатку виклич tool `crm_full_context` (мінімум 1 раз у діалозі) і спирайся на отримані дані CRM. Якщо даних не вистачає — викликай профільні tools.";
   const systemContent = memory
-    ? `${accessNarrative}\n\n${memory}`
-    : accessNarrative;
+    ? `${accessNarrative}\n\n${memory}\n\n${fullContextDirective}`
+    : `${accessNarrative}\n\n${fullContextDirective}`;
 
   const apiMessages: ChatMessage[] = [
     {

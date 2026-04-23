@@ -5,7 +5,6 @@ import type {
   ProductionCommandCenterView,
   WorkshopBottleneck,
 } from "../../types/production";
-import { getDemoCommandCenterView } from "../demo/production-demo";
 import { normalizeMaterialsChecklist } from "../../workshop-materials";
 import { normalizeMiniHqTaskState } from "../../workshop-mini-hq";
 import { WORKSHOP_KANBAN_COLUMNS, WORKSHOP_STATION_LABEL_BY_KEY } from "../../workshop-stages";
@@ -24,15 +23,45 @@ function isProductionSchemaMissingError(e: unknown): boolean {
 
 const STATION_LABELS = WORKSHOP_STATION_LABEL_BY_KEY;
 
+function buildEmptyCommandCenterView(): ProductionCommandCenterView {
+  return {
+    kpis: {
+      activeFlows: 0,
+      blockedFlows: 0,
+      averageReadiness: 0,
+      highRiskFlows: 0,
+      overdueFlows: 0,
+      readyToDistribute: 0,
+      procurementPending: 0,
+      procurementOverdue: 0,
+    },
+    workshopBottleneck: null,
+    recentEvents: [],
+    queue: [],
+    stationLoads: [],
+    criticalBlockers: [],
+    nextActions: [],
+    procurement: [],
+    warehouse: [],
+    workshopKanban: WORKSHOP_KANBAN_COLUMNS.map((stage) => ({
+      stageKey: stage.key,
+      stageLabel: stage.label,
+      tasks: [],
+    })),
+    installation: [],
+    syncedAt: new Date().toISOString(),
+  };
+}
+
 export async function getProductionCommandCenterView(): Promise<ProductionCommandCenterView> {
   if (!prisma.productionFlow) {
-    return getDemoCommandCenterView();
+    return buildEmptyCommandCenterView();
   }
   try {
     return await loadCommandCenterFromDatabase(prisma.productionFlow);
   } catch (e) {
     if (isProductionSchemaMissingError(e)) {
-      return getDemoCommandCenterView();
+      return buildEmptyCommandCenterView();
     }
     throw e;
   }
@@ -58,7 +87,7 @@ async function loadCommandCenterFromDatabase(
     take: 200,
   });
   if (flows.length === 0) {
-    return getDemoCommandCenterView();
+    return buildEmptyCommandCenterView();
   }
 
   const tasks = await prisma.productionTask.findMany({

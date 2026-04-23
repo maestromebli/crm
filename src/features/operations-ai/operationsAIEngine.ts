@@ -36,7 +36,7 @@ export function operationsAIEngine(order: ProductionOrderOpsState): OpsAiInsight
   }
 
   if (insights.length === 0) {
-    pushInsight(insights, "Операційний стан стабільний", "Критичних ризиків не виявлено. Продовжуйте рух за поточним next step.", "LOW");
+    pushInsight(insights, "Операційний стан стабільний", "Критичних ризиків не виявлено. Продовжуйте рух за поточним наступний крок.", "LOW");
   }
   return insights;
 }

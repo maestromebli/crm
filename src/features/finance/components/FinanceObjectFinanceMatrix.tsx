@@ -1,11 +1,40 @@
-import Link from "next/link";
 import type { ObjectFinanceLedgerRow } from "../lib/object-finance";
 import { formatMoneyUa } from "../lib/format-money";
+import Link from "next/link";
 
 type Props = {
   rows: ObjectFinanceLedgerRow[];
   consolidated: ObjectFinanceLedgerRow;
 };
+
+function normalizeOrderNumber(input: string): string | null {
+  const value = input.trim().toUpperCase();
+  const match = /^([A-ZА-ЯІЇЄҐ]{1,4}-\d{1,4}(?:\.\d{1,2})?)/u.exec(value);
+  return match ? match[1] : null;
+}
+
+function deriveOrderNumber(row: ObjectFinanceLedgerRow): string {
+  return (
+    normalizeOrderNumber(row.projectCode) ??
+    normalizeOrderNumber(row.projectTitle) ??
+    row.projectCode
+  );
+}
+
+function stripOrderPrefix(text: string, orderNumber: string): string {
+  const escaped = orderNumber.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return text
+    .replace(new RegExp(`^${escaped}\\s*[·:—-]?\\s*`, "iu"), "")
+    .trim();
+}
+
+function deriveObjectTitle(row: ObjectFinanceLedgerRow): string {
+  const orderNumber = deriveOrderNumber(row);
+  const fromObject = stripOrderPrefix(row.objectTitle, orderNumber);
+  if (fromObject && fromObject !== row.objectTitle) return fromObject;
+  const fromProject = stripOrderPrefix(row.projectTitle, orderNumber);
+  return fromProject || row.objectTitle || "—";
+}
 
 export function FinanceObjectFinanceMatrix({ rows, consolidated }: Props) {
   return (
@@ -16,7 +45,10 @@ export function FinanceObjectFinanceMatrix({ rows, consolidated }: Props) {
             <tr>
               <th className="px-4 py-3 text-left">Замовлення</th>
               <th className="px-4 py-3 text-left">Об&apos;єкт</th>
-              <th className="border-l border-slate-200/90 bg-emerald-50/50 px-3 py-3 text-right text-emerald-900" title="Надходження готівкою">
+              <th className="border-l border-slate-200/90 bg-sky-50/60 px-3 py-3 text-right text-sky-900" title="Сума договору по замовленню">
+                Заг. варт.
+              </th>
+              <th className="bg-emerald-50/50 px-3 py-3 text-right text-emerald-900" title="Надходження готівкою">
                 Надх.
               </th>
               <th className="bg-rose-50/40 px-3 py-3 text-right text-rose-900" title="Операційні витрати">
@@ -50,14 +82,20 @@ export function FinanceObjectFinanceMatrix({ rows, consolidated }: Props) {
                 className={`border-t border-slate-100 transition-colors hover:bg-slate-50/90 ${i % 2 === 1 ? "bg-slate-50/40" : ""}`}
               >
                 <td className="px-4 py-3 align-top">
-                  <span className="text-xs font-semibold text-slate-500">{r.projectCode}</span>
-                  <p className="mt-0.5 max-w-[12rem] text-[13px] font-medium leading-snug text-slate-900">{r.projectTitle}</p>
+                  <Link
+                    href={`/crm/finance/${r.projectId}`}
+                    className="inline-flex rounded-md px-1 py-0.5 text-xs font-semibold text-sky-700 underline-offset-2 transition hover:bg-sky-50 hover:text-sky-900 hover:underline"
+                    title="Відкрити фінансовий кабінет замовлення"
+                  >
+                    {deriveOrderNumber(r)}
+                  </Link>
                 </td>
                 <td className="px-4 py-3 align-top text-slate-800">
-                  <span className="font-medium">{r.objectTitle}</span>
+                  <span className="font-medium">{deriveObjectTitle(r)}</span>
                   <p className="mt-0.5 max-w-[14rem] text-xs leading-relaxed text-slate-500">{r.objectAddress}</p>
                 </td>
-                <td className="border-l border-slate-100 px-3 py-3 text-right tabular-nums text-emerald-800">{formatMoneyUa(r.incomeCash)}</td>
+                <td className="border-l border-slate-100 bg-sky-50/30 px-3 py-3 text-right tabular-nums text-sky-900">{formatMoneyUa(r.orderTotalAmount)}</td>
+                <td className="px-3 py-3 text-right tabular-nums text-emerald-800">{formatMoneyUa(r.incomeCash)}</td>
                 <td className="px-3 py-3 text-right tabular-nums text-rose-800">{formatMoneyUa(r.expenseCash)}</td>
                 <td className="px-3 py-3 text-right tabular-nums text-amber-900">{formatMoneyUa(r.payrollCash)}</td>
                 <td className="border-r border-slate-100 px-3 py-3 text-right tabular-nums text-violet-900">{formatMoneyUa(r.commissionCash)}</td>
@@ -66,20 +104,12 @@ export function FinanceObjectFinanceMatrix({ rows, consolidated }: Props) {
                 <td className="px-3 py-3 text-right tabular-nums text-amber-950">{formatMoneyUa(r.payrollAccrued)}</td>
                 <td className="border-r border-slate-100 px-3 py-3 text-right tabular-nums text-rose-900">{formatMoneyUa(r.openPurchaseOrders)}</td>
                 <td className="px-4 py-3 align-top">
-                  <div className="flex flex-col gap-1.5 sm:flex-row sm:flex-wrap">
-                    <Link
-                      href={`/crm/finance/${r.projectId}`}
-                      className="inline-flex justify-center rounded-lg border border-blue-200 bg-blue-50/60 px-3 py-1.5 text-xs font-medium text-blue-800 transition hover:bg-blue-100"
-                    >
-                      Фінанси
-                    </Link>
-                    <Link
-                      href={`/crm/procurement/${r.projectId}`}
-                      className="inline-flex justify-center rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-950 transition hover:bg-amber-100"
-                    >
-                      Закупівля
-                    </Link>
-                  </div>
+                  <Link
+                    href={`/crm/finance/${r.projectId}`}
+                    className="text-xs font-medium text-sky-700 underline-offset-2 hover:text-sky-900 hover:underline"
+                  >
+                    Відкрити фінкабінет
+                  </Link>
                 </td>
               </tr>
             ))}
@@ -88,7 +118,8 @@ export function FinanceObjectFinanceMatrix({ rows, consolidated }: Props) {
                 <span className="text-xs text-slate-500">Підсумок</span>
                 <p className="text-sm text-slate-900">{consolidated.projectTitle} — {consolidated.objectTitle}</p>
               </td>
-              <td className="border-l border-slate-200 px-3 py-3 text-right tabular-nums text-emerald-900">{formatMoneyUa(consolidated.incomeCash)}</td>
+              <td className="border-l border-slate-200 bg-sky-50/40 px-3 py-3 text-right tabular-nums text-sky-950">{formatMoneyUa(consolidated.orderTotalAmount)}</td>
+              <td className="px-3 py-3 text-right tabular-nums text-emerald-900">{formatMoneyUa(consolidated.incomeCash)}</td>
               <td className="px-3 py-3 text-right tabular-nums text-rose-900">{formatMoneyUa(consolidated.expenseCash)}</td>
               <td className="px-3 py-3 text-right tabular-nums text-amber-950">{formatMoneyUa(consolidated.payrollCash)}</td>
               <td className="border-r border-slate-200 px-3 py-3 text-right tabular-nums text-violet-900">{formatMoneyUa(consolidated.commissionCash)}</td>

@@ -80,7 +80,7 @@ export function computeLeadRisks(lead: LeadCoreInput): LeadRiskResult {
       push(
         out,
         "quote_sent_no_followup",
-        "КП надіслано давно — немає дати follow-up",
+        "КП надіслано давно — немає дати наступний контакт",
         "medium",
       );
     }

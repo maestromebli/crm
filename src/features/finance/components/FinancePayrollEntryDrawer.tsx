@@ -40,8 +40,7 @@ export function FinancePayrollEntryDrawer({ projects, objects }: Props) {
                 </p>
               </div>
               <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
-                Закрити
-              </Button>
+                Закрити </Button>
             </div>
             <div className="grid gap-3">
               <label className="text-xs font-medium text-slate-700">

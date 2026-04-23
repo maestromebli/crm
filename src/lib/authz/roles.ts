@@ -9,6 +9,7 @@ export type EffectiveRole =
   | "HEAD_MANAGER"
   | "TEAM_LEAD"
   | "SALES_MANAGER"
+  | "PRODUCTION_WORKER"
   | "MEASURER"
   | "ACCOUNTANT"
   | "PROCUREMENT_MANAGER";
@@ -30,6 +31,8 @@ export function normalizeRole(role: string): EffectiveRole {
       return "HEAD_MANAGER";
     case "TEAM_LEAD":
       return "TEAM_LEAD";
+    case "CONSTRUCTOR":
+      return "PRODUCTION_WORKER";
     case "SALES_MANAGER":
     case "USER":
       return "SALES_MANAGER";
@@ -39,6 +42,12 @@ export function normalizeRole(role: string): EffectiveRole {
       return "ACCOUNTANT";
     case "PROCUREMENT_MANAGER":
       return "PROCUREMENT_MANAGER";
+    case "PRODUCTION_WORKER":
+    case "CUTTING":
+    case "EDGING":
+    case "DRILLING":
+    case "ASSEMBLY":
+      return "PRODUCTION_WORKER";
     default:
       return "SALES_MANAGER";
   }

@@ -7,7 +7,7 @@ import { useErpBridge } from "@/components/erp/ErpBridgeProvider";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { tryReadResponseJson } from "@/lib/http/read-response-json";
 
-type Dashboard = {
+type Дашборд = {
   kpi: {
     balance: number;
     incomeMonth: number;
@@ -92,7 +92,7 @@ function readFinanceRiskFromStorage() {
 }
 
 export function FinanceHubClient() {
-  const [data, setData] = useState<Dashboard | null>(null);
+  const [data, setData] = useState<Дашборд | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<FinanceHubTab>("overview");
   const [objectQuery, setObjectQuery] = useState("");
@@ -132,7 +132,7 @@ export function FinanceHubClient() {
     setErr(null);
     try {
       const r = await fetch("/api/crm/finance/dashboard", { cache: "no-store" });
-      const j = await tryReadResponseJson<Dashboard & { error?: string }>(r);
+      const j = await tryReadResponseJson<Дашборд & { error?: string }>(r);
       if (!r.ok) throw new Error(j?.error ?? "Помилка");
       if (!j) throw new Error("Порожня відповідь сервера");
       setData(j);
@@ -355,13 +355,6 @@ export function FinanceHubClient() {
                 className="text-cyan-200/95 underline-offset-2 hover:text-white hover:underline"
               >
                 Виробництво
-              </Link>
-              <span className="text-slate-600">·</span>
-              <Link
-                href="/crm/procurement"
-                className="text-cyan-200/95 underline-offset-2 hover:text-white hover:underline"
-              >
-                Закупівлі
               </Link>
               <span className="text-slate-600">·</span>
               <Link
@@ -655,7 +648,7 @@ export function FinanceHubClient() {
                   </label>
                 </div>
                 <p className="mt-3 text-xs text-slate-500">
-                  Реєстр об'єктів: план/факт надходжень, план/факт витрат, борг клієнта та статус виконання.
+                  Реєстр об&apos;єктів: план/факт надходжень, план/факт витрат, борг клієнта та статус виконання.
                 </p>
               </div>
               <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -973,7 +966,6 @@ export function FinanceHubClient() {
                     subtitle="готовність замовлень і ризики строків"
                   />
                   <QuickLink href="/warehouse" title="Склад WMS" subtitle="залишки, резерви, оцінка запасів" />
-                  <QuickLink href="/crm/procurement" title="Контур закупівель" subtitle="PO, постачальники, склад" />
                   <QuickLink
                     href="/crm/erp"
                     title="Глобальний ERP-командний центр"

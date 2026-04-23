@@ -291,7 +291,7 @@ export function DealWorkspaceHeader({
               }}
               className="rounded-full border border-slate-300 bg-[var(--enver-card)] px-2.5 py-0.5 text-[11px] font-medium text-slate-700 hover:bg-[var(--enver-hover)]"
             >
-              {open ? "Закрити" : "Редагувати дані"}
+              {open ? "Close" : "Редагувати дані"}
             </button>
           </div>
         </div>

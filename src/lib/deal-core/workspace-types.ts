@@ -79,6 +79,35 @@ export type DealWorkspaceMeta = {
     clientApprovalsConfirmed?: boolean;
     specialNotesDocumented?: boolean;
   };
+  /**
+   * ENVER OS: execution truth (версія ТЗ, з якою реально працює виробництво).
+   */
+  projectSpec?: {
+    currentVersionId?: string;
+    currentVersionNo?: number;
+    approvalStage?: "commercial" | "client" | "technical" | "execution";
+    currentVersionApprovedForExecution?: boolean;
+    requiredFilesComplete?: boolean;
+    approvedAt?: string;
+  };
+  /**
+   * ENVER OS: формальний шлюз між sales і execution.
+   */
+  handoffGate?: {
+    checklistCompleted?: boolean;
+    reviewedByUserId?: string;
+    reviewedAt?: string;
+  };
+  /**
+   * ENVER OS: керуючі прапорці факту виконання.
+   */
+  executionControl?: {
+    bomApproved?: boolean;
+    criticalMaterialsReady?: boolean;
+    productionOrderDone?: boolean;
+    deliveryAccepted?: boolean;
+    financeActualsPosted?: boolean;
+  };
 };
 
 export type DealWorkspaceTabId =
@@ -236,6 +265,36 @@ export type DealWorkspacePayload = {
   readinessAllMet: boolean;
   lastReadinessSnapshotAt: string | null;
   handoff: DealHandoffPayload & { manifest: HandoffManifest };
+  enverExecution: {
+    projectSpec: {
+      id: string | null;
+      status: string | null;
+      currentVersionId: string | null;
+      currentVersionNo: number | null;
+      currentVersionApprovedForExecution: boolean;
+      approvedAt: string | null;
+    };
+    handoffChecklist: {
+      totalCount: number;
+      requiredCount: number;
+      checkedRequiredCount: number;
+      complete: boolean;
+    };
+    orderFinancialSnapshots: Array<{
+      id: string;
+      orderId: string;
+      orderNumber: string | null;
+      snapshotDate: string;
+      plannedRevenue: number;
+      actualRevenue: number;
+      plannedCost: number;
+      actualCost: number;
+      plannedMargin: number | null;
+      actualMargin: number | null;
+      source: string;
+      comment: string | null;
+    }>;
+  };
   productionLaunch: {
     status: "NOT_READY" | "QUEUED" | "LAUNCHING" | "LAUNCHED" | "FAILED";
     queuedAt: string | null;

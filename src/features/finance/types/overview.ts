@@ -1,1 +1,1 @@
-export type FinanceOverviewDataSource = "database" | "mock";
+export type FinanceOverviewDataSource = "database";

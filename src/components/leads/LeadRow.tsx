@@ -60,6 +60,8 @@ export function LeadRow({ lead, duplicatePhone }: LeadRowProps) {
         <p className="mt-0.5 text-[10px] text-slate-500">
           <span className="font-medium text-slate-600">{lead.stage.name}</span>
           {" · "}
+          {lead.orderNumber ?? "Без номера"}
+          {" · "}
           {lead.source}
           {" · "}
           {lead.owner.name ?? lead.owner.email}

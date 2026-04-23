@@ -1,6 +1,6 @@
 import type { DealHubOverview } from "../../domain/deal.types";
 
-function healthStatusLabel(status: DealHubOverview["health"]["status"]): string {
+function healthStatusLabel(status: DealHubOverview["стан"]["status"]): string {
   if (status === "GOOD") return "Добрий";
   if (status === "WARNING") return "Увага";
   if (status === "RISK") return "Ризик";
@@ -14,7 +14,8 @@ export function DealHubHeader({ data }: { data: DealHubOverview }) {
         <div>
           <p className="text-[11px] uppercase tracking-wide text-slate-500">Центр замовлення Ultra</p>
           <h2 className="text-lg font-semibold text-slate-900">
-            {data.deal.title} <span className="text-slate-400">#{data.deal.code}</span>
+            {data.deal.title}{" "}
+            {data.deal.code ? <span className="text-slate-400">#{data.deal.code}</span> : null}
           </h2>
           <p className="text-xs text-slate-600">
             {data.client?.name ?? "Клієнта не вказано"} · {data.deal.stageLabel}
@@ -23,7 +24,7 @@ export function DealHubHeader({ data }: { data: DealHubOverview }) {
         <div className="text-right">
           <p className="text-[11px] uppercase tracking-wide text-slate-500">Стан</p>
           <p className="text-base font-semibold text-slate-900">
-            {healthStatusLabel(data.health.status)} · {data.health.score}/100
+            {healthStatusLabel(data.стан.status)} · {data.стан.score}/100
           </p>
         </div>
       </div>

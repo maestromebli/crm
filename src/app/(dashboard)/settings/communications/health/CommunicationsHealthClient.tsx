@@ -132,7 +132,7 @@ export function CommunicationsHealthClient() {
       )) as CheckResponse;
       setChecks(j.checks);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Помилка check");
+      setError(e instanceof Error ? e.message : "Помилка перевірки");
     } finally {
       setChecking(false);
     }
@@ -151,7 +151,7 @@ export function CommunicationsHealthClient() {
       );
       await load(selectedUserId);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Помилка policy");
+      setError(e instanceof Error ? e.message : "Помилка політики");
     } finally {
       setSavingPolicy(false);
     }

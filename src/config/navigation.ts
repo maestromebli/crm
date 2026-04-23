@@ -7,6 +7,7 @@ import type React from "react";
 import {
   LayoutDashboard,
   Users,
+  UserPlus,
   KanbanSquare,
   Calendar,
   Mail,
@@ -14,6 +15,7 @@ import {
   ShoppingCart,
   Warehouse,
   Factory,
+  DraftingCompass,
   Shuffle,
   CheckSquare,
   FolderOpen,
@@ -64,7 +66,7 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     id: "leads",
     label: "Ліди",
-    icon: Users,
+    icon: UserPlus,
     href: "/leads",
     permission: P.LEADS_VIEW,
     subItems: [
@@ -303,6 +305,21 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
+    id: "constructor",
+    label: "Конструктор",
+    icon: DraftingCompass,
+    href: "/crm/constructor",
+    permission: P.PRODUCTION_ORDERS_VIEW,
+    subItems: [
+      {
+        id: "constructor-workspaces",
+        label: "Воркспейси",
+        href: "/crm/constructor",
+        description: "Окремий модуль роботи з воркспейсами конструктора.",
+      },
+    ],
+  },
+  {
     id: "production",
     label: "Виробництво",
     icon: Factory,
@@ -310,12 +327,6 @@ export const NAV_SECTIONS: NavSection[] = [
     permission: P.PRODUCTION_LAUNCH,
     subItems: [
       { id: "queue", label: "Черга робіт", href: "/crm/production", description: "Штаб виробництва: KPI, черга, цех." },
-      {
-        id: "constructor-workspaces",
-        label: "Воркспейси конструкторів",
-        href: "/crm/production/constructor",
-        description: "Список активних воркспейсів конструкторів після запуску у виробництво.",
-      },
       { id: "workshop", label: "Цеховий Kanban", href: "/crm/production/workshop" },
       {
         id: "mini-cutting",
@@ -364,12 +375,6 @@ export const NAV_SECTIONS: NavSection[] = [
         label: "Графік монтажу",
         href: "/production/installation-schedule",
         description: "План монтажів окремим екраном.",
-      },
-      {
-        id: "procurement-from-production",
-        label: "Закупівлі (хаб)",
-        href: "/crm/procurement?view=hub",
-        description: "Операційний контур: PO, склад, заявки.",
       },
       {
         id: "warehouse-wms",
@@ -496,7 +501,7 @@ export const NAV_SECTIONS: NavSection[] = [
         href: "/settings/communications/users",
         permission: P.USERS_VIEW,
       },
-      { id: "communications-health", label: "Health каналів", href: "/settings/communications/health" },
+      { id: "communications-health", label: "Стан каналів", href: "/settings/communications/health" },
       { id: "ai", label: "AI‑налаштування", href: "/settings/ai" },
       {
         id: "ai-admin-chat",

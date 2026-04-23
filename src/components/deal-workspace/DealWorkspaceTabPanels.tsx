@@ -1805,8 +1805,7 @@ function ContractTab({
                                   rel="noreferrer"
                                   className={cn(btnGhost, "no-underline")}
                                 >
-                                  Відкрити
-                                </a>
+                                  Відкрити </a>
                               </div>
                             </li>
                           );
@@ -2168,7 +2167,7 @@ function HandoffTab({
           : item.source.includes("production")
             ? ("production" as const)
             : ("constructor" as const),
-      ctaLabel: item.done ? "Перевірити" : "Відкрити",
+      ctaLabel: item.done ? "Перевірити" : "Open",
       onCta: () => {
         const label = item.label.toLowerCase();
         if (label.includes("догов")) onTab("contract");

@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, MessageSquarePlus, Save, SendHorizonal, Upload } from "lucide-react";
+import { CheckCircle2, MessageSquarePlus, Save as Зберегти, SendHorizonal, Download as Вивантажити } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 type Props = {
@@ -24,7 +24,7 @@ export function ConstructorActionBar(props: Props) {
           Поставити питання
         </Button>
         <Button variant="outline" className="gap-2" onClick={props.onUploadFiles}>
-          <Upload className="h-4 w-4" />
+          <Вивантажити className="h-4 w-4" />
           Завантажити файли
         </Button>
         <Button variant="outline" className="gap-2" onClick={props.onSubmitForReview}>
@@ -32,7 +32,7 @@ export function ConstructorActionBar(props: Props) {
           Надіслати на перевірку
         </Button>
         <Button variant="ghost" className="gap-2" onClick={props.onSaveDraft}>
-          <Save className="h-4 w-4" />
+          <Зберегти className="h-4 w-4" />
           Зберегти чернетку
         </Button>
       </div>

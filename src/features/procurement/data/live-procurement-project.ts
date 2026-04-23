@@ -6,13 +6,27 @@ import type {
   ProcurementItem,
   ProcurementRequest,
   ProcurementRequestStatus,
+  ProcurementWorkflowStatus,
   PurchaseOrder,
 } from "../types/models";
 import { sumPurchaseOrderCommitment, sumReceivedValueFromPoItems } from "../../finance/lib/aggregation";
 import { isNeededByPast, isOpenProcurementLine } from "../lib/deadlines";
-import { mockProcurementCategories } from "../../shared/data/mock-crm";
 
 const sum = (arr: number[]): number => arr.reduce((a, b) => a + b, 0);
+
+const PROCUREMENT_CATEGORY_CATALOG: ProcurementCategory[] = [
+  { id: "pc-001", name: "ДСП", group: "MATERIAL", sortOrder: 1 },
+  { id: "pc-002", name: "Фасади", group: "MATERIAL", sortOrder: 2 },
+  { id: "pc-003", name: "Фурнітура", group: "MATERIAL", sortOrder: 3 },
+  { id: "pc-004", name: "Стільниця", group: "MATERIAL", sortOrder: 4 },
+  { id: "pc-005", name: "Скло", group: "MATERIAL", sortOrder: 5 },
+  { id: "pc-006", name: "Підсвітка", group: "MATERIAL", sortOrder: 6 },
+  { id: "pc-007", name: "Замір", group: "LABOR", sortOrder: 7 },
+  { id: "pc-008", name: "Установка", group: "LABOR", sortOrder: 8 },
+  { id: "pc-009", name: "Збірка", group: "LABOR", sortOrder: 9 },
+  { id: "pc-010", name: "Конструктор", group: "LABOR", sortOrder: 10 },
+  { id: "pc-011", name: "Логістика", group: "LOGISTICS", sortOrder: 11 },
+];
 
 function n(v: unknown): number {
   if (v == null) return 0;
@@ -47,6 +61,35 @@ function mapRequestStatus(s: string): ProcurementRequestStatus {
     "CANCELLED",
   ];
   return (allowed.includes(s as ProcurementRequestStatus) ? s : "DRAFT") as ProcurementRequestStatus;
+}
+
+function mapWorkflowStatus(s: string | null | undefined): ProcurementWorkflowStatus {
+  const allowed: ProcurementWorkflowStatus[] = [
+    "new_request",
+    "in_progress_by_purchaser",
+    "ai_grouping",
+    "grouped_by_supplier_or_category",
+    "sent_to_supplier",
+    "supplier_response_received",
+    "supplier_invoice_uploaded",
+    "invoice_ai_matched",
+    "invoice_verification",
+    "approval_pending",
+    "sent_to_payment",
+    "payment_method_selected",
+    "paid",
+    "receipt_verification_pending",
+    "awaiting_delivery",
+    "goods_received",
+    "stock_posted",
+    "reserved_for_order",
+    "issued_to_production",
+    "rejected",
+    "returned_for_revision",
+  ];
+  return (allowed.includes(s as ProcurementWorkflowStatus)
+    ? s
+    : "new_request") as ProcurementWorkflowStatus;
 }
 
 function mapItemStatus(s: string | null | undefined): ProcurementItem["status"] {
@@ -86,7 +129,7 @@ function dealToProjectView(deal: {
   };
 }
 
-/** Зріз сторінки «закупівлі по проєкту» — live (deal) або demo (mock Project). */
+/** Зріз сторінки «закупівлі по проєкту» з live CRM-даних. */
 export type ProcurementProjectPageData = {
   project: Project;
   summary: {
@@ -107,7 +150,7 @@ export type ProcurementProjectPageData = {
   supplierNameById: Record<string, string>;
   categoryNameById: Record<string, string>;
   orderNumberById: Record<string, string>;
-  dataSource: "live" | "demo";
+  dataSource: "live";
 };
 
 /**
@@ -145,7 +188,7 @@ export async function tryLoadProcurementProjectFromDeal(
       }),
     ]);
 
-    const categories: ProcurementCategory[] = mockProcurementCategories;
+    const categories: ProcurementCategory[] = PROCUREMENT_CATEGORY_CATALOG;
     const categoryNameById = Object.fromEntries(categories.map((c) => [c.id, c.name]));
 
     const requests: ProcurementRequest[] = dbRequests.map((r) => {
@@ -160,6 +203,7 @@ export async function tryLoadProcurementProjectFromDeal(
         objectId: null,
         requestedById: null,
         status: mapRequestStatus(r.status),
+        workflowStatus: mapWorkflowStatus((r as { workflowStatus?: string }).workflowStatus),
         neededByDate: r.neededByDate?.toISOString().slice(0, 10) ?? null,
         budgetTotal,
         actualTotal,

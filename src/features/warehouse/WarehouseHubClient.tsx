@@ -497,14 +497,7 @@ export function WarehouseHubClient({ activeSection }: { activeSection: string })
                     <div className="enver-panel px-4 py-4 text-sm text-[var(--enver-text-muted)]">
                       <h2 className="text-sm font-semibold text-[var(--enver-text)]">Журнал руху</h2>
                       <p className="mt-2">
-                        Аудит проводок: надходження, видача, переміщення між зонами. Закупівлі та PO — у{" "}
-                        <Link
-                          href="/crm/procurement?view=hub"
-                          className="font-medium text-sky-700 underline-offset-2 hover:underline"
-                        >
-                          хабі закупівель
-                        </Link>
-                        .
+                        Аудит проводок: надходження, видача, переміщення між зонами. Закупівлі та PO — через бокове меню.
                       </p>
                       <ul className="mt-3 list-disc space-y-1 pl-5 text-[13px]">
                         <li>Відкриті PO: {data.procurement.openPurchaseOrders}</li>
@@ -855,12 +848,7 @@ export function WarehouseHubClient({ activeSection }: { activeSection: string })
                           <span className="text-xs text-slate-500">
                             {o.expectedDate ? o.expectedDate.slice(0, 10) : "дата уточнюється"}
                           </span>
-                          <Link
-                            href="/crm/procurement?view=hub"
-                            className="text-[11px] font-medium text-sky-700 hover:underline"
-                          >
-                            хаб
-                          </Link>
+                          <span className="text-[11px] font-medium text-slate-500">меню</span>
                         </li>
                       ))}
                     </ul>
@@ -873,28 +861,10 @@ export function WarehouseHubClient({ activeSection }: { activeSection: string })
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Звʼязки контуру</p>
                   <ul className="mt-3 space-y-2">
                     <ContourLink
-                      href="/crm/procurement?view=hub"
-                      icon={ShoppingCart}
-                      title="Закупівлі"
-                      subtitle="PO, постачальники, приймання на склад"
-                    />
-                    <ContourLink
-                      href="/crm/finance"
-                      icon={Wallet}
-                      title="Фінанси"
-                      subtitle="Оцінка запасів, каса, кредиторка по PO"
-                    />
-                    <ContourLink
                       href="/crm/production"
                       icon={Factory}
                       title="Виробництво"
                       subtitle="Резерви матеріалів під виробничі замовлення"
-                    />
-                    <ContourLink
-                      href="/crm/procurement"
-                      icon={Package}
-                      title="Реєстр закупівель"
-                      subtitle="Заявки та замовлення"
                     />
                   </ul>
                 </div>

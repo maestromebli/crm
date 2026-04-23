@@ -19,7 +19,16 @@ export function productionAccessFromSession(session: Session): ProductionAccessR
   if (role === "SUPER_ADMIN" || role === "ADMIN" || role === "DIRECTOR_PRODUCTION") return "admin";
   if (role === "TEAM_LEAD" || role === "HEAD_MANAGER" || role === "MANAGER")
     return "team_lead";
-  if (role === "PRODUCTION_WORKER") return "worker";
+  if (
+    role === "PRODUCTION_WORKER" ||
+    role === "CUTTING" ||
+    role === "EDGING" ||
+    role === "DRILLING" ||
+    role === "ASSEMBLY" ||
+    role === "CONSTRUCTOR"
+  ) {
+    return "worker";
+  }
   if (role === "SALES_MANAGER") return "sales_view";
   if (
     hasEffectivePermission(session.user.permissionKeys ?? [], P.PRODUCTION_ORDERS_MANAGE, {

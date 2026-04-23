@@ -1,12 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 import type { DealWorkspacePayload } from "@/features/deal-workspace/types";
 import { postJson } from "@/lib/api/patch-json";
 import { getApiErrorMessage, parseResponseJson } from "@/lib/api/parse-response-json";
 import { cn } from "@/lib/utils";
-import { buildProcurementHubNewRequestHref } from "@/features/procurement/lib/quick-actions";
 
 type Props = {
   data: DealWorkspacePayload;
@@ -82,6 +80,7 @@ export function DealFinanceProcurementTab({ data, roleView }: Props) {
   const [loading, setLoading] = useState(true);
   const [genBusy, setGenBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const canViewCompensation = roleView === "director";
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -101,6 +100,17 @@ export function DealFinanceProcurementTab({ data, roleView }: Props) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (
+      !canViewCompensation &&
+      (activeSubtab === "payroll" ||
+        activeSubtab === "commissions" ||
+        activeSubtab === "profitability")
+    ) {
+      setActiveSubtab("payments");
+    }
+  }, [activeSubtab, canViewCompensation]);
 
   const milestones = data.paymentMilestones ?? [];
   const m0 = milestones[0];
@@ -122,7 +132,67 @@ export function DealFinanceProcurementTab({ data, roleView }: Props) {
     }
   };
 
-  const showMoney = roleView !== "sales";
+  const totalAmount =
+    summary?.dealFinancialSummary?.contractAmount ?? data.deal.value ?? 0;
+  const advanceAmount =
+    m0?.amount ?? Math.round((data.deal.value ?? totalAmount) * 0.7);
+  const topUpAmount =
+    m1?.amount ?? Math.max(0, Number(totalAmount) - Number(advanceAmount));
+  const remainingAmount =
+    summary?.dealFinancialSummary?.remainingToReceive ??
+    Math.max(
+      0,
+      Number(totalAmount) - Number(summary?.dealFinancialSummary?.receivedAmount ?? 0),
+    );
+  const amountCurrency = data.deal.currency ?? m0?.currency ?? m1?.currency ?? "₴";
+
+  if (roleView === "sales") {
+    return (
+      <div className="space-y-4">
+        <div className="rounded-2xl border border-slate-200 bg-[var(--enver-card)] p-4 shadow-sm">
+          <h2 className="text-base font-semibold text-[var(--enver-text)]">
+            Фінанси замовлення
+          </h2>
+          {err ? (
+            <p className="mt-2 rounded-md bg-rose-50 px-2 py-1 text-xs text-rose-800">
+              {err}
+            </p>
+          ) : null}
+          {loading ? (
+            <p className="mt-3 text-xs text-slate-500">Завантаження…</p>
+          ) : null}
+          <div className="mt-3 grid grid-cols-2 gap-2 text-center sm:grid-cols-4">
+            <div className="rounded-lg border border-slate-100 bg-slate-50/70 px-2 py-2.5">
+              <p className="text-[10px] text-slate-500">Загальна сума</p>
+              <p className="text-sm font-semibold text-[var(--enver-text)]">
+                {Number(totalAmount).toLocaleString("uk-UA")} {amountCurrency}
+              </p>
+            </div>
+            <div className="rounded-lg border border-slate-100 bg-slate-50/70 px-2 py-2.5">
+              <p className="text-[10px] text-slate-500">Аванс</p>
+              <p className="text-sm font-semibold text-[var(--enver-text)]">
+                {Number(advanceAmount).toLocaleString("uk-UA")} {amountCurrency}
+              </p>
+            </div>
+            <div className="rounded-lg border border-slate-100 bg-slate-50/70 px-2 py-2.5">
+              <p className="text-[10px] text-slate-500">Доплата авансу</p>
+              <p className="text-sm font-semibold text-[var(--enver-text)]">
+                {Number(topUpAmount).toLocaleString("uk-UA")} {amountCurrency}
+              </p>
+            </div>
+            <div className="rounded-lg border border-slate-100 bg-slate-50/70 px-2 py-2.5">
+              <p className="text-[10px] text-slate-500">Залишок</p>
+              <p className="text-sm font-semibold text-[var(--enver-text)]">
+                {Number(remainingAmount).toLocaleString("uk-UA")} {amountCurrency}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const showMoney = roleView === "director" || roleView === "head";
 
   return (
     <div className="space-y-4">
@@ -131,20 +201,6 @@ export function DealFinanceProcurementTab({ data, roleView }: Props) {
           <h2 className="text-base font-semibold text-[var(--enver-text)]">
             Фінанси та закупівлі
           </h2>
-          <div className="flex gap-2">
-            <Link
-              href="/crm/finance"
-              className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-            >
-              Каса CRM
-            </Link>
-            <Link
-              href={buildProcurementHubNewRequestHref(data.deal.id)}
-              className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-            >
-              Закупівлі
-            </Link>
-          </div>
         </div>
 
         {err && (
@@ -209,9 +265,11 @@ export function DealFinanceProcurementTab({ data, roleView }: Props) {
               ["payments", "Оплати"],
               ["expenses", "Витрати"],
               ["procurement", "Закупівлі"],
-              ["payroll", "Зарплата"],
-              ["commissions", "Комісії"],
-              ["profitability", "Прибутковість"],
+              ...(canViewCompensation ? ([["payroll", "Зарплата"]] as const) : []),
+              ...(canViewCompensation ? ([["commissions", "Комісії"]] as const) : []),
+              ...(canViewCompensation
+                ? ([["profitability", "Прибутковість"]] as const)
+                : []),
             ].map(([key, label]) => (
               <button
                 key={key}
@@ -291,7 +349,7 @@ export function DealFinanceProcurementTab({ data, roleView }: Props) {
               ))}
             </ul>
           )}
-          {!loading && activeSubtab === "payroll" && (
+          {!loading && canViewCompensation && activeSubtab === "payroll" && (
             <ul className="space-y-1 text-sm">
               {(summary?.dealFinancialTabs.payroll ?? []).map((row) => (
                 <li key={row.id} className="flex justify-between rounded-lg border border-slate-100 px-2 py-1">
@@ -301,7 +359,7 @@ export function DealFinanceProcurementTab({ data, roleView }: Props) {
               ))}
             </ul>
           )}
-          {!loading && activeSubtab === "commissions" && (
+          {!loading && canViewCompensation && activeSubtab === "commissions" && (
             <ul className="space-y-1 text-sm">
               {(summary?.dealFinancialTabs.commissions ?? []).map((row) => (
                 <li key={row.id} className="flex justify-between rounded-lg border border-slate-100 px-2 py-1">
@@ -311,7 +369,7 @@ export function DealFinanceProcurementTab({ data, roleView }: Props) {
               ))}
             </ul>
           )}
-          {!loading && activeSubtab === "profitability" && (
+          {!loading && canViewCompensation && activeSubtab === "profitability" && (
             <div className="rounded-lg border border-slate-100 px-3 py-2 text-sm">
               <p>Валовий: {summary?.dealFinancialSummary ? summary.dealFinancialSummary.grossProfit.toFixed(0) : "0"} ₴</p>
               <p>Чистий: {summary?.dealFinancialSummary ? summary.dealFinancialSummary.netProfit.toFixed(0) : "0"} ₴</p>

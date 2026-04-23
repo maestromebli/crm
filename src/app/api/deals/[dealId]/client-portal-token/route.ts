@@ -21,7 +21,7 @@ export async function POST(_req: Request, ctx: Ctx) {
     const token = createClientPortalToken(dealId);
     return NextResponse.json({ token, url: `/client/${token}` });
   } catch (error) {
-    const msg = error instanceof Error ? error.message : "Token error";
+    const msg = error instanceof Error ? error.message : "Помилка створення токена";
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

@@ -5,7 +5,10 @@ import { useCallback, useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import type { PermissionKey, Role } from "@prisma/client";
 import { CRM_ROLES, ROLE_LABELS, type CrmRole } from "../../config/user-roles";
-import { ROLE_POLICY_SUMMARY_UK } from "../../lib/authz/role-access-policy";
+import {
+  ROLE_ACCESS_PROFILE_UK,
+  ROLE_POLICY_SUMMARY_UK,
+} from "../../lib/authz/role-access-policy";
 import { hasPermission } from "../../lib/authz/permissions";
 import type { MenuAccessState, NavSectionManifest } from "../../lib/navigation-access";
 import { patchJson as patchJsonRequest } from "../../lib/api/patch-json";
@@ -386,6 +389,11 @@ export function UserSettingsDetailClient({ userId }: { userId: string }) {
               {ROLE_POLICY_SUMMARY_UK[role as Role] ? (
                 <p className="text-[10px] leading-relaxed text-slate-500">
                   {ROLE_POLICY_SUMMARY_UK[role as Role]}
+                </p>
+              ) : null}
+              {ROLE_ACCESS_PROFILE_UK[role as Role] ? (
+                <p className="pt-1 text-[10px] font-medium text-sky-700">
+                  Профіль доступу: {ROLE_ACCESS_PROFILE_UK[role as Role]}
                 </p>
               ) : null}
             </div>

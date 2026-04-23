@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { DataTableShell } from "../../../components/shared/DataTableShell";
 import { CurrencyCell } from "../../../components/shared/CurrencyCell";
 import { PaymentPlanStatusBadge } from "./FinanceStatusBadge";
@@ -23,12 +22,9 @@ export function PaymentPlanTable({ rows, projectNameById }: Props) {
           <tr key={r.id} className="border-t border-slate-100">
             {showProject ? (
               <td className="px-3 py-2 text-slate-800">
-                <Link
-                  href={`/crm/finance/${r.projectId}`}
-                  className="font-medium text-blue-700 hover:underline"
-                >
+                <span className="font-medium text-slate-800">
                   {projectNameById?.[r.projectId] ?? r.projectId}
-                </Link>
+                </span>
               </td>
             ) : null}
             <td className="px-3 py-2 text-slate-800">{r.title}</td>
