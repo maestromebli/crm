@@ -19,6 +19,12 @@ import {
 import { deriveDealListWarningBadge } from "./deal-workspace-warnings";
 import { sanitizePipelineStageName } from "../../lib/crm-core/pipeline-stage-name";
 
+const prismaRecord = prisma as unknown as Record<string, unknown>;
+function prismaHasDelegate(name: string): boolean {
+  const delegate = prismaRecord[name];
+  return typeof delegate === "object" && delegate !== null;
+}
+
 /** Фільтр списку замовлень (бокове меню / статичні маршрути). */
 export type DealListViewId =
   | "all"
@@ -508,80 +514,85 @@ export async function getDealWorkspacePayload(
             },
           })
         : Promise.resolve(null),
-      prisma.projectSpec
-        .findFirst({
-          where: { dealId: deal.id },
-          select: {
-            id: true,
-            status: true,
-            currentVersionId: true,
-            currentVersion: {
+      prismaHasDelegate("projectSpec")
+        ? prisma.projectSpec
+            .findFirst({
+              where: { dealId: deal.id },
               select: {
-                versionNo: true,
+                id: true,
                 status: true,
-                approvalStage: true,
-                approvedAt: true,
-                isExecutionBaseline: true,
+                currentVersionId: true,
+                currentVersion: {
+                  select: {
+                    versionNo: true,
+                    status: true,
+                    approvalStage: true,
+                    approvedAt: true,
+                    isExecutionBaseline: true,
+                  },
+                },
               },
-            },
-          },
-          orderBy: { updatedAt: "desc" },
-        })
-        .catch((error) => {
-          if (
-            isMissingTableError(error, "ProjectSpec") ||
-            isMissingColumnError(error)
-          ) {
-            return null;
-          }
-          throw error;
-        }),
-      prisma.orderFinancialSnapshot
-        .findMany({
-          where: { dealId: deal.id },
-          orderBy: { snapshotDate: "desc" },
-          take: 20,
-          select: {
-            id: true,
-            orderId: true,
-            snapshotDate: true,
-            plannedRevenue: true,
-            actualRevenue: true,
-            plannedCost: true,
-            actualCost: true,
-            plannedMargin: true,
-            actualMargin: true,
-            source: true,
-            comment: true,
-            order: { select: { orderNumber: true } },
-          },
-        })
-        .catch((error) => {
-          if (
-            isMissingTableError(error, "OrderFinancialSnapshot") ||
-            isMissingColumnError(error)
-          ) {
-            return [];
-          }
-          throw error;
-        }),
+              orderBy: { updatedAt: "desc" },
+            })
+            .catch((error) => {
+              if (
+                isMissingTableError(error, "ProjectSpec") ||
+                isMissingColumnError(error)
+              ) {
+                return null;
+              }
+              throw error;
+            })
+        : Promise.resolve(null),
+      prismaHasDelegate("orderFinancialSnapshot")
+        ? prisma.orderFinancialSnapshot
+            .findMany({
+              where: { dealId: deal.id },
+              orderBy: { snapshotDate: "desc" },
+              take: 20,
+              select: {
+                id: true,
+                orderId: true,
+                snapshotDate: true,
+                plannedRevenue: true,
+                actualRevenue: true,
+                plannedCost: true,
+                actualCost: true,
+                plannedMargin: true,
+                actualMargin: true,
+                source: true,
+                comment: true,
+                order: { select: { orderNumber: true } },
+              },
+            })
+            .catch((error) => {
+              if (
+                isMissingTableError(error, "OrderFinancialSnapshot") ||
+                isMissingColumnError(error)
+              ) {
+                return [];
+              }
+              throw error;
+            })
+        : Promise.resolve([]),
     ]);
 
-    const handoffChecklistCounts = await prisma.dealHandoffChecklistItem
-      .aggregate({
+    const handoffChecklistCounts = await Promise.all([
+      prisma.dealHandoffChecklistItem.count({
         where: { handoffId: handoffRow.id },
-        _count: { _all: true, isRequired: true },
-      })
-      .then(async (agg) => {
-        const checkedRequiredCount = await prisma.dealHandoffChecklistItem.count({
-          where: { handoffId: handoffRow.id, isRequired: true, isChecked: true },
-        });
-        return {
-          totalCount: agg._count._all,
-          requiredCount: agg._count.isRequired ?? 0,
-          checkedRequiredCount,
-        };
-      })
+      }),
+      prisma.dealHandoffChecklistItem.count({
+        where: { handoffId: handoffRow.id, isRequired: true },
+      }),
+      prisma.dealHandoffChecklistItem.count({
+        where: { handoffId: handoffRow.id, isRequired: true, isChecked: true },
+      }),
+    ])
+      .then(([totalCount, requiredCount, checkedRequiredCount]) => ({
+        totalCount,
+        requiredCount,
+        checkedRequiredCount,
+      }))
       .catch((error) => {
         if (
           isMissingTableError(error, "DealHandoffChecklistItem") ||

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { SettingsShell } from "../../../../../components/settings/SettingsShell";
 import { SettingsCard } from "../../../../../components/settings/SettingsCard";
+import { IntegrationConnectionTest } from "../../../../../components/settings/IntegrationConnectionTest";
 import { P, requirePermissionForPage } from "../../../../../lib/authz/page-auth";
 
 export const metadata: Metadata = {
@@ -94,6 +95,16 @@ export default async function SettingsMetaTargetPage() {
           Адреса URL та verify token видаються після деплою API; у формі лід-форми вкажіть ту саму
           адресу, що налаштована в Meta.
         </div>
+      </SettingsCard>
+
+      <SettingsCard
+        title="Перевірка API"
+        description="Міні-тест перевіряє доступ до рекламного акаунта через Meta Graph API."
+      >
+        <IntegrationConnectionTest endpoint="/api/integrations/meta-target" />
+        <p className="mt-2 text-[11px] text-slate-600">
+          Ендпоінт тесту: <code className="rounded bg-slate-100 px-1">GET /api/integrations/meta-target</code>.
+        </p>
       </SettingsCard>
 
       <SettingsCard title="Чеклист запуску" description="Короткий порядок роботи з таргетом.">

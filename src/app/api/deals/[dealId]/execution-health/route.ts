@@ -14,6 +14,12 @@ import {
 
 type Ctx = { params: Promise<{ dealId: string }> };
 
+const prismaRecord = prisma as unknown as Record<string, unknown>;
+function prismaHasDelegate(name: string): boolean {
+  const delegate = prismaRecord[name];
+  return typeof delegate === "object" && delegate !== null;
+}
+
 function parseMeta(raw: unknown): Record<string, unknown> {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
   return raw as Record<string, unknown>;
@@ -81,24 +87,26 @@ export async function GET(_req: Request, ctx: Ctx) {
           comment: true,
         },
       }),
-      prisma.projectSpec.findFirst({
-        where: { dealId },
-        select: {
-          id: true,
-          status: true,
-          currentVersionId: true,
-          currentVersion: {
+      prismaHasDelegate("projectSpec")
+        ? prisma.projectSpec.findFirst({
+            where: { dealId },
             select: {
               id: true,
-              versionNo: true,
               status: true,
-              approvalStage: true,
-              approvedAt: true,
+              currentVersionId: true,
+              currentVersion: {
+                select: {
+                  id: true,
+                  versionNo: true,
+                  status: true,
+                  approvalStage: true,
+                  approvedAt: true,
+                },
+              },
             },
-          },
-        },
-        orderBy: { updatedAt: "desc" },
-      }),
+            orderBy: { updatedAt: "desc" },
+          })
+        : Promise.resolve(null),
     ]);
 
   const readyForHandoffBlockers = evaluateReadyForHandoffGate({

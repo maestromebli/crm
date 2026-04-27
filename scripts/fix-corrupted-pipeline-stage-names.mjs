@@ -17,7 +17,32 @@ const FALLBACK_STAGE_NAMES = {
   LEAD: {
     new: "Новий",
     working: "В роботі",
+    contact: "Контакт",
+    qualification: "Кваліфікація",
+    measurement: "Замір",
+    site_visit: "Виїзд на обʼєкт",
+    estimating: "Розрахунок",
+    calculation: "Розрахунок",
+    quote_draft: "Чернетка КП",
+    proposal_draft: "Чернетка КП",
+    quote_sent: "КП надіслано",
+    proposal_sent: "КП надіслано",
+    negotiating: "Узгодження",
+    approved: "Погоджено",
+    ready_convert: "Готово до замовлення",
+    proposal_approved: "КП погоджено",
+    quote_approved: "КП погоджено",
+    kp_approved: "КП погоджено",
+    agreed: "Узгоджено",
     qualified: "Розрахунок",
+    client: "Клієнт",
+    clients: "Клієнти",
+    control_measurement: "Контрольний замір",
+    contract: "Договір",
+    deal: "Замовлення",
+    production_ready: "Готово до виробництва",
+    handoff_ready: "Готово до передачі",
+    won: "Завершено",
     lost: "Закритий — втрата",
     archived: "Архів",
   },
@@ -57,19 +82,29 @@ async function main() {
   `);
 
   const candidates = result.rows
-    .filter((row) => isCorruptedDisplayText(row.name))
     .map((row) => {
-      const fallback =
-        FALLBACK_STAGE_NAMES[row.entity_type]?.[row.slug] ?? null;
-      return {
-        id: row.id,
-        entityType: row.entity_type,
-        slug: row.slug,
-        oldName: row.name,
-        newName: fallback,
-      };
+      const mapped = FALLBACK_STAGE_NAMES[row.entity_type]?.[row.slug] ?? null;
+      if (mapped && row.name !== mapped) {
+        return {
+          id: row.id,
+          entityType: row.entity_type,
+          slug: row.slug,
+          oldName: row.name,
+          newName: mapped,
+        };
+      }
+      if (isCorruptedDisplayText(row.name) && mapped) {
+        return {
+          id: row.id,
+          entityType: row.entity_type,
+          slug: row.slug,
+          oldName: row.name,
+          newName: mapped,
+        };
+      }
+      return null;
     })
-    .filter((row) => row.newName);
+    .filter(Boolean);
 
   if (candidates.length === 0) {
     console.log(JSON.stringify({ dryRun: DRY_RUN, updated: 0, rows: [] }, null, 2));

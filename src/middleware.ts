@@ -4,51 +4,25 @@ import {
   isExactNavPathAllowed,
   sanitizeMenuAccess,
 } from "./lib/navigation-access";
+import { isSessionExpiredByPolicy } from "./lib/auth/session-policy";
+
+const configuredNextAuthSecret = process.env.NEXTAUTH_SECRET?.trim();
+const nextAuthSecret =
+  (configuredNextAuthSecret && configuredNextAuthSecret.length > 0
+    ? configuredNextAuthSecret
+    : undefined) ??
+  (process.env.NODE_ENV === "development"
+    ? "dev-only-nextauth-secret-change-me"
+    : undefined);
 
 const REQUEST_ID_HEADER = "x-request-id";
 const CORRELATION_ID_HEADER = "x-correlation-id";
-
-function readPositiveIntEnv(name: string, fallback: number): number {
-  const raw = process.env[name];
-  if (!raw) return fallback;
-  const value = Number(raw);
-  if (!Number.isFinite(value) || value <= 0) return fallback;
-  return Math.floor(value);
-}
-
-const INACTIVITY_TIMEOUT_SECONDS = readPositiveIntEnv(
-  "AUTH_INACTIVITY_TIMEOUT_SECONDS",
-  60 * 60,
-);
-const DAILY_REAUTH_SECONDS = readPositiveIntEnv(
-  "AUTH_DAILY_REAUTH_SECONDS",
-  24 * 60 * 60,
-);
-
-function nowUnixSeconds(): number {
-  return Math.floor(Date.now() / 1000);
-}
 
 function isTokenSessionExpired(
   token: Record<string, unknown> | null | undefined,
 ): boolean {
   if (!token) return false;
-  if (typeof token.sessionExpiredAt === "number") return true;
-
-  const now = nowUnixSeconds();
-  const authenticatedAt =
-    typeof token.authenticatedAt === "number"
-      ? token.authenticatedAt
-      : now;
-  const lastActivityAt =
-    typeof token.lastActivityAt === "number"
-      ? token.lastActivityAt
-      : now;
-
-  return (
-    now - authenticatedAt > DAILY_REAUTH_SECONDS ||
-    now - lastActivityAt > INACTIVITY_TIMEOUT_SECONDS
-  );
+  return isSessionExpiredByPolicy(token);
 }
 
 function getOrCreateHeader(req: Request, headerName: string): string {
@@ -154,6 +128,7 @@ export default withAuth(
     return withTracingHeaders(req, NextResponse.next());
   },
   {
+    secret: nextAuthSecret,
     callbacks: {
       authorized: ({ token, req }) => {
         if (req.nextUrl.pathname === "/login") return true;

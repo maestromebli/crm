@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Moon, Sun } from "lucide-react";
 
 type ThemeMode = "dark" | "light";
@@ -17,14 +17,26 @@ function applyThemeMode(mode: ThemeMode) {
 }
 
 export function GlobalThemeToggle() {
-  const resolveInitialTheme = (): ThemeMode => {
-    if (typeof document === "undefined") return "light";
-    const htmlTheme = document.documentElement.getAttribute("data-theme");
-    return htmlTheme === "dark" || htmlTheme === "light" ? htmlTheme : "light";
-  };
+  const [theme, setTheme] = useState<ThemeMode>("light");
+  const readyToPersistThemeRef = useRef(false);
 
-  const [theme, setTheme] = useState<ThemeMode>(resolveInitialTheme);
   useEffect(() => {
+    const htmlTheme = document.documentElement.getAttribute("data-theme");
+    if (
+      (htmlTheme === "dark" || htmlTheme === "light") &&
+      htmlTheme !== "light"
+    ) {
+      queueMicrotask(() => {
+        readyToPersistThemeRef.current = true;
+        setTheme(htmlTheme);
+      });
+      return;
+    }
+    readyToPersistThemeRef.current = true;
+  }, []);
+
+  useEffect(() => {
+    if (!readyToPersistThemeRef.current) return;
     applyThemeMode(theme);
     try {
       window.localStorage.setItem(THEME_STORAGE_KEY, theme);

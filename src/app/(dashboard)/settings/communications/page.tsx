@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { SettingsShell } from "../../../../components/settings/SettingsShell";
 import { SettingsCard } from "../../../../components/settings/SettingsCard";
+import { IntegrationConnectionTest } from "../../../../components/settings/IntegrationConnectionTest";
 import { CommunicationsSettingsClient } from "./CommunicationsSettingsClient";
 
 export const metadata: Metadata = {
@@ -82,6 +83,44 @@ export default async function SettingsCommunicationsPage({
             розділі.
           </p>
         </div>
+      </SettingsCard>
+      <SettingsCard
+        title="Міні-тести підключень"
+        description="Швидка перевірка коректності ключів і доступу до API для поточного користувача."
+      >
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <IntegrationConnectionTest
+            endpoint="/api/integrations/telegram"
+            title="Telegram"
+          />
+          <IntegrationConnectionTest
+            endpoint="/api/integrations/whatsapp"
+            title="WhatsApp"
+          />
+          <IntegrationConnectionTest
+            endpoint="/api/integrations/instagram"
+            title="Instagram"
+          />
+          <IntegrationConnectionTest
+            endpoint="/api/integrations/viber"
+            title="Viber"
+          />
+          <IntegrationConnectionTest
+            endpoint="/api/integrations/sms"
+            title="SMS"
+          />
+          <IntegrationConnectionTest
+            endpoint="/api/integrations/phone"
+            title="Phone"
+          />
+        </div>
+        <p className="mt-2 text-[10px] text-slate-500">
+          Для детальної діагностики по каналах і співробітниках використовуйте сторінку{" "}
+          <Link href="/settings/communications/health" className="underline underline-offset-2">
+            /settings/communications/health
+          </Link>
+          .
+        </p>
       </SettingsCard>
       <CommunicationsSettingsClient />
     </SettingsShell>

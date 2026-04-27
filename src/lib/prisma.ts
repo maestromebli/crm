@@ -146,8 +146,16 @@ function prismaClientMatchesCurrentCodegen(client: PrismaClient): boolean {
  * хоча codegen у node_modules уже новий — тоді треба пересоздати клієнт (і в production).
  */
 function prismaSingletonHasRequiredDelegates(client: PrismaClient): boolean {
-  const c = client as unknown as { dealHandoff?: unknown };
-  return typeof c.dealHandoff !== "undefined";
+  const c = client as unknown as {
+    dealHandoff?: unknown;
+    projectSpec?: unknown;
+    orderFinancialSnapshot?: unknown;
+  };
+  return (
+    typeof c.dealHandoff !== "undefined" &&
+    typeof c.projectSpec !== "undefined" &&
+    typeof c.orderFinancialSnapshot !== "undefined"
+  );
 }
 
 async function resetPrismaSingletonHard(): Promise<void> {

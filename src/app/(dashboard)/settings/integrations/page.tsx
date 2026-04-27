@@ -16,6 +16,9 @@ export default async function SettingsIntegrationsPage() {
       title="Інтеграції"
       description="Підключення зовнішніх сервісів: пошта, календар, месенджери, Meta Ads (таргет), бухгалтерія, склад."
     >
+      <p className="text-[11px] text-slate-500">
+        Для кожної нової інтеграції обовʼязковий міні-тест підключення через API (кнопка перевірки на сторінці інтеграції).
+      </p>
       <SettingsCard
         title="Каталог"
         description="Статус зʼєднання, остання синхронізація, помилки."

@@ -3,12 +3,17 @@
 import { useEffect, useState } from "react";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
+import { Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { tryReadResponseJson } from "@/lib/http/read-response-json";
 
 export function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [hostHint, setHostHint] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const [emailValue, setEmailValue] = useState("");
+  const [passwordValue, setPasswordValue] = useState("");
+  const [capsLockOn, setCapsLockOn] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -79,15 +84,28 @@ export function LoginForm() {
     window.location.href = "/crm/dashboard";
   }
 
+  const completion = ((emailValue.trim() ? 1 : 0) + (passwordValue ? 1 : 0)) / 2;
+
   return (
-    <form className="space-y-5" onSubmit={onSubmit}>
+    <form className="login-auth-form space-y-5" onSubmit={onSubmit}>
       <div className="space-y-2">
-        <h2 className="text-lg font-semibold leading-tight text-[var(--enver-text)]">
-          Увійти в ENVER CRM
+        <h2 className="text-3xl font-semibold leading-tight text-[var(--enver-text)]">
+          Ласкаво просимо!
         </h2>
-        <p className="text-xs text-slate-500">
-          Керуйте лідами, проєктами та виробництвом з єдиного робочого місця.
+        <p className="text-sm text-slate-500">
+          Увійдіть у систему для продовження роботи
         </p>
+        <div className="space-y-1.5 pt-1">
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200/70">
+            <div
+              className="h-full rounded-full bg-amber-400 transition-all duration-300"
+              style={{ width: `${completion * 100}%` }}
+            />
+          </div>
+          <p className="text-[11px] text-slate-500">
+            Заповнення форми: {Math.round(completion * 100)}%
+          </p>
+        </div>
       </div>
 
       {hostHint ? (
@@ -102,89 +120,117 @@ export function LoginForm() {
         </div>
       ) : null}
 
-      <div className="space-y-3">
+      <div className="space-y-4">
         <div className="space-y-1.5">
           <label
             htmlFor="email"
-            className="block text-xs font-medium text-slate-700"
+            className="block text-sm font-medium text-slate-700"
           >
-            Ел. пошта
+            Email
           </label>
-          <input
-            id="email"
-            name="email"
-            type="email"
-            autoComplete="email"
-            required
-            defaultValue="admin@enver.com"
-            className="block w-full rounded-lg border border-slate-200 bg-[var(--enver-card)] px-3 py-2 text-sm text-[var(--enver-text)] shadow-sm outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
-            placeholder="admin@enver.com"
-          />
+          <div className="relative">
+            <input
+              id="email"
+              name="email"
+              type="email"
+              autoComplete="email"
+              required
+              value={emailValue}
+              onChange={(e) => setEmailValue(e.target.value)}
+              className="login-auth-input block w-full rounded-lg border border-slate-200 bg-[var(--enver-card)] py-2 pl-3 pr-10 text-sm text-[var(--enver-text)] shadow-sm outline-none transition"
+              placeholder="Введіть email"
+            />
+            <Mail className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          </div>
         </div>
 
         <div className="space-y-1.5">
           <label
             htmlFor="password"
-            className="block text-xs font-medium text-slate-700"
+            className="block text-sm font-medium text-slate-700"
           >
             Пароль
           </label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            autoComplete="current-password"
-            required
-            defaultValue="admin123"
-            className="block w-full rounded-lg border border-slate-200 bg-[var(--enver-card)] px-3 py-2 text-sm text-[var(--enver-text)] shadow-sm outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
-            placeholder="••••••••"
-          />
+          <div className="relative">
+            <input
+              id="password"
+              name="password"
+              type={passwordVisible ? "text" : "password"}
+              autoComplete="current-password"
+              required
+              value={passwordValue}
+              onChange={(e) => setPasswordValue(e.target.value)}
+              onKeyUp={(e) => setCapsLockOn(e.getModifierState("CapsLock"))}
+              onKeyDown={(e) => setCapsLockOn(e.getModifierState("CapsLock"))}
+              className="login-auth-input block w-full rounded-lg border border-slate-200 bg-[var(--enver-card)] py-2 pl-3 pr-16 text-sm text-[var(--enver-text)] shadow-sm outline-none transition"
+              placeholder="Введіть пароль"
+            />
+            <Lock className="pointer-events-none absolute right-10 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <button
+              type="button"
+              onClick={() => setPasswordVisible((value) => !value)}
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+              aria-label={passwordVisible ? "Сховати пароль" : "Показати пароль"}
+            >
+              {passwordVisible ? (
+                <EyeOff className="h-4 w-4" />
+              ) : (
+                <Eye className="h-4 w-4" />
+              )}
+            </button>
+          </div>
+          {capsLockOn ? (
+            <p className="text-[11px] text-amber-600">Caps Lock увімкнено</p>
+          ) : null}
         </div>
+      </div>
+
+      <div className="flex items-center justify-between text-xs">
+        <label className="inline-flex cursor-pointer items-center gap-2 text-slate-500">
+          <input
+            type="checkbox"
+            name="remember"
+            className="h-3.5 w-3.5 rounded border-slate-300 text-amber-500 focus:ring-amber-400"
+          />
+          <span>Запам&apos;ятати мене</span>
+        </label>
+        <button
+          type="button"
+          className="text-amber-500 transition hover:text-amber-400"
+        >
+          Забули пароль?
+        </button>
       </div>
 
       <button
         type="submit"
         disabled={pending}
-        className="inline-flex w-full items-center justify-center rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-sm shadow-slate-900/20 transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-50 disabled:opacity-60"
+        className="login-auth-submit inline-flex w-full items-center justify-center rounded-lg px-3 py-2.5 text-sm font-semibold text-white shadow-sm transition disabled:opacity-60"
       >
         {pending ? "Вхід…" : "Увійти"}
       </button>
 
-      <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-500">
-        <div className="mb-1 font-medium text-slate-600">
-          Облікові записи (після seed)
-        </div>
-        <div className="flex flex-col gap-1">
-          <span>
-            <strong>Адміністратор:</strong>{" "}
-            <code className="rounded bg-[var(--enver-card)] px-1">admin@enver.com</code> /{" "}
-            <code className="rounded bg-[var(--enver-card)] px-1">admin123</code>
-            <span className="text-slate-400"> — повний доступ</span>
-          </span>
-          <span>
-            <strong>Демо:</strong>{" "}
-            <code className="rounded bg-[var(--enver-card)] px-1">demo@enver.local</code> /{" "}
-            <code className="rounded bg-[var(--enver-card)] px-1">demo123</code>
-          </span>
-        </div>
-      </div>
-
       <p className="text-[11px] text-slate-400">
         Заходячи в систему, ви погоджуєтесь з{" "}
         <Link
-          href="#"
+          href="/terms"
           className="underline underline-offset-2 hover:text-slate-600"
         >
           умовами використання
         </Link>{" "}
         та{" "}
         <Link
-          href="#"
+          href="/privacy"
           className="underline underline-offset-2 hover:text-slate-600"
         >
           політикою конфіденційності
         </Link>
         .
+      </p>
+
+      <p className="text-center text-[11px] text-slate-500">
+        © 2026 <span className="text-amber-500">ENVER</span> CRM-ERP System OS.
+        Усі права захищено.
       </p>
     </form>
   );

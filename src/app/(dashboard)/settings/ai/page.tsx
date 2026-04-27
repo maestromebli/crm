@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { SettingsShell } from "../../../../components/settings/SettingsShell";
 import { SettingsCard } from "../../../../components/settings/SettingsCard";
+import { IntegrationConnectionTest } from "../../../../components/settings/IntegrationConnectionTest";
+import { SettingsSavePanel } from "../../../../components/settings/SettingsSavePanel";
+import { useRegistrySettings } from "../../../../components/settings/useRegistrySettings";
 
 type AiSettingsState = {
   apiKey: string;
@@ -27,54 +29,9 @@ const defaultAi: AiSettingsState = {
   risks: false,
 };
 
-function loadAiFromStorage(): AiSettingsState {
-  if (typeof window === "undefined") return defaultAi;
-  const raw = window.localStorage.getItem("enver_ai_settings");
-  if (!raw) return defaultAi;
-  try {
-    const parsed = JSON.parse(raw) as Partial<AiSettingsState>;
-    return {
-      ...defaultAi,
-      apiKey: typeof parsed.apiKey === "string" ? parsed.apiKey : defaultAi.apiKey,
-      baseUrl: typeof parsed.baseUrl === "string" ? parsed.baseUrl : defaultAi.baseUrl,
-      model: typeof parsed.model === "string" ? parsed.model : defaultAi.model,
-      leadSummary:
-        typeof parsed.leadSummary === "boolean"
-          ? parsed.leadSummary
-          : defaultAi.leadSummary,
-      dealSummary:
-        typeof parsed.dealSummary === "boolean"
-          ? parsed.dealSummary
-          : defaultAi.dealSummary,
-      inboxSummary:
-        typeof parsed.inboxSummary === "boolean"
-          ? parsed.inboxSummary
-          : defaultAi.inboxSummary,
-      nextSteps:
-        typeof parsed.nextSteps === "boolean"
-          ? parsed.nextSteps
-          : defaultAi.nextSteps,
-      risks: typeof parsed.risks === "boolean" ? parsed.risks : defaultAi.risks,
-    };
-  } catch {
-    return defaultAi;
-  }
-}
-
 export default function SettingsAiPage() {
-  const [cfg, setCfg] = useState<AiSettingsState>(() => loadAiFromStorage());
-  const [saving, setSaving] = useState(false);
-  const [savedHint, setSavedHint] = useState<string | null>(null);
-
-  const handleSave = () => {
-    if (typeof window === "undefined") return;
-    setSaving(true);
-    window.localStorage.setItem("enver_ai_settings", JSON.stringify(cfg));
-    setSavedHint("AI‑налаштування збережено локально.");
-    setTimeout(() => {
-      setSaving(false);
-    }, 300);
-  };
+  const { data: cfg, setData: setCfg, saving, savedAt, error, save } =
+    useRegistrySettings<AiSettingsState>("ai", defaultAi);
 
   return (
     <SettingsShell
@@ -129,6 +86,12 @@ export default function SettingsAiPage() {
           У реальній системі ці значення зберігаються як змінні
           середовища бекенду (`AI_API_KEY`, `AI_BASE_URL`, `AI_MODEL`).
         </p>
+        <div className="mt-3">
+          <IntegrationConnectionTest endpoint="/api/integrations/ai" />
+          <p className="mt-2 text-[10px] text-slate-500">
+            Ендпоінт тесту: <code className="rounded bg-slate-100 px-1">GET /api/integrations/ai</code>
+          </p>
+        </div>
       </SettingsCard>
 
       <SettingsCard
@@ -228,24 +191,12 @@ export default function SettingsAiPage() {
         </Link>
       </SettingsCard>
 
-      <div className="flex items-center justify-between pt-2 text-[11px]">
-        <p className="text-slate-500">
-          Ці налаштування зараз зберігаються лише локально у браузері.
-        </p>
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={saving}
-          className="rounded-full bg-slate-900 px-4 py-1.5 text-slate-50 shadow-sm shadow-slate-900/40 disabled:opacity-60"
-        >
-          {saving ? "Зберігаю…" : "Зберегти AI‑налаштування"}
-        </button>
-      </div>
-      {savedHint && (
-        <p className="pt-1 text-[10px] text-emerald-600">
-          {savedHint}
-        </p>
-      )}
+      <SettingsSavePanel
+        saving={saving}
+        savedAt={savedAt}
+        error={error}
+        onSave={() => void save()}
+      />
     </SettingsShell>
   );
 }

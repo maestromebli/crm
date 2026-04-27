@@ -3,49 +3,26 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "../prisma";
 import { refreshEffectiveUserFields } from "./jwt-effective-user";
+import {
+  isSessionExpiredByPolicy,
+  nowUnixSecondsSafe,
+  SESSION_POLICY,
+} from "./session-policy";
 
-function readPositiveIntEnv(name: string, fallback: number): number {
-  const raw = process.env[name];
-  if (!raw) return fallback;
-  const value = Number(raw);
-  if (!Number.isFinite(value) || value <= 0) return fallback;
-  return Math.floor(value);
-}
-
-const INACTIVITY_TIMEOUT_SECONDS = readPositiveIntEnv(
-  "AUTH_INACTIVITY_TIMEOUT_SECONDS",
-  60 * 60,
-);
-const DAILY_REAUTH_SECONDS = readPositiveIntEnv(
-  "AUTH_DAILY_REAUTH_SECONDS",
-  24 * 60 * 60,
-);
-
-function nowUnixSeconds(): number {
-  return Math.floor(Date.now() / 1000);
-}
-
-function isSessionExpiredByPolicy(token: {
-  authenticatedAt?: number;
-  lastActivityAt?: number;
-}): boolean {
-  const now = nowUnixSeconds();
-  const authenticatedAt =
-    typeof token.authenticatedAt === "number" ? token.authenticatedAt : now;
-  const lastActivityAt =
-    typeof token.lastActivityAt === "number" ? token.lastActivityAt : now;
-
-  return (
-    now - authenticatedAt > DAILY_REAUTH_SECONDS ||
-    now - lastActivityAt > INACTIVITY_TIMEOUT_SECONDS
-  );
-}
+const configuredNextAuthSecret = process.env.NEXTAUTH_SECRET?.trim();
+const nextAuthSecret =
+  (configuredNextAuthSecret && configuredNextAuthSecret.length > 0
+    ? configuredNextAuthSecret
+    : undefined) ??
+  (process.env.NODE_ENV === "development"
+    ? "dev-only-nextauth-secret-change-me"
+    : undefined);
 
 export const authOptions: NextAuthOptions = {
-  secret: process.env.NEXTAUTH_SECRET,
+  secret: nextAuthSecret,
   session: {
     strategy: "jwt",
-    maxAge: DAILY_REAUTH_SECONDS,
+    maxAge: SESSION_POLICY.dailyReauthSeconds,
   },
   pages: {
     signIn: "/login",
@@ -74,8 +51,12 @@ export const authOptions: NextAuthOptions = {
                 mode: "insensitive",
               },
             },
-            include: {
-              permissions: { include: { permission: true } },
+            select: {
+              id: true,
+              email: true,
+              name: true,
+              role: true,
+              passwordHash: true,
             },
           });
           if (!user) {
@@ -99,12 +80,34 @@ export const authOptions: NextAuthOptions = {
             return null;
           }
 
+          let permissionKeys: string[] = [];
+          if (user.role !== "SUPER_ADMIN") {
+            try {
+              const permissionRows = await prisma.permissionOnUser.findMany({
+                where: { userId: user.id },
+                select: {
+                  permission: {
+                    select: { key: true },
+                  },
+                },
+              });
+              permissionKeys = permissionRows.map((row) => String(row.permission.key));
+            } catch (permissionsError) {
+              if (process.env.NODE_ENV === "development") {
+                console.warn(
+                  "[auth] Не вдалося прочитати permissionOnUser, вхід продовжено з порожніми правами:",
+                  permissionsError,
+                );
+              }
+            }
+          }
+
           return {
             id: user.id,
             email: user.email,
             name: user.name ?? undefined,
             role: user.role,
-            permissionKeys: user.permissions.map((p) => p.permission.key),
+            permissionKeys,
           };
         } catch (e) {
           if (process.env.NODE_ENV === "development") {
@@ -118,7 +121,7 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     async jwt({ token, user, trigger, session }) {
-      const now = nowUnixSeconds();
+      const now = nowUnixSecondsSafe();
 
       if (user) {
         token.sub = user.id;
