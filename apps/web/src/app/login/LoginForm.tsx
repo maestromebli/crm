@@ -141,11 +141,11 @@ export function LoginForm({ devHint }: Props) {
 
       <p className="text-[11px] text-slate-400">
         Заходячи в систему, ви погоджуєтесь з{" "}
-        <Link href="#" className="underline underline-offset-2 hover:text-slate-600">
+        <Link href="/terms" className="underline underline-offset-2 hover:text-slate-600">
           умовами використання
         </Link>{" "}
         та{" "}
-        <Link href="#" className="underline underline-offset-2 hover:text-slate-600">
+        <Link href="/privacy" className="underline underline-offset-2 hover:text-slate-600">
           політикою конфіденційності
         </Link>
         .
