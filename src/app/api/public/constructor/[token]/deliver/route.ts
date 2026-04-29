@@ -5,6 +5,7 @@ import { isAttachmentUploadCategory } from "../../../../../../lib/attachments/up
 import { resolveDealUploaderUserId } from "../../../../../../lib/constructor-room/upload-attribution";
 import { appendActivityLog } from "../../../../../../lib/deal-api/audit";
 import { isAllowedPublicConstructorFileUrl } from "../../../../../../lib/constructor-room/public-file-url";
+import { requireRouteRateLimitByRequest } from "@/lib/api/rate-limit";
 
 type Ctx = { params: Promise<{ token: string }> };
 
@@ -26,6 +27,15 @@ export async function POST(req: Request, ctx: Ctx) {
   if (!token) {
     return NextResponse.json({ error: "Некоректне посилання" }, { status: 400 });
   }
+  const rateLimited = await requireRouteRateLimitByRequest({
+    req,
+    action: "public-constructor:deliver",
+    maxRequests: 40,
+    windowMinutes: 5,
+    fallbackSubjectType: "token",
+    fallbackSubjectValue: token,
+  });
+  if (rateLimited) return rateLimited;
 
   let body: {
     fileName?: string;

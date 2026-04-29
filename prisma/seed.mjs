@@ -3,6 +3,9 @@ import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import pg from "pg";
 import bcrypt from "bcryptjs";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 config({ path: ".env.local" });
 config();
@@ -17,70 +20,10 @@ const pool = new pg.Pool({ connectionString });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
-/** Узгоджено з `enum PermissionKey` у prisma/schema.prisma */
-const PERMISSION_KEYS = [
-  "DASHBOARD_VIEW",
-  "LEADS_VIEW",
-  "CONTACTS_VIEW",
-  "CALENDAR_VIEW",
-  "TASKS_VIEW",
-  "ORDERS_VIEW",
-  "PRODUCTS_VIEW",
-  "REPORTS_VIEW",
-  "REPORTS_EXPORT",
-  "NOTIFICATIONS_VIEW",
-  "ADMIN_PANEL_VIEW",
-  "SETTINGS_VIEW",
-  "LEADS_CREATE",
-  "LEADS_UPDATE",
-  "LEADS_ASSIGN",
-  "DEALS_VIEW",
-  "DEALS_CREATE",
-  "DEALS_UPDATE",
-  "DEALS_ASSIGN",
-  "DEALS_STAGE_CHANGE",
-  "TASKS_CREATE",
-  "TASKS_UPDATE",
-  "TASKS_ASSIGN",
-  "FILES_VIEW",
-  "FILES_UPLOAD",
-  "FILES_DELETE",
-  "ESTIMATES_VIEW",
-  "ESTIMATES_CREATE",
-  "ESTIMATES_UPDATE",
-  "QUOTES_CREATE",
-  "CONTRACTS_VIEW",
-  "CONTRACTS_CREATE",
-  "CONTRACTS_UPDATE",
-  "PAYMENTS_VIEW",
-  "PAYMENTS_UPDATE",
-  "COST_VIEW",
-  "MARGIN_VIEW",
-  "SETTINGS_MANAGE",
-  "USERS_VIEW",
-  "USERS_MANAGE",
-  "ROLES_MANAGE",
-  "AUDIT_LOG_VIEW",
-  "DEAL_WORKSPACE_VIEW",
-  "CONTRACT_VIEW",
-  "CONTRACT_EDIT",
-  "CONTRACT_APPROVE_INTERNAL",
-  "CONTRACT_SEND_SIGNATURE",
-  "FILE_UPLOAD",
-  "FILE_DELETE",
-  "READINESS_OVERRIDE_REQUEST",
-  "READINESS_OVERRIDE_APPROVE",
-  "HANDOFF_SUBMIT",
-  "HANDOFF_ACCEPT",
-  "PRODUCTION_LAUNCH",
-  "PRODUCTION_ORDERS_VIEW",
-  "PRODUCTION_ORDERS_MANAGE",
-  "PRODUCTION_ORCHESTRATION_VIEW",
-  "PRODUCTION_ORCHESTRATION_MANAGE",
-  "PAYMENT_CONFIRM",
-  "AI_USE",
-  "AI_ANALYTICS",
-];
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const contractPath = path.resolve(__dirname, "../config/rbac-role-policy.json");
+const RBAC_CONTRACT = JSON.parse(readFileSync(contractPath, "utf8"));
+const PERMISSION_KEYS = RBAC_CONTRACT.permissionKeys;
 
 /** Довідник матеріалів для пошуку в сметі (Viyar-стиль, локальний кеш). */
 async function ensureMaterialCatalog(prisma) {
@@ -245,175 +188,18 @@ async function grantAllPermissions(userId) {
   }
 }
 
-/** Головний менеджер: повний операційний контур без керування обліковими записами та аудиту. */
-const HEAD_MANAGER_EXCLUDED_KEYS = new Set([
-  "USERS_MANAGE",
-  "ROLES_MANAGE",
-  "AUDIT_LOG_VIEW",
-  "ADMIN_PANEL_VIEW",
-]);
-
-const WORKSHOP_BASE_KEYS = [
-  "DASHBOARD_VIEW",
-  "DEALS_VIEW",
-  "DEAL_WORKSPACE_VIEW",
-  "TASKS_VIEW",
-  "TASKS_UPDATE",
-  "PRODUCTION_ORDERS_VIEW",
-  "NOTIFICATIONS_VIEW",
-  "AI_USE",
-];
-
-const CUTTING_KEYS = [...WORKSHOP_BASE_KEYS, "FILES_VIEW"];
-const EDGING_KEYS = [...WORKSHOP_BASE_KEYS, "FILES_VIEW"];
-const DRILLING_KEYS = [...WORKSHOP_BASE_KEYS, "FILES_VIEW"];
-const ASSEMBLY_KEYS = [
-  ...WORKSHOP_BASE_KEYS,
-  "FILES_VIEW",
-  "FILES_UPLOAD",
-  "HANDOFF_ACCEPT",
-];
-const CONSTRUCTOR_KEYS = [
-  "DASHBOARD_VIEW",
-  "DEALS_VIEW",
-  "DEAL_WORKSPACE_VIEW",
-  "FILES_VIEW",
-  "FILES_UPLOAD",
-  "FILES_DELETE",
-  "FILE_UPLOAD",
-  "FILE_DELETE",
-  "TASKS_VIEW",
-  "TASKS_UPDATE",
-  "PRODUCTION_ORDERS_VIEW",
-  "PRODUCTION_ORCHESTRATION_VIEW",
-  "PRODUCTION_ORCHESTRATION_MANAGE",
-  "NOTIFICATIONS_VIEW",
-  "AI_USE",
-];
-
 function getDefaultPermissionKeysForRole(role) {
-  switch (role) {
-    case "SUPER_ADMIN":
-    case "DIRECTOR":
-    case "DIRECTOR_PRODUCTION":
-      return "ALL";
-    case "HEAD_MANAGER":
-    case "MANAGER":
-    case "TEAM_LEAD":
-      return PERMISSION_KEYS.filter((k) => !HEAD_MANAGER_EXCLUDED_KEYS.has(k));
-    case "ADMIN":
-      return PERMISSION_KEYS.filter((k) => k !== "ROLES_MANAGE");
-    case "SALES_MANAGER":
-    case "USER":
-      return [
-        "DASHBOARD_VIEW",
-        "LEADS_VIEW",
-        "LEADS_CREATE",
-        "LEADS_UPDATE",
-        "LEADS_ASSIGN",
-        "CONTACTS_VIEW",
-        "CALENDAR_VIEW",
-        "TASKS_VIEW",
-        "TASKS_CREATE",
-        "TASKS_UPDATE",
-        "TASKS_ASSIGN",
-        "DEALS_VIEW",
-        "DEALS_CREATE",
-        "DEALS_UPDATE",
-        "DEALS_ASSIGN",
-        "DEALS_STAGE_CHANGE",
-        "DEAL_WORKSPACE_VIEW",
-        "NOTIFICATIONS_VIEW",
-        "FILES_VIEW",
-        "FILES_UPLOAD",
-        "FILES_DELETE",
-        "FILE_UPLOAD",
-        "FILE_DELETE",
-        "ESTIMATES_VIEW",
-        "ESTIMATES_CREATE",
-        "ESTIMATES_UPDATE",
-        "QUOTES_CREATE",
-        "CONTRACTS_VIEW",
-        "CONTRACTS_CREATE",
-        "CONTRACTS_UPDATE",
-        "CONTRACT_VIEW",
-        "CONTRACT_EDIT",
-        "CONTRACT_SEND_SIGNATURE",
-        "PAYMENTS_VIEW",
-        "PAYMENTS_UPDATE",
-        "PAYMENT_CONFIRM",
-        "HANDOFF_SUBMIT",
-        "READINESS_OVERRIDE_REQUEST",
-        "PRODUCTION_LAUNCH",
-        "REPORTS_VIEW",
-        "ORDERS_VIEW",
-        "PRODUCTS_VIEW",
-        "AI_USE",
-      ];
-    case "MEASURER":
-      return [
-        "DASHBOARD_VIEW",
-        "LEADS_VIEW",
-        "CALENDAR_VIEW",
-        "TASKS_VIEW",
-        "NOTIFICATIONS_VIEW",
-        "AI_USE",
-      ];
-    case "PRODUCTION_WORKER":
-      return [
-        "DASHBOARD_VIEW",
-        "DEALS_VIEW",
-        "DEAL_WORKSPACE_VIEW",
-        "FILES_VIEW",
-        "FILES_UPLOAD",
-        "TASKS_VIEW",
-        "TASKS_UPDATE",
-        "PRODUCTION_ORDERS_VIEW",
-        "PRODUCTION_ORCHESTRATION_VIEW",
-        "NOTIFICATIONS_VIEW",
-        "AI_USE",
-      ];
-    case "CUTTING":
-      return CUTTING_KEYS;
-    case "EDGING":
-      return EDGING_KEYS;
-    case "DRILLING":
-      return DRILLING_KEYS;
-    case "ASSEMBLY":
-      return ASSEMBLY_KEYS;
-    case "CONSTRUCTOR":
-      return CONSTRUCTOR_KEYS;
-    case "ACCOUNTANT":
-      return [
-        ...PERMISSION_KEYS.filter(
-          (k) =>
-            !HEAD_MANAGER_EXCLUDED_KEYS.has(k) &&
-            k !== "LEADS_ASSIGN" &&
-            k !== "DEALS_ASSIGN",
-        ),
-        "AI_USE",
-      ];
-    case "PROCUREMENT_MANAGER":
-      return [
-        ...PERMISSION_KEYS.filter(
-          (k) =>
-            !HEAD_MANAGER_EXCLUDED_KEYS.has(k) &&
-            k !== "ROLES_MANAGE" &&
-            k !== "USERS_MANAGE",
-        ),
-        "AI_USE",
-        "AI_ANALYTICS",
-      ];
-    default:
-      return [
-        "DASHBOARD_VIEW",
-        "LEADS_VIEW",
-        "CONTACTS_VIEW",
-        "TASKS_VIEW",
-        "DEALS_VIEW",
-        "NOTIFICATIONS_VIEW",
-      ];
+  const rule = RBAC_CONTRACT.roleRules?.[role] ?? RBAC_CONTRACT.defaultRule;
+  if (!rule || !rule.mode) return [];
+  if (rule.mode === "ALL") return "ALL";
+  if (rule.mode === "ALL_EXCEPT") {
+    const excluded = new Set(rule.exclude ?? []);
+    return PERMISSION_KEYS.filter((key) => !excluded.has(key));
   }
+  if (rule.mode === "SET") {
+    return [...(RBAC_CONTRACT.namedPermissionSets?.[rule.set ?? ""] ?? [])];
+  }
+  return [];
 }
 
 async function grantPermissionsForRole(userId, role) {

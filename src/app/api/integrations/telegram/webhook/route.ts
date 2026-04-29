@@ -4,6 +4,7 @@ import { appendUnlinkedInbound } from "../../../../../lib/messaging/unlinked-inb
 import { seenInboundExternalId } from "../../../../../lib/messaging/webhook-security";
 import { markChannelHealth } from "../../../../../lib/messaging/communications-health";
 import { recordWorkflowEvent, WORKFLOW_EVENT_TYPES } from "@/features/event-system";
+import { requireRouteRateLimitByRequest } from "@/lib/api/rate-limit";
 
 type TelegramWebhook = {
   update_id?: number;
@@ -27,6 +28,16 @@ export async function POST(req: Request) {
     reqUrl.searchParams.get("userId")?.trim() ||
     req.headers.get("x-enver-owner-id")?.trim() ||
     null;
+  const rateLimited = await requireRouteRateLimitByRequest({
+    req,
+    action: "webhook:telegram:inbound",
+    maxRequests: 300,
+    windowMinutes: 5,
+    fallbackSubjectType: ownerHint ? "webhook" : "ip",
+    fallbackSubjectValue: ownerHint || null,
+  });
+  if (rateLimited) return rateLimited;
+
   const expectedSecret = process.env.TELEGRAM_WEBHOOK_SECRET?.trim();
   const providedSecret = req.headers.get("x-telegram-bot-api-secret-token")?.trim();
   if (expectedSecret && providedSecret !== expectedSecret) {

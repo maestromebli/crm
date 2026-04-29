@@ -28,6 +28,7 @@ type LoadPayload = {
   menuAccess: MenuAccessState | null;
   navManifest: NavSectionManifest[];
   canManage: boolean;
+  canManageCredentials: boolean;
   canAssignSuperAdmin: boolean;
 };
 
@@ -118,6 +119,22 @@ function mergeMenuAccess(
   return Object.keys(base).length > 0 ? base : null;
 }
 
+function getSectionMenuRule(
+  menuAccess: MenuAccessState | null | undefined,
+  sectionId: string,
+): "all" | string[] | undefined {
+  const rule = (menuAccess as Record<string, unknown> | null | undefined)?.[
+    sectionId
+  ];
+  if (rule === undefined) return undefined;
+  if (rule === "all") return "all";
+  if (rule === true) return "all";
+  if (Array.isArray(rule)) {
+    return rule.filter((id): id is string => typeof id === "string");
+  }
+  return undefined;
+}
+
 export function UserSettingsDetailClient({ userId }: { userId: string }) {
   const { update: updateSession } = useSession();
   const [tab, setTab] = useState<"general" | "access" | "extra">("general");
@@ -126,7 +143,10 @@ export function UserSettingsDetailClient({ userId }: { userId: string }) {
   const [data, setData] = useState<LoadPayload | null>(null);
 
   const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
   const [role, setRole] = useState<CrmRole>("SALES_MANAGER");
+  const [password, setPassword] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
   const [generalBusy, setGeneralBusy] = useState(false);
   const [generalMsg, setGeneralMsg] = useState<string | null>(null);
 
@@ -145,6 +165,7 @@ export function UserSettingsDetailClient({ userId }: { userId: string }) {
       }
       setData(j);
       setName(j.user.name?.trim() ?? "");
+      setEmail(j.user.email);
       setRole(j.user.role as CrmRole);
     } catch (err) {
       setLoadError(
@@ -181,14 +202,38 @@ export function UserSettingsDetailClient({ userId }: { userId: string }) {
 
   const onSaveGeneral = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!data?.canManage) return;
+    if (!data?.canManageCredentials) return;
     setGeneralMsg(null);
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedPassword = password.trim();
+    const normalizedPasswordConfirm = passwordConfirm.trim();
+    if (!normalizedEmail) {
+      setGeneralMsg("Логін (email) обов'язковий.");
+      return;
+    }
+    if (normalizedPassword && normalizedPassword.length < 8) {
+      setGeneralMsg("Пароль має містити щонайменше 8 символів.");
+      return;
+    }
+    if (normalizedPassword && normalizedPassword !== normalizedPasswordConfirm) {
+      setGeneralMsg("Підтвердження пароля не співпадає.");
+      return;
+    }
     setGeneralBusy(true);
     try {
-      await patchJson({
-        name: name.trim() || null,
-        role,
-      });
+      const payload: Record<string, unknown> = {
+        email: normalizedEmail,
+      };
+      if (data.canManage) {
+        payload.name = name.trim() || null;
+        payload.role = role;
+      }
+      if (normalizedPassword) {
+        payload.password = normalizedPassword;
+      }
+      await patchJson(payload);
+      setPassword("");
+      setPasswordConfirm("");
       setGeneralMsg("Збережено.");
     } catch (err) {
       setGeneralMsg(
@@ -211,7 +256,7 @@ export function UserSettingsDetailClient({ userId }: { userId: string }) {
     menuAccess: MenuAccessState | null,
   ) => {
     if (!parentAllowed(section.permission, keys)) return false;
-    const rule = menuAccess?.[section.id];
+    const rule = getSectionMenuRule(menuAccess, section.id);
     if (rule === undefined || rule === "all") return true;
     return rule.includes(subId);
   };
@@ -252,7 +297,7 @@ export function UserSettingsDetailClient({ userId }: { userId: string }) {
       const keys = data.permissionKeys;
       if (!parentAllowed(section.permission, keys)) return;
 
-      const rule = data.menuAccess?.[section.id];
+      const rule = getSectionMenuRule(data.menuAccess, section.id);
       let selected: Set<string>;
       if (rule === undefined || rule === "all") {
         selected = new Set(subIds);
@@ -362,10 +407,17 @@ export function UserSettingsDetailClient({ userId }: { userId: string }) {
               />
             </div>
             <div className="space-y-1">
-              <p className="text-[11px] text-slate-600">Ел. пошта</p>
-              <p className="rounded-md border border-slate-100 bg-slate-50 px-2 py-1.5 text-xs text-slate-800">
-                {d.user.email}
-              </p>
+              <label className="text-[11px] text-slate-600" htmlFor="ud-email">
+                Логін (email)
+              </label>
+              <input
+                id="ud-email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={!d.canManageCredentials}
+                className="w-full rounded-md border border-slate-200 bg-[var(--enver-card)] px-2 py-1.5 text-xs outline-none focus:border-slate-900 disabled:bg-slate-50"
+              />
             </div>
             <div className="space-y-1">
               <label className="text-[11px] text-slate-600" htmlFor="ud-role">
@@ -397,7 +449,37 @@ export function UserSettingsDetailClient({ userId }: { userId: string }) {
                 </p>
               ) : null}
             </div>
-            {d.canManage ? (
+            <div className="space-y-1">
+              <label className="text-[11px] text-slate-600" htmlFor="ud-password">
+                Новий пароль
+              </label>
+              <input
+                id="ud-password"
+                type="password"
+                autoComplete="new-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={!d.canManageCredentials}
+                placeholder="Залиште порожнім, якщо не змінюєте"
+                className="w-full rounded-md border border-slate-200 bg-[var(--enver-card)] px-2 py-1.5 text-xs outline-none focus:border-slate-900 disabled:bg-slate-50"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[11px] text-slate-600" htmlFor="ud-password-confirm">
+                Підтвердження пароля
+              </label>
+              <input
+                id="ud-password-confirm"
+                type="password"
+                autoComplete="new-password"
+                value={passwordConfirm}
+                onChange={(e) => setPasswordConfirm(e.target.value)}
+                disabled={!d.canManageCredentials}
+                placeholder="Повторіть новий пароль"
+                className="w-full rounded-md border border-slate-200 bg-[var(--enver-card)] px-2 py-1.5 text-xs outline-none focus:border-slate-900 disabled:bg-slate-50"
+              />
+            </div>
+            {d.canManageCredentials ? (
               <div className="flex items-center gap-2 pt-1">
                 <Button
                   type="submit"
@@ -418,6 +500,11 @@ export function UserSettingsDetailClient({ userId }: { userId: string }) {
                 Лише перегляд. Потрібне право USERS_MANAGE для змін.
               </p>
             )}
+            {d.canManageCredentials && !d.canManage ? (
+              <p className="text-[11px] text-slate-500">
+                Ви можете змінювати логін і пароль. Роль та доступи змінюються лише з правом USERS_MANAGE.
+              </p>
+            ) : null}
           </form>
         </SettingsCard>
       ) : null}

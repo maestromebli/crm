@@ -9,6 +9,7 @@ import { seenInboundExternalId } from "../../../../../lib/messaging/webhook-secu
 import { prisma } from "../../../../../lib/prisma";
 import { findUserIdByViberAuthToken } from "../../../../../lib/settings/communications-settings-store";
 import { markChannelHealth } from "../../../../../lib/messaging/communications-health";
+import { requireRouteRateLimitByRequest } from "@/lib/api/rate-limit";
 
 type ViberWebhookPayload = {
   event?: string;
@@ -24,6 +25,14 @@ type ViberWebhookPayload = {
 };
 
 export async function POST(req: Request) {
+  const rateLimited = await requireRouteRateLimitByRequest({
+    req,
+    action: "webhook:viber:inbound",
+    maxRequests: 300,
+    windowMinutes: 5,
+  });
+  if (rateLimited) return rateLimited;
+
   const expectedToken = process.env.VIBER_WEBHOOK_SECRET?.trim();
   const providedToken =
     req.headers.get("x-viber-auth-token")?.trim() ??

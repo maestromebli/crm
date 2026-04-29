@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { SETTINGS_ITEMS } from "../../config/settings";
+import { hasEffectivePermission, P } from "../../lib/authz/permissions";
 import { cn } from "../../lib/utils";
 
 type SettingsSectionListProps = {
@@ -13,13 +14,49 @@ export function SettingsSectionList({
   currentPath,
 }: SettingsSectionListProps) {
   const { data } = useSession();
-  const role = data?.user?.realRole ?? data?.user?.role;
-  const isSuperAdmin = role === "SUPER_ADMIN";
-  const isAdmin = isSuperAdmin || role === "ADMIN" || role === "DIRECTOR";
+  const role = data?.user?.realRole;
+  const impersonatorId = data?.user?.impersonatorId;
+  const permissionKeys = data?.user?.permissionKeys ?? [];
+
+  const canViewSettings = hasEffectivePermission(
+    permissionKeys,
+    P.SETTINGS_VIEW,
+    { realRole: role, impersonatorId },
+  );
 
   const visibleItems = SETTINGS_ITEMS.filter((item) => {
-    if (item.access === "super-admin") return isSuperAdmin;
-    return isAdmin;
+    if (!canViewSettings) return false;
+    if (item.path === "/settings/users") {
+      return hasEffectivePermission(permissionKeys, P.USERS_VIEW, {
+        realRole: role,
+        impersonatorId,
+      });
+    }
+    if (item.path === "/settings/permissions" || item.path === "/settings/integrations") {
+      return hasEffectivePermission(permissionKeys, P.ROLES_MANAGE, {
+        realRole: role,
+        impersonatorId,
+      });
+    }
+    if (item.path === "/settings/access-hierarchy") {
+      return hasEffectivePermission(permissionKeys, P.USERS_MANAGE, {
+        realRole: role,
+        impersonatorId,
+      });
+    }
+    if (item.path === "/settings/communications/users") {
+      return hasEffectivePermission(permissionKeys, P.USERS_VIEW, {
+        realRole: role,
+        impersonatorId,
+      });
+    }
+    if (item.path === "/settings/ai/admin") {
+      return hasEffectivePermission(permissionKeys, P.AI_ANALYTICS, {
+        realRole: role,
+        impersonatorId,
+      });
+    }
+    return true;
   });
 
   const sections = visibleItems.reduce<

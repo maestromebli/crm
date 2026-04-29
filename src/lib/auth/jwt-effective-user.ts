@@ -68,8 +68,7 @@ export async function refreshEffectiveUserFields(token: JWT): Promise<JWT> {
 
   if (
     (loginRole === "SUPER_ADMIN" ||
-      loginRole === "ADMIN" ||
-      loginRole === "DIRECTOR") &&
+      loginRole === "ADMIN") &&
     !impersonateId
   ) {
 

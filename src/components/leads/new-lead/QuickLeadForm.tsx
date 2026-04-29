@@ -166,17 +166,17 @@ export function QuickLeadForm({
         </label>
         <label className="block space-y-0.5">
           <span className="text-[11px] font-medium text-slate-700">
-            Номер замовлення<span className="text-rose-500">*</span>
+            Номер замовлення
           </span>
           <input
             className={inputClass}
             value={orderNumber}
             onChange={(e) => onOrderNumberChange(e.target.value)}
-            placeholder="ЕМ-1"
+            placeholder="ЕМ-1 (опційно)"
           />
         </label>
         <p className="text-[10px] text-slate-500">
-          Формат: ЕМ-1 ... ЕМ-200.
+          Якщо заповнюєте, формат: ЕМ-1 ... ЕМ-200.
         </p>
         {duplicateSlot}
         <p className="text-[10px] text-slate-500">

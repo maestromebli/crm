@@ -9,8 +9,12 @@ import { normalizeRole } from "./roles";
 /** Мінімальні поля для scope (без циклічного імпорту з api-guard). */
 export type ScopeUser = { id: string; role: string };
 
-/** Базові ролі менеджерів продажу (цільова видимість для HEAD_MANAGER). */
-const SALES_TEAM_ROLES = ["SALES_MANAGER", "USER"] as const;
+/** Лінія менеджерів продажу (включно з legacy MANAGER/USER). */
+const SALES_LINE_ROLES = [
+  "SALES_MANAGER",
+  "USER",
+  "MANAGER",
+] as const;
 const COMPANY_OPERATIONS_ROLES = [
   "DIRECTOR_PRODUCTION",
   "ACCOUNTANT",
@@ -57,11 +61,15 @@ export async function resolveAccessContext(
     };
   }
 
-  if (role === "HEAD_MANAGER" || role === "TEAM_LEAD") {
+  if (role === "HEAD_MANAGER") {
+    // Бізнес-вимога: головний менеджер бачить всю роботу по лідах/угодах/дашборду.
+    return { teamOwnerIdSet: null, measurerLeadIds: null };
+  }
+
+  if (role === "TEAM_LEAD") {
     const rows = await prisma.user.findMany({
       where: {
-        headManagerId: user.id,
-        role: { in: [...SALES_TEAM_ROLES] },
+        role: { in: [...SALES_LINE_ROLES] },
       },
       select: { id: true },
     });
@@ -127,7 +135,7 @@ export function ownerIdWhere(
 
 /**
  * Хто потрапляє в список користувачів у налаштуваннях.
- * SUPER_ADMIN / DIRECTOR — усі; HEAD_MANAGER — менеджери продажів + себе; інакше — лише себе.
+ * SUPER_ADMIN / DIRECTOR — усі; HEAD_MANAGER/TEAM_LEAD — лінія продажів + себе; інакше — лише себе.
  */
 export async function settingsUsersListWhere(
   prisma: PrismaClient,
@@ -137,11 +145,10 @@ export async function settingsUsersListWhere(
   if (role === "SUPER_ADMIN" || role === "DIRECTOR") {
     return undefined;
   }
-  if (role === "HEAD_MANAGER") {
+  if (role === "HEAD_MANAGER" || role === "TEAM_LEAD") {
     const rows = await prisma.user.findMany({
       where: {
-        headManagerId: user.id,
-        role: { in: [...SALES_TEAM_ROLES] },
+        role: { in: [...SALES_LINE_ROLES] },
       },
       select: { id: true },
     });

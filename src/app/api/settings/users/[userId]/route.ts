@@ -24,6 +24,7 @@ export const runtime = "nodejs";
 
 const patchBody = z
   .object({
+    email: z.string().trim().email().max(320).optional(),
     password: z.string().min(8).max(128).optional(),
     generatePassword: z.boolean().optional(),
     name: z.string().trim().max(200).optional().nullable(),
@@ -46,6 +47,11 @@ const patchBody = z
   );
 
 type Ctx = { params: Promise<{ userId: string }> };
+const CREDENTIALS_MANAGE_ROLE_NAMES = new Set([
+  "SUPER_ADMIN",
+  "ADMIN",
+  "DIRECTOR",
+]);
 
 export async function GET(_req: Request, ctx: Ctx) {
   try {
@@ -84,6 +90,8 @@ export async function GET(_req: Request, ctx: Ctx) {
         impersonatorId: sessionUser.impersonatorId,
       },
     );
+    const canManageCredentials =
+      canManage || CREDENTIALS_MANAGE_ROLE_NAMES.has(sessionUser.realRole);
 
     return NextResponse.json({
       user: {
@@ -96,6 +104,7 @@ export async function GET(_req: Request, ctx: Ctx) {
       menuAccess: sanitizeMenuAccess(target.menuAccess),
       navManifest: buildNavManifest(),
       canManage,
+      canManageCredentials,
       canAssignSuperAdmin: canAssignSuperAdminRole({
         realRole: sessionUser.realRole,
       }),
@@ -125,9 +134,21 @@ export async function PATCH(req: Request, ctx: Ctx) {
     const sessionUser = await requireSessionUser();
     if (sessionUser instanceof NextResponse) return sessionUser;
 
-    const denied = forbidUnlessPermission(sessionUser, P.USERS_MANAGE);
-    if (denied) return denied;
-
+    const canManageByPermission = hasEffectivePermission(
+      sessionUser.permissionKeys,
+      P.USERS_MANAGE,
+      {
+        realRole: sessionUser.realRole,
+        impersonatorId: sessionUser.impersonatorId,
+      },
+    );
+    const canManageByRole = CREDENTIALS_MANAGE_ROLE_NAMES.has(
+      sessionUser.realRole,
+    );
+    if (!canManageByPermission && !canManageByRole) {
+      const denied = forbidUnlessPermission(sessionUser, P.USERS_MANAGE);
+      if (denied) return denied;
+    }
     const { userId } = await ctx.params;
 
     let body: z.infer<typeof patchBody>;
@@ -135,6 +156,19 @@ export async function PATCH(req: Request, ctx: Ctx) {
       body = patchBody.parse(await req.json());
     } catch {
       return NextResponse.json({ error: "Некоректні дані" }, { status: 400 });
+    }
+    if (
+      !canManageByPermission &&
+      (body.name !== undefined ||
+        body.role !== undefined ||
+        body.menuAccess !== undefined ||
+        body.permissionKey !== undefined ||
+        body.permissionGranted !== undefined)
+    ) {
+      return NextResponse.json(
+        { error: "Недостатньо прав для редагування ролей/доступів" },
+        { status: 403 },
+      );
     }
 
     const listWhere = await settingsUsersListWhere(prisma, sessionUser);
@@ -195,6 +229,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
       });
 
       if (
+        body.email === undefined &&
         body.name === undefined &&
         body.role === undefined &&
         body.menuAccess === undefined &&
@@ -217,10 +252,17 @@ export async function PATCH(req: Request, ctx: Ctx) {
       );
     }
 
-    if (body.name !== undefined || body.role !== undefined) {
+    if (
+      body.email !== undefined ||
+      body.name !== undefined ||
+      body.role !== undefined
+    ) {
       await prisma.user.update({
         where: { id: userId },
         data: {
+          ...(body.email !== undefined
+            ? { email: body.email.trim().toLowerCase() }
+            : {}),
           ...(body.name !== undefined
             ? { name: body.name?.trim() || null }
             : {}),
@@ -284,7 +326,17 @@ export async function PATCH(req: Request, ctx: Ctx) {
       menuAccess: fresh ? sanitizeMenuAccess(fresh.menuAccess) : null,
     });
   } catch (err) {
-     
+    const code =
+      err && typeof err === "object" && "code" in err
+        ? (err as { code?: string }).code
+        : "";
+    if (code === "P2002") {
+      return NextResponse.json(
+        { error: "Користувач з таким логіном вже існує" },
+        { status: 409 },
+      );
+    }
+    
     console.error("[PATCH /api/settings/users/[userId]]", err);
     return NextResponse.json(
       {

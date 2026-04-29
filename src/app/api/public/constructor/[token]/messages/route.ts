@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../../../lib/prisma";
+import { requireRouteRateLimitByRequest } from "@/lib/api/rate-limit";
 
 type Ctx = { params: Promise<{ token: string }> };
 
@@ -16,6 +17,15 @@ export async function POST(req: Request, ctx: Ctx) {
   if (!token) {
     return NextResponse.json({ error: "Некоректне посилання" }, { status: 400 });
   }
+  const rateLimited = await requireRouteRateLimitByRequest({
+    req,
+    action: "public-constructor:messages:create",
+    maxRequests: 80,
+    windowMinutes: 5,
+    fallbackSubjectType: "token",
+    fallbackSubjectValue: token,
+  });
+  if (rateLimited) return rateLimited;
 
   let body: { body?: string };
   try {

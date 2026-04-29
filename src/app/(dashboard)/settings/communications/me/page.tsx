@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import { SettingsShell } from "../../../../../components/settings/SettingsShell";
 import { CommunicationsSettingsClient } from "../CommunicationsSettingsClient";
+import { P, requirePermissionForPage } from "../../../../../lib/authz/page-auth";
 
 export const metadata: Metadata = {
   title: "Мої канали звʼязку · ENVER CRM",
 };
 
-export default function SettingsMyCommunicationsPage() {
+export default async function SettingsMyCommunicationsPage() {
+  await requirePermissionForPage(P.NOTIFICATIONS_VIEW);
   return (
     <SettingsShell
       title="Мої канали звʼязку"

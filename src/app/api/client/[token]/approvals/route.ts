@@ -3,11 +3,21 @@ import { prisma } from "@/lib/prisma";
 import { verifyClientPortalToken } from "@/lib/client-portal/token";
 import { publishCrmEvent, CRM_EVENT_TYPES } from "@/lib/events/crm-events";
 import { recordWorkflowEvent, WORKFLOW_EVENT_TYPES } from "@/features/event-system";
+import { requireRouteRateLimitByRequest } from "@/lib/api/rate-limit";
 
 type Ctx = { params: Promise<{ token: string }> };
 
 export async function POST(req: Request, ctx: Ctx) {
   const { token } = await ctx.params;
+  const rateLimited = await requireRouteRateLimitByRequest({
+    req,
+    action: "client-portal:approvals:create",
+    maxRequests: 40,
+    windowMinutes: 5,
+    fallbackSubjectType: "token",
+    fallbackSubjectValue: token,
+  });
+  if (rateLimited) return rateLimited;
   const payload = verifyClientPortalToken(token);
   if (!payload) return NextResponse.json({ error: "Некоректний токен" }, { status: 401 });
 

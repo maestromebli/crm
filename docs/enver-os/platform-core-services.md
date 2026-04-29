@@ -11,6 +11,9 @@
   - writes activity logs with trace metadata (`requestId`, `correlationId`).
 - Idempotency claims: `src/lib/platform/idempotency.ts`
   - uses `DomainEvent.dedupeKey` for safe retried requests.
+- Route rate limiting: `src/lib/api/rate-limit.ts`
+  - centralizes per-endpoint throttle buckets (`user`, `ip`, `token`, `webhook`, `workspace`).
+  - emits `429` + `Retry-After` on exceeded limits.
 
 ## Pilot integration
 
@@ -25,3 +28,4 @@
 - Existing API contracts remain additive and backward-compatible.
 - Idempotency behavior is opt-in (header-based), so legacy clients are unchanged.
 - Cross-cutting services are introduced as wrappers over existing logic to avoid breakage.
+- Rate-limit policy and route coverage are documented in `docs/enver-os/rate-limit-policy.md`.

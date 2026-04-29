@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../../lib/prisma";
+import { requireRouteRateLimitByRequest } from "@/lib/api/rate-limit";
 
 type Ctx = { params: Promise<{ token: string }> };
 
-export async function GET(_req: Request, ctx: Ctx) {
+export async function GET(req: Request, ctx: Ctx) {
   if (!process.env.DATABASE_URL?.trim()) {
     return NextResponse.json(
       { error: "DATABASE_URL не задано" },
@@ -16,6 +17,15 @@ export async function GET(_req: Request, ctx: Ctx) {
   if (!token) {
     return NextResponse.json({ error: "Некоректне посилання" }, { status: 400 });
   }
+  const rateLimited = await requireRouteRateLimitByRequest({
+    req,
+    action: "public-constructor:workspace:view",
+    maxRequests: 90,
+    windowMinutes: 5,
+    fallbackSubjectType: "token",
+    fallbackSubjectValue: token,
+  });
+  if (rateLimited) return rateLimited;
 
   try {
     const room = await prisma.dealConstructorRoom.findFirst({

@@ -97,7 +97,7 @@ export function hasAnyPermission(
 }
 
 /**
- * Ураховує імпersonацію: SUPER_ADMIN/ADMIN/DIRECTOR без активної імпersonації проходять усі перевірки.
+ * Ураховує імпersonацію: лише SUPER_ADMIN/ADMIN без активної імпersonації проходять усі перевірки.
  * `impersonatorId` у сесії = id того, хто увійшов, коли показуємо іншого користувача.
  */
 export function hasEffectivePermission(
@@ -135,8 +135,7 @@ export function hasUnrestrictedPermissionScope(ctx: {
   if (impersonating) return false;
   return (
     ctx.realRole === "SUPER_ADMIN" ||
-    ctx.realRole === "ADMIN" ||
-    ctx.realRole === "DIRECTOR"
+    ctx.realRole === "ADMIN"
   );
 }
 

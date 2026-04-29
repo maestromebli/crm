@@ -23,6 +23,7 @@ import { resolveDefaultLeadStage } from "@/lib/leads/resolve-default-stage";
 import { ensureContactForLead } from "@/lib/leads/ensure-contact-from-lead";
 import { prisma } from "@/lib/prisma";
 import { requireDatabaseUrl } from "@/lib/api/route-guards";
+import { requireRouteRateLimit } from "@/lib/api/rate-limit";
 import { saveLeadUploadPrivate } from "@/lib/uploads/lead-disk-upload";
 import { CORE_EVENT_TYPES, publishEntityEvent } from "@/lib/events/crm-events";
 import { recordWorkflowEvent, WORKFLOW_EVENT_TYPES } from "@/features/event-system";
@@ -53,6 +54,14 @@ export async function POST(req: Request) {
 
   const denied = forbidUnlessPermission(user, P.LEADS_CREATE);
   if (denied) return denied;
+
+  const rateLimited = await requireRouteRateLimit({
+    action: "leads:create",
+    subject: { type: "user", value: user.id },
+    maxRequests: 30,
+    windowMinutes: 5,
+  });
+  if (rateLimited) return rateLimited;
 
   const sessionUserId = user.id;
 
@@ -167,21 +176,28 @@ export async function POST(req: Request) {
     body.orderNumber === null || body.orderNumber === undefined
       ? ""
       : String(body.orderNumber).trim().toUpperCase();
-  const orderNumberMatch = /^(?:ЕМ|EM)-([1-9]\d{0,2})$/u.exec(orderNumberRaw);
-  if (!orderNumberMatch) {
-    return NextResponse.json(
-      { error: "Номер замовлення має бути у форматі ЕМ-1 ... ЕМ-200" },
-      { status: 400 },
-    );
+  let orderNumber: string | null = null;
+  if (orderNumberRaw) {
+    const orderNumberMatch = /^(?:ЕМ|EM)-([1-9]\d{0,2})$/u.exec(orderNumberRaw);
+    if (!orderNumberMatch) {
+      return NextResponse.json(
+        { error: "Номер замовлення має бути у форматі ЕМ-1 ... ЕМ-200" },
+        { status: 400 },
+      );
+    }
+    const orderNumberValue = Number(orderNumberMatch[1]);
+    if (
+      !Number.isFinite(orderNumberValue) ||
+      orderNumberValue < 1 ||
+      orderNumberValue > 200
+    ) {
+      return NextResponse.json(
+        { error: "Номер замовлення має бути у діапазоні ЕМ-1 ... ЕМ-200" },
+        { status: 400 },
+      );
+    }
+    orderNumber = `ЕМ-${orderNumberValue}`;
   }
-  const orderNumberValue = Number(orderNumberMatch[1]);
-  if (!Number.isFinite(orderNumberValue) || orderNumberValue < 1 || orderNumberValue > 200) {
-    return NextResponse.json(
-      { error: "Номер замовлення має бути у діапазоні ЕМ-1 ... ЕМ-200" },
-      { status: 400 },
-    );
-  }
-  const orderNumber = `ЕМ-${orderNumberValue}`;
 
   const source =
     typeof body.source === "string" && body.source.trim()
@@ -498,7 +514,9 @@ export async function POST(req: Request) {
           contactsCount: companyContacts.length,
         };
       }
-      hubMeta.orderNumber = orderNumber;
+      if (orderNumber) {
+        hubMeta.orderNumber = orderNumber;
+      }
 
       const leadCreateData: Prisma.LeadUncheckedCreateInput = {
         title,

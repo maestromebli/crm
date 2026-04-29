@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { allocateDealNumber } from "@/lib/deals/deal-number";
 import type { SessionUser } from "@/lib/authz/api-guard";
+import { canAccessLead, resolveAccessContext } from "@/lib/authz/data-scope";
 import { calculatePricing } from "@/modules/leads/lead-pricing/ultra/engine/calculate-pricing";
 import type { PricingItemInput } from "@/modules/leads/lead-pricing/ultra/engine/types";
 import { toLeadHubSessionDto } from "../adapters/session-dto";
@@ -24,10 +25,23 @@ export async function getLeadHubSession(id: string, user: SessionUser) {
         },
         orderBy: { createdAt: "desc" },
       },
+      lead: {
+        select: {
+          id: true,
+          ownerId: true,
+        },
+      },
     },
   });
 
   if (!session) return null;
+  if (session.lead) {
+    const ctx = await resolveAccessContext(prisma, {
+      id: user.id,
+      role: user.dbRole,
+    });
+    if (!canAccessLead(ctx, session.lead)) return null;
+  }
   return toLeadHubSessionDto(
     { ...session, status: session.status as "DRAFT" | "ACTIVE" | "CONVERTED" | "ARCHIVED" },
     user,

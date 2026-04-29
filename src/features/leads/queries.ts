@@ -22,6 +22,7 @@ import {
 import { sanitizePipelineStageName } from "../../lib/crm-core/pipeline-stage-name";
 import {
   type AccessContext,
+  canAccessLead,
   canAccessOwner,
   leadWhereForAccess,
   ownerIdWhere,
@@ -643,7 +644,7 @@ export async function getLeadById(
       include: leadDetailInclude,
     });
     if (!row) return null;
-    if (!canAccessOwner(ctx, row.ownerId)) return null;
+    if (!canAccessLead(ctx, { id: row.id, ownerId: row.ownerId })) return null;
 
     const { pipeline: pFull, deals } = row;
     const pipeline = {

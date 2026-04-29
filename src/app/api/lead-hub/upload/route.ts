@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireSessionUser, forbidUnlessPermission } from "@/lib/authz/api-guard";
 import { P } from "@/lib/authz/permissions";
+import { requireRouteRateLimitByRequest } from "@/lib/api/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -38,6 +39,15 @@ export async function POST(req: Request) {
 
   const denied = forbidUnlessPermission(user, P.FILES_UPLOAD);
   if (denied) return denied;
+
+  const rateLimited = await requireRouteRateLimitByRequest({
+    req,
+    action: "lead-hub:upload",
+    preferredUserId: user.id,
+    maxRequests: 60,
+    windowMinutes: 5,
+  });
+  if (rateLimited) return rateLimited;
 
   const contentType = req.headers.get("content-type")?.toLowerCase() ?? "";
 

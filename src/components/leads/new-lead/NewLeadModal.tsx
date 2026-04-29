@@ -307,8 +307,11 @@ export function NewLeadModal({
     if (!src) {
       return { error: "Оберіть джерело зі списку." as const };
     }
-    const normalizedOrderNumber = normalizeLeadOrderNumber(orderNumber);
-    if (!normalizedOrderNumber) {
+    const rawOrderNumber = orderNumber.trim();
+    const normalizedOrderNumber = rawOrderNumber
+      ? normalizeLeadOrderNumber(rawOrderNumber)
+      : null;
+    if (rawOrderNumber && !normalizedOrderNumber) {
       return {
         error:
           "Вкажіть номер замовлення у форматі ЕМ-1 ... ЕМ-200." as const,
@@ -381,7 +384,9 @@ export function NewLeadModal({
         if (p.ph) fd.append("phone", p.ph);
         fd.append("email", p.email);
         fd.append("source", p.src);
-        fd.append("orderNumber", p.normalizedOrderNumber);
+        if (p.normalizedOrderNumber) {
+          fd.append("orderNumber", p.normalizedOrderNumber);
+        }
         if (p.note) fd.append("note", p.note);
         fd.append("ownerId", p.oid);
         if (p.designerId) fd.append("designerUserId", p.designerId);

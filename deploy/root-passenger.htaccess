@@ -1,0 +1,5 @@
+PassengerEnabled on
+PassengerAppType node
+PassengerAppRoot /home/hq237786/public_html
+PassengerStartupFile app.js
+PassengerBaseURI /

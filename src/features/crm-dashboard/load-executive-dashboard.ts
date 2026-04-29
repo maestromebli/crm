@@ -54,6 +54,7 @@ const ProductionIssueStatus = { OPEN: "OPEN" } as const;
 import type { SessionAccess } from "../../lib/authz/session-access";
 import { sessionUserFromAccess } from "../../lib/authz/session-access";
 import {
+  canAccessOwner,
   calendarEventWhere,
   leadWhereForAccess,
   ownerIdWhere,
@@ -348,9 +349,10 @@ export async function loadExecutiveDashboard(
     ? await taskListWhereForUser(prisma, sessionUser)
     : null;
 
-  const managerFilter = query.managerId
-    ? { ownerId: query.managerId }
-    : undefined;
+  const managerFilter =
+    query.managerId && canAccessOwner(ctx, query.managerId)
+      ? { ownerId: query.managerId }
+      : undefined;
   const leadWhere: Prisma.LeadWhereInput = {
     ...leadBase,
     ...(managerFilter ? { ownerId: managerFilter.ownerId } : {}),

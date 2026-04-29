@@ -3,6 +3,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "../prisma";
 import { refreshEffectiveUserFields } from "./jwt-effective-user";
+import { enforceRouteRateLimit } from "../api/rate-limit";
 import {
   isSessionExpiredByPolicy,
   nowUnixSecondsSafe,
@@ -38,10 +39,32 @@ export const authOptions: NextAuthOptions = {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
-      async authorize(credentials) {
+      async authorize(credentials, req) {
         const email = credentials?.email?.trim().toLowerCase();
         const password = credentials?.password;
         if (!email || !password) return null;
+        const forwardedHeader = req?.headers?.["x-forwarded-for"];
+        const clientIp =
+          typeof forwardedHeader === "string"
+            ? forwardedHeader.split(",")[0]?.trim() || "unknown-ip"
+            : "unknown-ip";
+        const authRateLimit = await enforceRouteRateLimit({
+          action: "auth:credentials:signin",
+          subject: {
+            type: "token",
+            value: `${email}|${clientIp}`,
+          },
+          maxRequests: 20,
+          windowMinutes: 15,
+        });
+        if (!authRateLimit.allowed) {
+          if (process.env.NODE_ENV === "development") {
+            console.warn(
+              `[auth] Rate limit exceeded for ${email} (${clientIp}), retryAfter=${authRateLimit.retryAfterSec}s`,
+            );
+          }
+          return null;
+        }
 
         try {
           const user = await prisma.user.findFirst({

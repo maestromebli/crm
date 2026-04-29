@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../../../lib/prisma";
 import { resolveAttachmentAbsolutePath } from "../../../../../../lib/uploads/lead-disk-upload";
+import { requireRouteRateLimitByRequest } from "@/lib/api/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -12,7 +13,7 @@ type Ctx = {
 /**
  * Публічне завантаження файлу проєкту для кімнати конструктора (без логіну).
  */
-export async function GET(_req: Request, ctx: Ctx) {
+export async function GET(req: Request, ctx: Ctx) {
   if (!process.env.DATABASE_URL?.trim()) {
     return NextResponse.json(
       { error: "DATABASE_URL не задано" },
@@ -26,6 +27,15 @@ export async function GET(_req: Request, ctx: Ctx) {
   if (!t || !aid) {
     return NextResponse.json({ error: "Некоректний запит" }, { status: 400 });
   }
+  const rateLimited = await requireRouteRateLimitByRequest({
+    req,
+    action: "public-constructor:attachment:download",
+    maxRequests: 120,
+    windowMinutes: 5,
+    fallbackSubjectType: "token",
+    fallbackSubjectValue: t,
+  });
+  if (rateLimited) return rateLimited;
 
   const room = await prisma.dealConstructorRoom.findFirst({
     where: { publicToken: t },

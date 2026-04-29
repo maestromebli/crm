@@ -56,6 +56,11 @@ export async function PATCH(req: Request, ctx: Ctx) {
     );
   }
 
+  const scopedSession = await getLeadHubSession(id, user);
+  if (!scopedSession) {
+    return NextResponse.json({ error: "Сесію lead hub не знайдено" }, { status: 404 });
+  }
+
   const deal = await convertLeadHubToDeal({
     sessionId: id,
     pipelineId: body.pipelineId,

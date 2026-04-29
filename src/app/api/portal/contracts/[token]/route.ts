@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hashShareToken, mapContractDetails } from "@/lib/contracts/service";
+import { requireRouteRateLimitByRequest } from "@/lib/api/rate-limit";
 
 type Ctx = { params: Promise<{ token: string }> };
 
@@ -14,8 +15,17 @@ function toPortalError(status: number, message: string) {
   return NextResponse.json({ ok: false, error: message }, { status });
 }
 
-export async function GET(_req: Request, ctx: Ctx) {
+export async function GET(req: Request, ctx: Ctx) {
   const { token } = await ctx.params;
+  const rateLimited = await requireRouteRateLimitByRequest({
+    req,
+    action: "portal:contract:view",
+    maxRequests: 60,
+    windowMinutes: 5,
+    fallbackSubjectType: "token",
+    fallbackSubjectValue: token,
+  });
+  if (rateLimited) return rateLimited;
   const tokenHash = hashShareToken(token);
   const share = await (prisma as any).dealContractShareLink.findUnique({
     where: { tokenHash },

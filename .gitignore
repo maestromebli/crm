@@ -48,6 +48,8 @@ package-lock.json
 # Local / temp dirs (розгортання, тимчасові витяжки)
 .tmp-*/
 .tmp-*
+.tmp_remote/
+deploy/*.zip
 
 # IDE (опційно; розкоментуйте якщо не хочете шарити)
 # .vscode

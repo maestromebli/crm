@@ -48,23 +48,16 @@ export function AppHeader({
   sidebarCompact = false,
   onToggleSidebar,
 }: AppHeaderProps = {}) {
-  const resolveInitialTheme = (): ThemeMode => {
-    if (typeof document === "undefined") return "light";
-    const htmlTheme = document.documentElement.getAttribute("data-theme");
-    return htmlTheme === "dark" || htmlTheme === "light" ? htmlTheme : "light";
-  };
-
   const reduceMotion = useReducedMotion();
   const [animationsReady, setAnimationsReady] = useState(false);
   const pathname = usePathname();
   const { data: session } = useSession();
   /** Radix Sheet генерує aria-controls на клієнті; SSR дає інші id → гідратаційний розрив без defer. */
   const [mobileNavMounted, setMobileNavMounted] = useState(false);
+  const [themeReady, setThemeReady] = useState(false);
   const [alertsUnread, setAlertsUnread] = useState(0);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
-  const [theme, setTheme] = useState<ThemeMode>(() => {
-    return resolveInitialTheme();
-  });
+  const [theme, setTheme] = useState<ThemeMode>("light");
   const shouldAnimate = animationsReady && !reduceMotion;
   const canViewAlerts = Boolean(
     session?.user?.permissionKeys?.includes("NOTIFICATIONS_VIEW"),
@@ -122,9 +115,24 @@ export function AppHeader({
   }, []);
 
   useEffect(() => {
+    const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
+    const htmlTheme = document.documentElement.getAttribute("data-theme");
+    const resolvedTheme: ThemeMode =
+      storedTheme === "dark" || storedTheme === "light"
+        ? storedTheme
+        : htmlTheme === "dark" || htmlTheme === "light"
+          ? htmlTheme
+          : "light";
+    setTheme(resolvedTheme);
+    applyTheme(resolvedTheme);
+    setThemeReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!themeReady) return;
     applyTheme(theme);
     window.localStorage.setItem(THEME_STORAGE_KEY, theme);
-  }, [theme]);
+  }, [theme, themeReady]);
 
   const toggleTheme = () => {
     setTheme((prev) => (prev === "dark" ? "light" : "dark"));

@@ -12,6 +12,7 @@ import {
 import { prisma } from "../../../../../lib/prisma";
 import { findUserIdByWhatsappPhoneNumberId } from "../../../../../lib/settings/communications-settings-store";
 import { markChannelHealth } from "../../../../../lib/messaging/communications-health";
+import { requireRouteRateLimitByRequest } from "@/lib/api/rate-limit";
 
 type WhatsAppMessage = {
   id?: string;
@@ -53,6 +54,14 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const rateLimited = await requireRouteRateLimitByRequest({
+    req,
+    action: "webhook:whatsapp:inbound",
+    maxRequests: 300,
+    windowMinutes: 5,
+  });
+  if (rateLimited) return rateLimited;
+
   const rawBody = await req.text();
   const signature = req.headers.get("x-hub-signature-256");
   const validSignature = verifyMetaSignature({

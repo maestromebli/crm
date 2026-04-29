@@ -4,6 +4,7 @@ import { SettingsShell } from "../../../../components/settings/SettingsShell";
 import { SettingsCard } from "../../../../components/settings/SettingsCard";
 import { IntegrationConnectionTest } from "../../../../components/settings/IntegrationConnectionTest";
 import { CommunicationsSettingsClient } from "./CommunicationsSettingsClient";
+import { P, requirePermissionForPage } from "../../../../lib/authz/page-auth";
 
 export const metadata: Metadata = {
   title: "Месенджери та телефонія · ENVER CRM",
@@ -30,6 +31,7 @@ export default async function SettingsCommunicationsPage({
 }: {
   searchParams?: Promise<{ instagramOAuth?: string; reason?: string }>;
 }) {
+  await requirePermissionForPage(P.SETTINGS_VIEW);
   const params = await searchParams;
   const oauthState = params?.instagramOAuth;
   const oauthReason = params?.reason;

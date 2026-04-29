@@ -9,6 +9,7 @@ import {
   seenInboundExternalId,
   verifyMetaSignature,
 } from "@/lib/messaging/webhook-security";
+import { requireRouteRateLimitByRequest } from "@/lib/api/rate-limit";
 
 type InstagramMessageEvent = {
   sender?: { id?: string; username?: string };
@@ -59,6 +60,14 @@ function parseTextEvents(payload: InstagramWebhookPayload): Array<{
 }
 
 export async function GET(req: Request) {
+  const verificationRateLimited = await requireRouteRateLimitByRequest({
+    req,
+    action: "webhook:instagram:verify",
+    maxRequests: 90,
+    windowMinutes: 5,
+  });
+  if (verificationRateLimited) return verificationRateLimited;
+
   const url = new URL(req.url);
   const mode = url.searchParams.get("hub.mode");
   const token = url.searchParams.get("hub.verify_token");
@@ -76,6 +85,14 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const rateLimited = await requireRouteRateLimitByRequest({
+    req,
+    action: "webhook:instagram:inbound",
+    maxRequests: 300,
+    windowMinutes: 5,
+  });
+  if (rateLimited) return rateLimited;
+
   const rawBody = await req.text();
   const signature = req.headers.get("x-hub-signature-256");
   const cfg = await getCommunicationsConfig();

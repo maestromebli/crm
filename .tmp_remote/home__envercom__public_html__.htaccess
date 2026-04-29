@@ -1,0 +1,5 @@
+PassengerEnabled on
+PassengerAppType node
+PassengerAppRoot /home/envercom/public_html
+PassengerStartupFile app.js
+PassengerBaseURI /

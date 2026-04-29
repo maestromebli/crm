@@ -75,16 +75,19 @@ export function LoginForm() {
           /* ignore */
         }
       }
+      const isCredentialsError =
+        res.error === "CredentialsSignin" || res.status === 401;
       setError(
-        "Невірний email або пароль, або зламався крок входу (CSRF / JWT). Перевірте admin@enver.com / admin123. Також: у .env.local той самий DATABASE_URL + перезапуск pnpm dev; pnpm db:check-admin." +
-          extra,
+        isCredentialsError
+          ? "Невірний email або пароль. Перевірте розкладку клавіатури, Caps Lock і введіть дані ще раз." +
+              extra
+          : "Зламався крок входу (CSRF/JWT/host/cookie). Перевірте NEXTAUTH_URL, NEXTAUTH_SECRET, адресу в браузері та перезапустіть pnpm dev." +
+              extra,
       );
       return;
     }
     window.location.href = "/crm/dashboard";
   }
-
-  const completion = ((emailValue.trim() ? 1 : 0) + (passwordValue ? 1 : 0)) / 2;
 
   return (
     <form className="login-auth-form space-y-5" onSubmit={onSubmit}>
@@ -95,17 +98,6 @@ export function LoginForm() {
         <p className="text-sm text-slate-500">
           Увійдіть у систему для продовження роботи
         </p>
-        <div className="space-y-1.5 pt-1">
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200/70">
-            <div
-              className="h-full rounded-full bg-amber-400 transition-all duration-300"
-              style={{ width: `${completion * 100}%` }}
-            />
-          </div>
-          <p className="text-[11px] text-slate-500">
-            Заповнення форми: {Math.round(completion * 100)}%
-          </p>
-        </div>
       </div>
 
       {hostHint ? (

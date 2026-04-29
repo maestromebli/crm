@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { randomBytes } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { hashShareToken } from "@/lib/contracts/service";
+import { requireRouteRateLimitByRequest } from "@/lib/api/rate-limit";
 
 type Ctx = { params: Promise<{ token: string }> };
 
@@ -10,8 +11,17 @@ function providerMode() {
   return mode === "diia" ? "diia" : "mock";
 }
 
-export async function POST(_req: Request, ctx: Ctx) {
+export async function POST(req: Request, ctx: Ctx) {
   const { token } = await ctx.params;
+  const rateLimited = await requireRouteRateLimitByRequest({
+    req,
+    action: "portal:contract:sign-start",
+    maxRequests: 20,
+    windowMinutes: 5,
+    fallbackSubjectType: "token",
+    fallbackSubjectValue: token,
+  });
+  if (rateLimited) return rateLimited;
   const tokenHash = hashShareToken(token);
   const share = await (prisma as any).dealContractShareLink.findUnique({
     where: { tokenHash },

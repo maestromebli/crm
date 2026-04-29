@@ -88,10 +88,11 @@ export function hasCompanyOperationsScope(role: EffectiveRole): boolean {
   return (
     role === "SUPER_ADMIN" ||
     role === "DIRECTOR" ||
+    role === "HEAD_MANAGER" ||
     role === "DIRECTOR_PRODUCTION" ||
-    role === "TEAM_LEAD" ||
     role === "PROCUREMENT_MANAGER" ||
-    role === "ACCOUNTANT"
+    role === "ACCOUNTANT" ||
+    role === "PRODUCTION_WORKER"
   );
 }
 

@@ -5,200 +5,57 @@
  * За замовчуванням лише показує diff (dry-run).
  *   pnpm realign:permissions
  *   pnpm realign:permissions -- --email=demo@enver.local
- * Запис у БД:
+ * Запис у БД (гібридний режим за замовчуванням):
  *   pnpm realign:permissions -- --apply --email=user@x.com
  *   pnpm realign:permissions -- --apply --all --yes
+ *
+ * Повне жорстке вирівнювання (з видаленням зайвих override-прав):
+ *   pnpm realign:permissions -- --apply --strict --email=user@x.com
+ *   pnpm realign:permissions -- --apply --strict --all --yes
  */
 import { config } from "dotenv";
 import pg from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 config({ path: ".env.local" });
 config();
 
-// --- sync with src/lib/authz/role-access-policy.ts ---
-const ALL_PERMISSION_KEYS = [
-  "DASHBOARD_VIEW",
-  "LEADS_VIEW",
-  "CONTACTS_VIEW",
-  "CALENDAR_VIEW",
-  "TASKS_VIEW",
-  "ORDERS_VIEW",
-  "PRODUCTS_VIEW",
-  "REPORTS_VIEW",
-  "REPORTS_EXPORT",
-  "NOTIFICATIONS_VIEW",
-  "ADMIN_PANEL_VIEW",
-  "SETTINGS_VIEW",
-  "LEADS_CREATE",
-  "LEADS_UPDATE",
-  "LEADS_ASSIGN",
-  "DEALS_VIEW",
-  "DEALS_CREATE",
-  "DEALS_UPDATE",
-  "DEALS_ASSIGN",
-  "DEALS_STAGE_CHANGE",
-  "TASKS_CREATE",
-  "TASKS_UPDATE",
-  "TASKS_ASSIGN",
-  "FILES_VIEW",
-  "FILES_UPLOAD",
-  "FILES_DELETE",
-  "ESTIMATES_VIEW",
-  "ESTIMATES_CREATE",
-  "ESTIMATES_UPDATE",
-  "QUOTES_CREATE",
-  "CONTRACTS_VIEW",
-  "CONTRACTS_CREATE",
-  "CONTRACTS_UPDATE",
-  "PAYMENTS_VIEW",
-  "PAYMENTS_UPDATE",
-  "COST_VIEW",
-  "MARGIN_VIEW",
-  "SETTINGS_MANAGE",
-  "USERS_VIEW",
-  "USERS_MANAGE",
-  "ROLES_MANAGE",
-  "AUDIT_LOG_VIEW",
-  "DEAL_WORKSPACE_VIEW",
-  "CONTRACT_VIEW",
-  "CONTRACT_EDIT",
-  "CONTRACT_APPROVE_INTERNAL",
-  "CONTRACT_SEND_SIGNATURE",
-  "FILE_UPLOAD",
-  "FILE_DELETE",
-  "READINESS_OVERRIDE_REQUEST",
-  "READINESS_OVERRIDE_APPROVE",
-  "HANDOFF_SUBMIT",
-  "HANDOFF_ACCEPT",
-  "PRODUCTION_LAUNCH",
-  "PAYMENT_CONFIRM",
-  "AI_USE",
-  "AI_ANALYTICS",
-];
-
-const HEAD_MANAGER_EXCLUDED = new Set([
-  "USERS_MANAGE",
-  "ROLES_MANAGE",
-  "AUDIT_LOG_VIEW",
-  "ADMIN_PANEL_VIEW",
-]);
-
-const OPERATIONAL_ADMIN_EXCLUDED = new Set(["ROLES_MANAGE"]);
-
-const SALES_MANAGER_PERMISSION_KEYS = [
-  "DASHBOARD_VIEW",
-  "LEADS_VIEW",
-  "LEADS_CREATE",
-  "LEADS_UPDATE",
-  "LEADS_ASSIGN",
-  "CONTACTS_VIEW",
-  "CALENDAR_VIEW",
-  "TASKS_VIEW",
-  "TASKS_CREATE",
-  "TASKS_UPDATE",
-  "TASKS_ASSIGN",
-  "DEALS_VIEW",
-  "DEALS_CREATE",
-  "DEALS_UPDATE",
-  "DEALS_ASSIGN",
-  "DEALS_STAGE_CHANGE",
-  "DEAL_WORKSPACE_VIEW",
-  "NOTIFICATIONS_VIEW",
-  "FILES_VIEW",
-  "FILES_UPLOAD",
-  "FILES_DELETE",
-  "FILE_UPLOAD",
-  "FILE_DELETE",
-  "ESTIMATES_VIEW",
-  "ESTIMATES_CREATE",
-  "ESTIMATES_UPDATE",
-  "QUOTES_CREATE",
-  "CONTRACTS_VIEW",
-  "CONTRACTS_CREATE",
-  "CONTRACTS_UPDATE",
-  "CONTRACT_VIEW",
-  "CONTRACT_EDIT",
-  "CONTRACT_SEND_SIGNATURE",
-  "PAYMENTS_VIEW",
-  "PAYMENTS_UPDATE",
-  "PAYMENT_CONFIRM",
-  "HANDOFF_SUBMIT",
-  "READINESS_OVERRIDE_REQUEST",
-  "PRODUCTION_LAUNCH",
-  "REPORTS_VIEW",
-  "ORDERS_VIEW",
-  "PRODUCTS_VIEW",
-  "AI_USE",
-];
-
-const MEASURER_PERMISSION_KEYS = [
-  "DASHBOARD_VIEW",
-  "LEADS_VIEW",
-  "CALENDAR_VIEW",
-  "TASKS_VIEW",
-  "NOTIFICATIONS_VIEW",
-  "AI_USE",
-];
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const contractPath = path.resolve(__dirname, "../config/rbac-role-policy.json");
+const RBAC_CONTRACT = JSON.parse(readFileSync(contractPath, "utf8"));
+const ALL_PERMISSION_KEYS = RBAC_CONTRACT.permissionKeys;
 
 /**
  * @param {string} role
  * @returns {{ mode: "ALL" } | { mode: "KEYS", keys: string[] }}
  */
 function getDefaultPermissionModeForRole(role) {
-  switch (role) {
-    case "SUPER_ADMIN":
-    case "DIRECTOR":
-      return { mode: "ALL" };
-    case "HEAD_MANAGER":
-    case "MANAGER":
-      return {
-        mode: "KEYS",
-        keys: ALL_PERMISSION_KEYS.filter((k) => !HEAD_MANAGER_EXCLUDED.has(k)),
-      };
-    case "ADMIN":
-      return {
-        mode: "KEYS",
-        keys: ALL_PERMISSION_KEYS.filter((k) => !OPERATIONAL_ADMIN_EXCLUDED.has(k)),
-      };
-    case "SALES_MANAGER":
-    case "USER":
-      return { mode: "KEYS", keys: [...SALES_MANAGER_PERMISSION_KEYS] };
-    case "MEASURER":
-      return { mode: "KEYS", keys: [...MEASURER_PERMISSION_KEYS] };
-    case "ACCOUNTANT": {
-      const keys = new Set(
-        ALL_PERMISSION_KEYS.filter(
-          (k) =>
-            !HEAD_MANAGER_EXCLUDED.has(k) &&
-            k !== "LEADS_ASSIGN" &&
-            k !== "DEALS_ASSIGN",
-        ),
-      );
-      keys.add("AI_USE");
-      return { mode: "KEYS", keys: [...keys].sort() };
-    }
-    case "PROCUREMENT_MANAGER": {
-      const keys = new Set(
-        ALL_PERMISSION_KEYS.filter(
-          (k) =>
-            !HEAD_MANAGER_EXCLUDED.has(k) &&
-            k !== "ROLES_MANAGE" &&
-            k !== "USERS_MANAGE",
-        ),
-      );
-      keys.add("AI_USE");
-      keys.add("AI_ANALYTICS");
-      return { mode: "KEYS", keys: [...keys].sort() };
-    }
-    default:
-      return { mode: "KEYS", keys: [...SALES_MANAGER_PERMISSION_KEYS] };
+  const rule = RBAC_CONTRACT.roleRules?.[role] ?? RBAC_CONTRACT.defaultRule;
+  if (!rule || !rule.mode) {
+    return { mode: "KEYS", keys: [] };
   }
+  if (rule.mode === "ALL") return { mode: "ALL" };
+  if (rule.mode === "ALL_EXCEPT") {
+    const excluded = new Set(rule.exclude ?? []);
+    return {
+      mode: "KEYS",
+      keys: ALL_PERMISSION_KEYS.filter((key) => !excluded.has(key)),
+    };
+  }
+  if (rule.mode === "SET") {
+    const fromSet = RBAC_CONTRACT.namedPermissionSets?.[rule.set ?? ""];
+    return { mode: "KEYS", keys: [...(fromSet ?? [])] };
+  }
+  return { mode: "KEYS", keys: [] };
 }
 
 function parseArgs(argv) {
   let apply = false;
+  let strict = false;
   let all = false;
   let yes = false;
   /** @type {string | undefined} */
@@ -207,12 +64,13 @@ function parseArgs(argv) {
   let userId;
   for (const a of argv) {
     if (a === "--apply") apply = true;
+    else if (a === "--strict") strict = true;
     else if (a === "--all") all = true;
     else if (a === "--yes") yes = true;
     else if (a.startsWith("--email=")) email = a.slice("--email=".length);
     else if (a.startsWith("--user-id=")) userId = a.slice("--user-id=".length);
   }
-  return { apply, all, yes, email, userId };
+  return { apply, strict, all, yes, email, userId };
 }
 
 const url = process.env.DATABASE_URL?.trim();
@@ -252,15 +110,17 @@ async function resolveExpectedPermissionIds(prisma, spec) {
 }
 
 try {
-  const { apply, all, yes, email, userId } = parseArgs(process.argv.slice(2));
+  const { apply, strict, all, yes, email, userId } = parseArgs(process.argv.slice(2));
 
   if (!all && !email && !userId) {
     console.log(`Використання:
   pnpm realign:permissions -- --email=user@company.com     # dry-run одного
   pnpm realign:permissions -- --user-id=cuid               # dry-run
   pnpm realign:permissions -- --all                        # dry-run усіх
-  pnpm realign:permissions -- --apply --email=user@x.com     # запис
-  pnpm realign:permissions -- --apply --all --yes            # запис усім (потрібно --yes)
+  pnpm realign:permissions -- --apply --email=user@x.com     # запис (гібрид: додає missing, не чіпає extras)
+  pnpm realign:permissions -- --apply --all --yes            # запис усім (гібрид)
+  pnpm realign:permissions -- --apply --strict --email=user@x.com
+  pnpm realign:permissions -- --apply --strict --all --yes   # жорстко: baseline-only
 
 Без --apply лише показує різницю з політикою ролі (role-access-policy).`);
     process.exit(1);
@@ -345,21 +205,33 @@ try {
     );
 
     if (apply && changed) {
-      await prisma.$transaction([
-        prisma.permissionOnUser.deleteMany({ where: { userId: u.id } }),
-        prisma.permissionOnUser.createMany({
-          data: expectedIds.map((permissionId) => ({ userId: u.id, permissionId })),
-          skipDuplicates: true,
-        }),
-      ]);
-      console.log("  ✓ оновлено в БД");
+      if (strict) {
+        await prisma.$transaction([
+          prisma.permissionOnUser.deleteMany({ where: { userId: u.id } }),
+          prisma.permissionOnUser.createMany({
+            data: expectedIds.map((permissionId) => ({ userId: u.id, permissionId })),
+            skipDuplicates: true,
+          }),
+        ]);
+        console.log("  ✓ strict baseline застосовано (extras видалено)");
+      } else {
+        const missingIds = expectedIds.filter((id) => !currentIdSet.has(id));
+        if (missingIds.length > 0) {
+          await prisma.permissionOnUser.createMany({
+            data: missingIds.map((permissionId) => ({ userId: u.id, permissionId })),
+            skipDuplicates: true,
+          });
+        }
+        console.log("  ✓ hybrid baseline застосовано (extras збережено)");
+      }
     } else if (apply && !changed) {
       console.log("  (без змін)");
     }
   }
 
   if (!apply) {
-    console.log("\nЦе dry-run. Для запису додайте --apply (для --all також --yes).");
+    console.log("\nЦе dry-run. Для hybrid-запису додайте --apply (для --all також --yes).");
+    console.log("Для strict baseline (із видаленням extras) додайте --strict.");
   }
 } finally {
   await prisma.$disconnect();

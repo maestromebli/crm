@@ -21,3 +21,10 @@ Run after each platform rollout (internal cohort first).
 
 ## Governance
 - Confirm workflow governance endpoint responds: `/api/crm/workflow-governance`.
+
+## Security and Abuse Guard
+- Confirm portal token API rate limit triggers `429`:
+  - run `tests/e2e/contracts-portal-public-rate-limit.spec.ts`.
+- Confirm quick lead create works without `orderNumber`:
+  - run `tests/e2e/leads-quick-create-no-order-number.spec.ts`.
+- Confirm `Retry-After` header is present on throttled responses.

@@ -109,7 +109,7 @@ export function isExactNavPathAllowed(
   pathname: string,
   menuAccess: MenuAccessState | null | undefined,
 ): boolean {
-  // Якщо явно не налаштовано menuAccess — використовуємо інші механізми доступу (permissions/page guards).
+  // Якщо menuAccess не задано — використовуємо тільки permission/page guards.
   if (!menuAccess || Object.keys(menuAccess).length === 0) {
     return true;
   }
@@ -118,8 +118,8 @@ export function isExactNavPathAllowed(
   if (!target) return true;
 
   const rule = menuAccess[target.sectionId];
-  // За наявності menuAccess це strict allowlist: не вказано секцію -> заборонено.
-  if (rule === undefined) return false;
+  // Невказані секції не обмежуємо: доступ визначається permission/page guards.
+  if (rule === undefined) return true;
 
   if (rule === "all") return true;
 
@@ -175,8 +175,8 @@ export function filterNavSubItemsForUser(
 
   if (!menuAccess) return [...byPermissions];
   const rule = menuAccess[sectionId];
-  // За наявності menuAccess це strict allowlist: не вказано секцію -> не показуємо.
-  if (rule === undefined) return [];
+  // Невказані секції не обмежуємо: показуємо за permission-моделлю.
+  if (rule === undefined) return [...byPermissions];
   if (rule === "all") return [...byPermissions];
   const allow = new Set(rule);
   return byPermissions.filter((s) => allow.has(s.id));

@@ -2,13 +2,14 @@ import { NextResponse } from "next/server";
 import { ensureLeadProposalFirstViewRecorded } from "../../../../../lib/leads/mark-proposal-first-view";
 import { parseProposalSnapshot } from "../../../../../lib/leads/proposal-snapshot";
 import { prisma } from "../../../../../lib/prisma";
+import { requireRouteRateLimitByRequest } from "@/lib/api/rate-limit";
 
 type Ctx = { params: Promise<{ token: string }> };
 
 /**
  * Публічні дані КП за токеном (без авторизації). Перегляд фіксує `viewedAt` один раз.
  */
-export async function GET(_req: Request, ctx: Ctx) {
+export async function GET(req: Request, ctx: Ctx) {
   if (!process.env.DATABASE_URL?.trim()) {
     return NextResponse.json(
       { error: "Недоступно" },
@@ -20,6 +21,15 @@ export async function GET(_req: Request, ctx: Ctx) {
   if (!token?.trim()) {
     return NextResponse.json({ error: "Некоректний токен" }, { status: 400 });
   }
+  const rateLimited = await requireRouteRateLimitByRequest({
+    req,
+    action: "public-proposal:view",
+    maxRequests: 120,
+    windowMinutes: 5,
+    fallbackSubjectType: "token",
+    fallbackSubjectValue: token,
+  });
+  if (rateLimited) return rateLimited;
 
   const proposal = await prisma.leadProposal.findFirst({
     where: { publicToken: token.trim() },
